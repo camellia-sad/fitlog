@@ -60,6 +60,14 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    override fun onStart() {
+        super.onStart()
+        (application as FitLogApplication).container.sharing.foreground.value = true
+    }
+    override fun onStop() {
+        (application as FitLogApplication).container.sharing.foreground.value = false
+        super.onStop()
+    }
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)

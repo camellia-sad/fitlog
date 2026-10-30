@@ -50,6 +50,9 @@ class FriendsViewModel(private val repository: FriendsRepository) : ViewModel() 
     }
     fun saveProfile(name:String,bio:String)=execute { repository.saveProfile(name,bio); message.value="资料已保存" }
     fun saveNote(id:String,note:String)=execute { repository.saveNote(id,note); friends.value=repository.friends(); message.value="备注已保存" }
+    suspend fun repositorySharing() = repository.sharing()
+    suspend fun updateSharing(value:SharingPreferences) = repository.saveSharing(value)
+    suspend fun unblock(id:String) = repository.act(id,"unblock")
     fun signOut()=execute { repository.signOut(); friends.value=emptyList(); found.value=null; codeSent.value=false }
     class Factory(private val repository:FriendsRepository):ViewModelProvider.Factory {
         override fun <T:ViewModel> create(modelClass:Class<T>):T {

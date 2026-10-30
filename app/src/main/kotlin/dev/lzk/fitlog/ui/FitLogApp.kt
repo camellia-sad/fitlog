@@ -40,6 +40,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route ?: "home"
     val snackbars = remember { SnackbarHostState() }
+    var socialSubpage by remember { mutableStateOf(false) }
     var finishing by rememberSaveable { mutableStateOf(false) }
     var pendingTemplateExit by rememberSaveable { mutableStateOf<String?>(null) }
     var resumeWorkoutAfterExit by rememberSaveable { mutableStateOf(false) }
@@ -106,7 +107,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
         containerColor = MaterialTheme.colorScheme.background, contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbars) },
         bottomBar = {
-            if (route in listOf("home", "library", "friends", "settings")) NavigationBar(
+            if (route in listOf("home", "library", "friends", "settings") && !(route=="friends" && socialSubpage)) NavigationBar(
                 modifier = Modifier.testTag("main-navigation"), containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                 val destinations = listOf("home" to "主页", "library" to "动作", "friends" to "好友", "settings" to "设置")
                 destinations.forEachIndexed { index, (destination, label) ->
@@ -142,6 +143,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                     } else goWorkout() })
             }
             composable("workout") {
+                LaunchedEffect(state.selectedExercise?.id) { container.social.selectTrainingExercise(state.selectedExercise?.id) }
                 WorkoutScreen(state, model, onBack = { model.setPaused(true); nav.popBackStack("home", false) }, onAdd = { nav.navigate("library") }, onFinish = { finishing = true })
             }
             composable("templates") { TemplateScreen(templates, state.workout == null, onBack = { nav.popBackStack() }, onExitEditor = { requestTemplateExit("template-list", false) }) { selectedTemplateId = it; selectionChanged = true; nav.popBackStack("home", false) } }
@@ -151,7 +153,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             }
             composable("friends") {
                 val friendsModel: FriendsViewModel = viewModel(factory = FriendsViewModel.Factory(container.friends))
-                FriendsScreen(friendsModel)
+                FriendsScreen(friendsModel,container.social,container.sharing) {socialSubpage=it}
             }
             composable("settings") { SettingsScreen(settings) }
         }

@@ -26,6 +26,7 @@ class WorkoutTimerService : Service() {
         }
         if (monitor == null) monitor = scope.launch {
             val container = (application as FitLogApplication).container
+            container.sharing.trainingService.value = true
             container.ready.await()
             container.workouts.observeActiveWorkout().collectLatest { workout ->
                 if (workout == null) { stopForeground(STOP_FOREGROUND_REMOVE); stopSelf(); return@collectLatest }
@@ -53,7 +54,7 @@ class WorkoutTimerService : Service() {
             .setContentIntent(content).setOngoing(true).setOnlyAlertOnce(true).setShowWhen(true)
             .setCategory(Notification.CATEGORY_SERVICE).build()
     }
-    override fun onDestroy() { scope.cancel(); super.onDestroy() }
+    override fun onDestroy() { (application as FitLogApplication).container.sharing.trainingService.value = false; scope.cancel(); super.onDestroy() }
     companion object {
         const val OPEN_WORKOUT = "open_workout"
         const val CHANNEL = "workout_timer"

@@ -62,6 +62,9 @@ class RoomTrainingRepository(private val database: FitLogDatabase, private val c
 
     override suspend fun deleteTemplate(id: String) = database.withTransaction { dao.deleteTemplate(id) }
 
+    suspend fun sharingPage(before: Long = Long.MAX_VALUE, beforeId: String = "~"): List<Workout> =
+        dao.sharingPage(before, beforeId).map { it.toDomain() }
+
     override fun observeHistory(from: LocalDate, to: LocalDate) =
         dao.observeHistory(from.toString(), to.toString()).map { rows -> rows.map { it.toDomain() } }
 

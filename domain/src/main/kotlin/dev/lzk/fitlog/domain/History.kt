@@ -14,6 +14,13 @@ interface HistoryRepository {
     fun observeExerciseHistory(exerciseId: String): Flow<List<Workout>>
 }
 
+fun Workout.historyStatus(): String = when (session.status) {
+    SessionStatus.FINISHED -> if (allSetsCompleted) "已完成" else "未完成"
+    SessionStatus.ACTIVE -> "进行中 · 未完成"
+    SessionStatus.PAUSED -> "已暂停 · 未完成"
+    SessionStatus.DISCARDED -> "已放弃"
+}
+
 object TrainingHistory {
     fun statistics(workouts: List<Workout>): TrainingStatistics {
         val finished = workouts.filter { it.session.status == SessionStatus.FINISHED && it.completedSetCount > 0 }

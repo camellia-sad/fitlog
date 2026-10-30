@@ -15,7 +15,7 @@ import javax.net.ssl.HttpsURLConnection
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 
-class SupabaseFriendsRepository(context: Context, private val baseUrl: String, private val publicKey: String,
+open class SupabaseFriendsRepository(context: Context, private val baseUrl: String, private val publicKey: String,
     namespace: String = "fitlog") : FriendsRepository {
     override val configured = runCatching {
         val uri = URI(baseUrl)
@@ -52,7 +52,9 @@ class SupabaseFriendsRepository(context: Context, private val baseUrl: String, p
         val array = JSONArray(authorized("/rest/v1/rpc/list_fitlog_friends", "POST", JSONObject()))
         return (0 until array.length()).map { index ->
             val item = array.getJSONObject(index)
-            Friend(decodeProfile(item), item.optString("note"), item.getString("status") == "accepted", item.getBoolean("incoming"))
+            Friend(decodeProfile(item), item.optString("note"), item.getString("status") == "accepted", item.getBoolean("incoming"),
+                PresenceStatus.from(item.optString("presence")), item.optString("presence_updated_at").toSocialInstant(),
+                item.optString("last_message").takeIf {it.isNotBlank() && it!="null"}, item.optString("last_message_at").toSocialInstant(), item.optInt("unread"))
         }
     }
     override suspend fun find(fitlogId: String): SocialProfile? {
@@ -86,9 +88,11 @@ class SupabaseFriendsRepository(context: Context, private val baseUrl: String, p
         catch (_: IOException) { }
         Unit
     }
-    private fun requireProfileId() = requireNotNull(profile.value?.id) { "请先登录" }
-    private suspend fun authorized(path: String, method: String = "GET", body: JSONObject? = null, prefer: String? = null): String =
-        lock.withLock {
+    protected fun requireProfileId() = requireNotNull(profile.value?.id) { "请先登录" }
+    protected suspend fun authorized(path: String, method: String = "GET", body: JSONObject? = null, prefer: String? = null,
+        expectedOwner:String=requireProfileId()): String {
+        return lock.withLock {
+            check(profile.value?.id==expectedOwner) {"账号已切换"}
             refreshToken()
             try { call(path, method, body, requireNotNull(session).getString("access_token"), prefer) }
             catch (e: CloudException) {
@@ -96,6 +100,7 @@ class SupabaseFriendsRepository(context: Context, private val baseUrl: String, p
                 throw e
             }
         }
+    }
     private suspend fun refreshToken() {
         val old = requireNotNull(session) { "请先登录" }
         if (old.optLong("expires_at") > System.currentTimeMillis() / 1000 + 60) return
@@ -111,7 +116,7 @@ class SupabaseFriendsRepository(context: Context, private val baseUrl: String, p
     }
     private suspend fun loadProfile() {
         val id = requireNotNull(session).getJSONObject("user").getString("id")
-        val array = JSONArray(call("/rest/v1/social_profiles?id=eq.$id&select=id,fitlog_id,nickname,bio",
+        val array = JSONArray(call("/rest/v1/social_profiles?id=eq.$id&select=id,fitlog_id,nickname,bio,avatar_path",
             token = requireNotNull(session).getString("access_token")))
         require(array.length() == 1) { "云端好友表尚未初始化，请先部署数据库" }
         val value = array.getJSONObject(0)
@@ -123,46 +128,63 @@ class SupabaseFriendsRepository(context: Context, private val baseUrl: String, p
         store.write(value.toString()); session = value
     }
     private fun decodeProfile(value: JSONObject) = SocialProfile(value.getString("id"), value.getString("fitlog_id"),
-        value.getString("nickname"), value.optString("bio"))
+        value.getString("nickname"), value.optString("bio"), value.optString("avatar_path").takeIf { it.isNotBlank() && it!="null" })
+
+    protected suspend fun authorizedBinary(path:String,method:String="GET",payload:ByteArray?=null,mime:String="image/jpeg"):ByteArray {
+        val expectedOwner=requireProfileId()
+        return lock.withLock {
+            check(profile.value?.id==expectedOwner) {"账号已切换"}
+            refreshToken()
+            try {requestBytes(path,method,payload,requireNotNull(session).getString("access_token"),null,mime)}
+            catch(e:CloudException) {
+                if(e.status==401) {store.clear();session=null;_profile.value=null}
+                throw e
+            }
+        }
+    }
 
     private suspend fun call(path: String, method: String = "GET", body: JSONObject? = null,
-        token: String? = null, prefer: String? = null): String = withContext(Dispatchers.IO) {
+        token: String? = null, prefer: String? = null): String =
+        String(requestBytes(path,method,body?.toString()?.toByteArray(Charsets.UTF_8),token,prefer,"application/json; charset=utf-8"),Charsets.UTF_8)
+
+    private suspend fun requestBytes(path:String,method:String,payload:ByteArray?,token:String?,prefer:String?,mime:String):ByteArray = withContext(Dispatchers.IO) {
         check(configured) { "尚未配置云端连接" }
         val connection = URI(baseUrl.trimEnd('/') + path).toURL().openConnection() as HttpsURLConnection
         try {
             connection.connectTimeout=15_000; connection.readTimeout=15_000
             connection.instanceFollowRedirects=false; connection.requestMethod=method
             connection.setRequestProperty("apikey", publicKey)
-            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("Accept", "*/*")
             token?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
             prefer?.let { connection.setRequestProperty("Prefer", it) }
-            if (body != null) {
+            if(payload!=null) {
                 connection.doOutput=true
-                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+                connection.setRequestProperty("Content-Type",mime)
+                connection.outputStream.use { it.write(payload) }
             }
             val status=connection.responseCode
-            val text=(if(status in 200..299) connection.inputStream else connection.errorStream)?.use { input ->
+            val bytes=(if(status in 200..299) connection.inputStream else connection.errorStream)?.use { input ->
                 val output=ByteArrayOutputStream()
                 val buffer=ByteArray(8192)
                 while(true) {
                     val count=input.read(buffer)
                     if(count<0) break
-                    require(output.size()+count<=2_000_000) { "云端响应过大" }
+                    require(output.size()+count<=4_000_000) {"云端响应过大"}
                     output.write(buffer,0,count)
                 }
-                output.toString("UTF-8")
-            }.orEmpty()
+                output.toByteArray()
+            } ?: byteArrayOf()
             if(status !in 200..299) {
+                val text=String(bytes,Charsets.UTF_8)
                 val message=when(status) {
                     401 -> "登录已失效，请重新登录"
                     429 -> "操作过于频繁，请稍后再试"
                     else -> runCatching { JSONObject(text).optString("msg").ifBlank { JSONObject(text).optString("message") } }
-                        .getOrDefault("").takeIf { it.isNotBlank() } ?: "云端请求失败，请稍后重试"
+                        .getOrDefault("").takeIf { it.isNotBlank() }?.take(300) ?: "云端请求失败，请稍后重试"
                 }
                 throw CloudException(status,message)
             }
-            text
+            bytes
         } finally { connection.disconnect() }
     }
     private class CloudException(val status: Int,message:String): IOException(message)

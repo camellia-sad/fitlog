@@ -43,6 +43,11 @@ interface TrainingDao {
     """)
     fun observeExerciseHistory(exerciseId: String): Flow<List<WorkoutRow>>
 
+    @Transaction @Query(WORKOUT_SELECT + """WHERE status = 'FINISHED' AND
+        (startedAtUtc < :before OR (startedAtUtc = :before AND id < :beforeId))
+        ORDER BY startedAtUtc DESC, id DESC LIMIT 50""")
+    suspend fun sharingPage(before: Long, beforeId: String): List<WorkoutRow>
+
     @Query("SELECT * FROM exercises ORDER BY id") suspend fun allExercises(): List<ExerciseEntity>
     @Query("SELECT * FROM exercise_muscles ORDER BY exerciseId, muscle, role") suspend fun allMuscles(): List<ExerciseMuscleEntity>
     @Query("SELECT * FROM workout_templates ORDER BY id") suspend fun allTemplates(): List<TemplateEntity>

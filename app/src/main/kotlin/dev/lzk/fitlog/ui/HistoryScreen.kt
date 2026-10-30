@@ -187,12 +187,6 @@ private fun TrainingColorLegend() {
     }
 }
 
-fun Workout.historyStatus(): String = when (session.status) {
-    SessionStatus.FINISHED -> if (allSetsCompleted) "已完成" else "未完成"
-    SessionStatus.ACTIVE -> "进行中 · 未完成"
-    SessionStatus.PAUSED -> "已暂停 · 未完成"
-    SessionStatus.DISCARDED -> "已放弃"
-}
 
 @Composable
 private fun PerformanceChart(points: List<PerformancePoint>, unit: WeightUnit) {

@@ -17,10 +17,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.lzk.fitlog.domain.*
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.isActive
 import dev.lzk.fitlog.features.FriendsViewModel
 
 @Composable
-fun FriendsScreen(model:FriendsViewModel) {
+fun FriendsScreen(model:FriendsViewModel, social:SocialRepository?=null,
+    sharing:dev.lzk.fitlog.features.TrainingSharing?=null,onSubpage:(Boolean)->Unit={}) {
     val profile by model.profile.collectAsStateWithLifecycle()
     val friends by model.friends.collectAsStateWithLifecycle()
     val found by model.found.collectAsStateWithLifecycle()
@@ -32,6 +35,37 @@ fun FriendsScreen(model:FriendsViewModel) {
     var search by rememberSaveable { mutableStateOf("") }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var editingSelf by rememberSaveable { mutableStateOf(false) }
+    var chatPeer by rememberSaveable {mutableStateOf<String?>(null)}
+    var timeline by rememberSaveable {mutableStateOf(false)}
+    val lifecycle=androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(model,profile?.id,lifecycle) {
+        lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            while(kotlinx.coroutines.currentCoroutineContext().isActive) {
+                kotlinx.coroutines.delay(15_000)
+                if(model.profile.value!=null) model.refresh()
+            }
+        }
+    }
+    LaunchedEffect(selectedId,editingSelf,chatPeer,timeline) {
+        onSubpage(selectedId!=null || editingSelf || chatPeer!=null || timeline)
+    }
+    DisposableEffect(Unit) {onDispose {onSubpage(false)}}
+    if(profile==null) LaunchedEffect(Unit) {selectedId=null;chatPeer=null;timeline=false;editingSelf=false}
+    if(social!=null && profile!=null && (selectedId!=null || timeline)) {
+        SocialTimelineScreen(social,requireNotNull(profile),owner=selectedId,
+            friend=friends.find {it.profile.id==selectedId},
+            onBack={if(selectedId!=null)selectedId=null else timeline=false},
+            onPerson={selectedId=it},
+            onNote={note->selectedId?.let {model.saveNote(it,note)}},
+            onRemove={selectedId?.let {model.act(it,"remove")};selectedId=null;chatPeer=null},
+            onBlock={selectedId?.let {model.act(it,"block")};selectedId=null;chatPeer=null})
+        return
+    }
+    val chatting=friends.find {it.profile.id==chatPeer}
+    if(social!=null && profile!=null && chatting!=null) {
+        ChatScreen(social,requireNotNull(profile),chatting,friends,onBack={chatPeer=null},onPerson={selectedId=it})
+        return
+    }
     val selected=friends.find { it.profile.id==selectedId }
     var confirming by remember { mutableStateOf<Pair<String,String>?>(null) }
     if(selectedId!=null || editingSelf) BackHandler { selectedId=null; editingSelf=false }
@@ -75,10 +109,13 @@ fun FriendsScreen(model:FriendsViewModel) {
                 var name by rememberSaveable(current.id) { mutableStateOf(current.nickname) }
                 var bio by rememberSaveable(current.id) { mutableStateOf(current.bio) }
                 SoftCard {
+                    if(social!=null) { AvatarEditor(social,current); TextButton(onClick={selectedId=current.id}){Text("我的动态与共享历史")} }
                     ProfileIdentity(current)
                     OutlinedTextField(name,{name=it.take(40)},label={Text("昵称")},singleLine=true,modifier=Modifier.fillMaxWidth())
                     OutlinedTextField(bio,{bio=it.take(300)},label={Text("简介")},modifier=Modifier.fillMaxWidth())
                     Button(onClick={model.saveProfile(name,bio)},enabled=!busy){Text("保存资料")}
+                    if(social!=null && sharing!=null) SharingControls(model,social) {sharing.syncHistory()}
+                    if(social!=null) BlockedFriends(social,model)
                     OutlinedButton(onClick={confirming="" to "logout"},enabled=!busy){Text("退出登录")}
                 }
             }
@@ -119,6 +156,9 @@ fun FriendsScreen(model:FriendsViewModel) {
                     }
                 }
             }
+            if(social!=null) item {
+                Button(onClick={timeline=true},modifier=Modifier.fillMaxWidth()){Text("查看动态")}
+            }
             val requests=friends.filter { !it.accepted }
             if(requests.isNotEmpty()) item { Text("好友申请",style=MaterialTheme.typography.titleMedium) }
             items(requests,key={"request:"+it.profile.id}) { friend ->
@@ -137,12 +177,13 @@ fun FriendsScreen(model:FriendsViewModel) {
             item { Text("我的好友 · ${accepted.size}",style=MaterialTheme.typography.titleMedium) }
             if(accepted.isEmpty()) item { Text("还没有好友，输入对方的 FitLog ID 发起申请。",color=MaterialTheme.colorScheme.onSurfaceVariant) }
             items(accepted,key={it.profile.id}) { friend ->
-                SoftCard(Modifier.clickable {selectedId=friend.profile.id}) {
+                SoftCard(Modifier.clickable {if(social==null)selectedId=friend.profile.id else chatPeer=friend.profile.id}) {
                     Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                        FriendAvatar(friend.displayName) {selectedId=friend.profile.id}
+                        SocialAvatar(social,friend.profile) {selectedId=friend.profile.id}
                         Column(Modifier.weight(1f)) {
                             OneLineText(friend.displayName,style=MaterialTheme.typography.titleMedium)
-                            OneLineText(friend.profile.bio.ifBlank { "查看个人主页" },style=MaterialTheme.typography.bodySmall,
+                            OneLineText(friend.presence.label+(if(friend.unread>0) " · ${friend.unread} 条未读" else ""),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.primary)
+                            OneLineText(friend.lastMessage ?: friend.profile.bio.ifBlank { "查看个人主页" },style=MaterialTheme.typography.bodySmall,
                                 color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         LineIcon(Symbol.ARROW,Modifier.size(20.dp))
@@ -153,7 +194,7 @@ fun FriendsScreen(model:FriendsViewModel) {
     }
     confirming?.let { (id,action) ->
         AlertDialog(onDismissRequest={confirming=null},title={Text(when(action){"logout"->"退出登录？";"block"->"拉黑此好友？";else->"删除好友？"})},
-            text={Text(if(action=="logout") "本机训练记录会保留。" else "好友关系将移除，停止后续共享。")},
+            text={Text(if(action=="logout") "本机训练记录会保留；待发送社交消息和缓存将清除。" else "好友关系将移除，停止后续共享。")},
             confirmButton={TextButton(onClick={
                 confirming=null
                 if(action=="logout") { editingSelf=false; model.signOut() }
