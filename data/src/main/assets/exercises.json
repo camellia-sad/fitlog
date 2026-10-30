@@ -1,0 +1,578 @@
+{
+  "version": 2,
+  "exercises": [
+    {
+      "id": "barbell-bench-press",
+      "nameZh": "杠铃卧推",
+      "nameEn": "Barbell Bench Press",
+      "equipmentType": "BARBELL",
+      "primaryMuscles": [
+        "CHEST"
+      ],
+      "secondaryMuscles": [
+        "TRICEPS",
+        "SHOULDERS"
+      ],
+      "instructions": "双脚稳定支撑，上背贴凳，控制杠铃下放后推起，保持手腕稳定。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "dumbbell-bench-press",
+      "nameZh": "哑铃卧推",
+      "nameEn": "Dumbbell Bench Press",
+      "equipmentType": "DUMBBELL",
+      "primaryMuscles": [
+        "CHEST"
+      ],
+      "secondaryMuscles": [
+        "TRICEPS",
+        "SHOULDERS"
+      ],
+      "instructions": "仰卧持铃置于胸部两侧，控制双臂下放后同步推起，不让哑铃相撞。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "machine-chest-press",
+      "nameZh": "器械推胸",
+      "nameEn": "Machine Chest Press",
+      "equipmentType": "MACHINE",
+      "primaryMuscles": [
+        "CHEST"
+      ],
+      "secondaryMuscles": [
+        "TRICEPS",
+        "SHOULDERS"
+      ],
+      "instructions": "调节座椅使握把位于胸部附近，背部贴靠背，向前推起后缓慢回位。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "push-up",
+      "nameZh": "俯卧撑",
+      "nameEn": "Push Up",
+      "equipmentType": "BODYWEIGHT",
+      "primaryMuscles": [
+        "CHEST"
+      ],
+      "secondaryMuscles": [
+        "TRICEPS",
+        "CORE"
+      ],
+      "instructions": "双手支撑于肩部两侧，身体保持稳定直线，屈肘下放后推起，可选择跪姿降低难度。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "lat-pulldown",
+      "nameZh": "高位下拉",
+      "nameEn": "Lat Pulldown",
+      "equipmentType": "CABLE",
+      "primaryMuscles": [
+        "BACK"
+      ],
+      "secondaryMuscles": [
+        "BICEPS"
+      ],
+      "instructions": "坐稳并固定大腿，将横杆向胸前下拉，再缓慢回放，避免大幅后仰。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "seated-cable-row",
+      "nameZh": "坐姿绳索划船",
+      "nameEn": "Seated Cable Row",
+      "equipmentType": "CABLE",
+      "primaryMuscles": [
+        "BACK"
+      ],
+      "secondaryMuscles": [
+        "BICEPS"
+      ],
+      "instructions": "坐稳、双脚支撑，将握把拉向躯干，再控制手臂向前伸展。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "dumbbell-row",
+      "nameZh": "哑铃划船",
+      "nameEn": "Dumbbell Row",
+      "equipmentType": "DUMBBELL",
+      "primaryMuscles": [
+        "BACK"
+      ],
+      "secondaryMuscles": [
+        "BICEPS"
+      ],
+      "instructions": "一手支撑训练凳或稳定俯身，将哑铃拉向髋侧，再控制回放。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "pull-up",
+      "nameZh": "引体向上",
+      "nameEn": "Pull Up",
+      "equipmentType": "BODYWEIGHT",
+      "primaryMuscles": [
+        "BACK"
+      ],
+      "secondaryMuscles": [
+        "BICEPS"
+      ],
+      "instructions": "握稳横杆，从稳定悬垂位置向上拉起身体，避免大幅摆动，控制下放。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "barbell-squat",
+      "nameZh": "杠铃深蹲",
+      "nameEn": "Barbell Squat",
+      "equipmentType": "BARBELL",
+      "primaryMuscles": [
+        "QUADRICEPS",
+        "GLUTES"
+      ],
+      "secondaryMuscles": [
+        "CORE"
+      ],
+      "instructions": "杠铃稳定置于上背，屈髋屈膝下蹲后站起，膝盖朝向与脚尖大致一致。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "leg-press",
+      "nameZh": "腿举",
+      "nameEn": "Leg Press",
+      "equipmentType": "MACHINE",
+      "primaryMuscles": [
+        "QUADRICEPS",
+        "GLUTES"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "调整座椅与踏板，背部贴靠垫，控制屈膝下放和推起，避免膝关节猛然锁死。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "romanian-deadlift",
+      "nameZh": "罗马尼亚硬拉",
+      "nameEn": "Romanian Deadlift",
+      "equipmentType": "BARBELL",
+      "primaryMuscles": [
+        "HAMSTRINGS",
+        "GLUTES"
+      ],
+      "secondaryMuscles": [
+        "BACK"
+      ],
+      "instructions": "膝盖轻微弯曲，髋部向后移动，杠铃沿腿部下放，再伸髋站起。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "leg-curl",
+      "nameZh": "器械腿弯举",
+      "nameEn": "Leg Curl",
+      "equipmentType": "MACHINE",
+      "primaryMuscles": [
+        "HAMSTRINGS"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "调整器械转轴与膝关节位置并固定身体，屈膝带动滚垫，缓慢回放。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "dumbbell-shoulder-press",
+      "nameZh": "哑铃推肩",
+      "nameEn": "Dumbbell Shoulder Press",
+      "equipmentType": "DUMBBELL",
+      "primaryMuscles": [
+        "SHOULDERS"
+      ],
+      "secondaryMuscles": [
+        "TRICEPS"
+      ],
+      "instructions": "坐稳或站稳，将肩部两侧的哑铃向上推起后缓慢下放，避免过度挺腰。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "dumbbell-lateral-raise",
+      "nameZh": "哑铃侧平举",
+      "nameEn": "Dumbbell Lateral Raise",
+      "equipmentType": "DUMBBELL",
+      "primaryMuscles": [
+        "SHOULDERS"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "手臂轻微弯曲，将哑铃向身体两侧抬起，控制下放，避免耸肩和甩动。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "dumbbell-curl",
+      "nameZh": "哑铃弯举",
+      "nameEn": "Dumbbell Curl",
+      "equipmentType": "DUMBBELL",
+      "primaryMuscles": [
+        "BICEPS"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "上臂稳定在身体两侧，屈肘举起哑铃后缓慢下放，避免躯干摆动。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "cable-triceps-pushdown",
+      "nameZh": "绳索下压",
+      "nameEn": "Cable Triceps Pushdown",
+      "equipmentType": "CABLE",
+      "primaryMuscles": [
+        "TRICEPS"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "上臂靠近躯干，伸肘将把手向下压后控制回位，保持肩部稳定。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "smith-squat",
+      "nameZh": "史密斯深蹲",
+      "nameEn": "Smith Machine Squat",
+      "equipmentType": "SMITH",
+      "primaryMuscles": [
+        "QUADRICEPS",
+        "GLUTES"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "调整杠位与安全限位，沿器械轨道下蹲再站起，保持躯干稳定。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "standing-calf-raise",
+      "nameZh": "站姿提踵",
+      "nameEn": "Standing Calf Raise",
+      "equipmentType": "BODYWEIGHT",
+      "primaryMuscles": [
+        "CALVES"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "站稳并保持平衡，脚跟向上抬起后控制下放，可扶固定支撑物。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "crunch",
+      "nameZh": "卷腹",
+      "nameEn": "Crunch",
+      "equipmentType": "BODYWEIGHT",
+      "primaryMuscles": [
+        "CORE"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "仰卧屈膝，保持颈部自然，收缩腹部使肩胛轻轻离地，再控制回落，不用手拉头。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "incline-dumbbell-press",
+      "nameZh": "上斜哑铃卧推",
+      "nameEn": "Incline Dumbbell Press",
+      "equipmentType": "DUMBBELL",
+      "primaryMuscles": [
+        "CHEST"
+      ],
+      "secondaryMuscles": [
+        "SHOULDERS",
+        "TRICEPS"
+      ],
+      "instructions": "背部贴住上斜训练凳，将哑铃从胸部两侧推起后控制下放。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "smith-bench-press",
+      "nameZh": "史密斯卧推",
+      "nameEn": "Smith Bench Press",
+      "equipmentType": "SMITH",
+      "primaryMuscles": [
+        "CHEST"
+      ],
+      "secondaryMuscles": [
+        "TRICEPS"
+      ],
+      "instructions": "调整训练凳与安全限位，控制杠铃沿轨道下放至舒适位置，再向上推起。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "cable-fly",
+      "nameZh": "绳索夹胸",
+      "nameEn": "Cable Fly",
+      "equipmentType": "CABLE",
+      "primaryMuscles": [
+        "CHEST"
+      ],
+      "secondaryMuscles": [
+        "SHOULDERS"
+      ],
+      "instructions": "站稳并保持肘部轻微弯曲，双手向胸前合拢，再控制向两侧打开。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "pec-deck",
+      "nameZh": "蝴蝶机夹胸",
+      "nameEn": "Pec Deck Fly",
+      "equipmentType": "MACHINE",
+      "primaryMuscles": [
+        "CHEST"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "调整座椅与握把，背部贴靠垫。将双臂向胸前合拢，再缓慢回位。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "barbell-row",
+      "nameZh": "杠铃划船",
+      "nameEn": "Barbell Bent Over Row",
+      "equipmentType": "BARBELL",
+      "primaryMuscles": [
+        "BACK"
+      ],
+      "secondaryMuscles": [
+        "BICEPS",
+        "CORE"
+      ],
+      "instructions": "屈髋俯身并保持背部稳定，将杠铃拉向腹部附近，再控制下放。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "chest-supported-row",
+      "nameZh": "上斜凳哑铃划船",
+      "nameEn": "Chest Supported Dumbbell Row",
+      "equipmentType": "DUMBBELL",
+      "primaryMuscles": [
+        "BACK"
+      ],
+      "secondaryMuscles": [
+        "BICEPS"
+      ],
+      "instructions": "胸部贴住上斜凳，向躯干两侧拉起哑铃，再缓慢回落。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "straight-arm-pulldown",
+      "nameZh": "直臂下拉",
+      "nameEn": "Straight Arm Pulldown",
+      "equipmentType": "CABLE",
+      "primaryMuscles": [
+        "BACK"
+      ],
+      "secondaryMuscles": [
+        "CORE"
+      ],
+      "instructions": "面对高位绳索站稳，手臂轻微弯曲，将把手向髋部方向下拉，再控制回放。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "machine-row",
+      "nameZh": "坐姿器械划船",
+      "nameEn": "Seated Machine Row",
+      "equipmentType": "MACHINE",
+      "primaryMuscles": [
+        "BACK"
+      ],
+      "secondaryMuscles": [
+        "BICEPS"
+      ],
+      "instructions": "调节座椅和胸垫，握稳把手，将肘部向后拉动，再缓慢回位。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "deadlift",
+      "nameZh": "杠铃硬拉",
+      "nameEn": "Barbell Deadlift",
+      "equipmentType": "BARBELL",
+      "primaryMuscles": [
+        "GLUTES",
+        "HAMSTRINGS"
+      ],
+      "secondaryMuscles": [
+        "BACK",
+        "CORE"
+      ],
+      "instructions": "双脚站稳，杠铃靠近小腿。稳定躯干后伸髋伸膝站起，再控制屈髋将杠铃放回。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "goblet-squat",
+      "nameZh": "高脚杯深蹲",
+      "nameEn": "Goblet Squat",
+      "equipmentType": "DUMBBELL",
+      "primaryMuscles": [
+        "QUADRICEPS",
+        "GLUTES"
+      ],
+      "secondaryMuscles": [
+        "CORE"
+      ],
+      "instructions": "双手将哑铃抱于胸前，屈髋屈膝下蹲后站起，保持脚掌稳定接触地面。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "dumbbell-lunge",
+      "nameZh": "哑铃箭步蹲",
+      "nameEn": "Dumbbell Lunge",
+      "equipmentType": "DUMBBELL",
+      "primaryMuscles": [
+        "QUADRICEPS",
+        "GLUTES"
+      ],
+      "secondaryMuscles": [
+        "HAMSTRINGS"
+      ],
+      "instructions": "双手持铃，向前或向后迈出一步，控制双膝弯曲下落，再用前腿发力站起。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "split-squat",
+      "nameZh": "分腿蹲",
+      "nameEn": "Split Squat",
+      "equipmentType": "BODYWEIGHT",
+      "primaryMuscles": [
+        "QUADRICEPS",
+        "GLUTES"
+      ],
+      "secondaryMuscles": [
+        "CORE"
+      ],
+      "instructions": "前后分腿站稳，身体垂直下降后站起，两侧分别记录。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "leg-extension",
+      "nameZh": "器械腿屈伸",
+      "nameEn": "Leg Extension",
+      "equipmentType": "MACHINE",
+      "primaryMuscles": [
+        "QUADRICEPS"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "调整滚垫使膝关节与转轴对齐，伸膝抬起滚垫后缓慢回落。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "hip-thrust",
+      "nameZh": "杠铃臀推",
+      "nameEn": "Barbell Hip Thrust",
+      "equipmentType": "BARBELL",
+      "primaryMuscles": [
+        "GLUTES"
+      ],
+      "secondaryMuscles": [
+        "HAMSTRINGS"
+      ],
+      "instructions": "上背稳定靠在训练凳上，杠铃垫稳置于髋部，伸髋抬起后控制下降，避免过度挺腰。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "seated-calf-raise",
+      "nameZh": "坐姿提踵",
+      "nameEn": "Seated Calf Raise",
+      "equipmentType": "MACHINE",
+      "primaryMuscles": [
+        "CALVES"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "坐稳并固定大腿，前脚掌放稳，抬起脚跟后缓慢下放。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "machine-shoulder-press",
+      "nameZh": "器械推肩",
+      "nameEn": "Machine Shoulder Press",
+      "equipmentType": "MACHINE",
+      "primaryMuscles": [
+        "SHOULDERS"
+      ],
+      "secondaryMuscles": [
+        "TRICEPS"
+      ],
+      "instructions": "调整握把至肩部附近，背部贴靠垫，向上推起后控制回位。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "arnold-press",
+      "nameZh": "阿诺德推举",
+      "nameEn": "Arnold Press",
+      "equipmentType": "DUMBBELL",
+      "primaryMuscles": [
+        "SHOULDERS"
+      ],
+      "secondaryMuscles": [
+        "TRICEPS"
+      ],
+      "instructions": "哑铃置于身前，推举时自然旋转手掌，全程控制动作，保持躯干稳定。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "face-pull",
+      "nameZh": "绳索面拉",
+      "nameEn": "Cable Face Pull",
+      "equipmentType": "CABLE",
+      "primaryMuscles": [
+        "SHOULDERS"
+      ],
+      "secondaryMuscles": [
+        "BACK"
+      ],
+      "instructions": "绳索调整至面部附近高度，双手向面部两侧拉开，肘部外展，再控制回位。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "rear-delt-fly",
+      "nameZh": "俯身哑铃反向飞鸟",
+      "nameEn": "Dumbbell Rear Delt Fly",
+      "equipmentType": "DUMBBELL",
+      "primaryMuscles": [
+        "SHOULDERS"
+      ],
+      "secondaryMuscles": [
+        "BACK"
+      ],
+      "instructions": "稳定俯身，手臂保持轻微弯曲，向两侧打开哑铃后缓慢回落，避免耸肩借力。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "hammer-curl",
+      "nameZh": "哑铃锤式弯举",
+      "nameEn": "Dumbbell Hammer Curl",
+      "equipmentType": "DUMBBELL",
+      "primaryMuscles": [
+        "BICEPS"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "手心相对持铃，上臂靠近身体，屈肘举起哑铃后控制下放。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "barbell-curl",
+      "nameZh": "杠铃弯举",
+      "nameEn": "Barbell Curl",
+      "equipmentType": "BARBELL",
+      "primaryMuscles": [
+        "BICEPS"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "双手握杠，上臂稳定在身体两侧，屈肘抬起杠铃后缓慢回落。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "overhead-cable-extension",
+      "nameZh": "绳索过顶臂屈伸",
+      "nameEn": "Overhead Cable Triceps Extension",
+      "equipmentType": "CABLE",
+      "primaryMuscles": [
+        "TRICEPS"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "握住绳索并将上臂置于头部两侧，保持上臂稳定，伸肘后控制回位。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "reverse-crunch",
+      "nameZh": "反向卷腹",
+      "nameEn": "Reverse Crunch",
+      "equipmentType": "BODYWEIGHT",
+      "primaryMuscles": [
+        "CORE"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "仰卧屈膝，收缩腹部使骨盆轻轻卷起，再缓慢回落，避免甩腿。",
+      "estimatedSecondsPerSet": 45
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+package dev.lzk.fitlog.domain
+
+import java.math.BigInteger
+import java.time.Instant
+import java.time.LocalDate
+import kotlinx.coroutines.flow.Flow
+
+data class TrainingDay(val date: LocalDate, val completedSets: Int, val sessions: Int)
+data class PerformancePoint(val sessionId: String, val date: LocalDate, val weightGrams: Long, val reps: Int)
+data class TrainingStatistics(val days: Int, val sessions: Int, val completedSets: Int, val durationSeconds: Long, val volumeGrams: BigInteger)
+
+interface HistoryRepository {
+    fun observeHistory(from: LocalDate, to: LocalDate): Flow<List<Workout>>
+    fun observeExerciseHistory(exerciseId: String): Flow<List<Workout>>
+}
+
+object TrainingHistory {
+    fun statistics(workouts: List<Workout>): TrainingStatistics {
+        val finished = workouts.filter { it.session.status == SessionStatus.FINISHED && it.completedSetCount > 0 }
+        val completed = finished.flatMap { it.exercises }.flatMap { it.sets }.filter { it.status == SetStatus.COMPLETED }
+        val volume = completed.fold(BigInteger.ZERO) { value, set ->
+            value + BigInteger.valueOf(set.weightGrams) * BigInteger.valueOf(set.reps.toLong())
+        }
+        return TrainingStatistics(
+            finished.map { it.session.localWorkoutDate }.distinct().size, finished.size, completed.size,
+            finished.fold(0L) { total, workout ->
+                val seconds = workout.elapsedDuration(workout.session.endedAtUtc ?: Instant.now()).seconds
+                if (Long.MAX_VALUE - total < seconds) Long.MAX_VALUE else total + seconds
+            }, volume,
+        )
+    }
+
+    fun days(workouts: List<Workout>): List<TrainingDay> = workouts
+        .filter { it.session.status == SessionStatus.FINISHED && it.completedSetCount > 0 }
+        .groupBy { it.session.localWorkoutDate }.map { (date, sessions) ->
+            TrainingDay(date, sessions.sumOf { it.completedSetCount }, sessions.size)
+        }.sortedBy { it.date }
+
+    fun performance(workouts: List<Workout>, exerciseId: String): List<PerformancePoint> = workouts
+        .filter { it.session.status == SessionStatus.FINISHED }
+        .sortedBy { it.session.startedAtUtc }.flatMap { workout ->
+            workout.exercises.filter { it.exerciseId == exerciseId }.flatMap { it.sets }
+                .filter { it.status == SetStatus.COMPLETED }.map {
+                    PerformancePoint(workout.session.id, workout.session.localWorkoutDate, it.weightGrams, it.reps)
+                }
+        }
+}

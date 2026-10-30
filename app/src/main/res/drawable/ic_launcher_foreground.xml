@@ -1,0 +1,5 @@
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/puppy_idle_0"
+    android:gravity="fill"
+    android:antialias="false"
+    android:filter="false" />

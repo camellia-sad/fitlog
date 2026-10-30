@@ -1,0 +1,25 @@
+.gradle/
+.kotlin/
+**/build/
+local.properties
+.local-tools/
+.idea/
+*.iml
+.DS_Store
+
+# Local credentials and exported app data
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.db
+*.db-shm
+*.db-wal
+*.apk
+*.aab
+
+# Original asset archive and Windows download metadata
+/FitLog_Pixel_Puppy_Animations_Package.zip
+*Zone.Identifier
