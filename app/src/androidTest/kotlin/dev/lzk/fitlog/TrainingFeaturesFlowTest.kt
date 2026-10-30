@@ -42,7 +42,7 @@ class TrainingFeaturesFlowTest {
                 FitLogTheme(darkTheme = largeFont) { FitLogApp(container) }
             }
         }
-        waitText("设置")
+        waitText("我的")
     }
 
     @Test fun templateStartsTrainingRestPauseFinishAndHistory() {
@@ -132,12 +132,14 @@ class TrainingFeaturesFlowTest {
             container.workouts.updateSetDraft(exercise, set.id, 37_500, 8)
         }
         show(largeFont = true)
-        compose.onNodeWithText("设置", substring = false).performClick()
+        compose.onNodeWithText("我的", substring = false).performClick()
+        compose.onNodeWithTag("open-settings").performClick()
         compose.onNodeWithText("lb", substring = false).performScrollTo().performClick()
         compose.onNodeWithText("深色", substring = false).performScrollTo().performClick()
         compose.onNodeWithText("保存设置", substring = false).performScrollTo().performClick()
         compose.waitUntil(10_000) { runBlocking { container.preferences.preferences.first().weightUnit == WeightUnit.LB } }
         assertEquals(ThemeMode.DARK, runBlocking { container.preferences.preferences.first().theme })
+        compose.onNodeWithContentDescription("返回我的").performScrollTo().performClick()
         compose.onNodeWithText("主页", substring = false).performClick()
         waitText("继续训练")
         compose.onNodeWithText("继续训练").performScrollTo().performClick()

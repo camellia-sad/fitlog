@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 
-enum class Symbol { HOME, DUMBBELL, BACK, PLUS, CHECK, SEARCH, ARROW, MINUS, CLOCK, LIST, SETTINGS, FRIENDS }
+enum class Symbol { HOME, DUMBBELL, BACK, PLUS, CHECK, SEARCH, ARROW, MINUS, CLOCK, LIST, SETTINGS, FRIENDS, PERSON }
 
 @Composable
 fun LineIcon(symbol: Symbol, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.primary) {
@@ -48,6 +48,11 @@ fun LineIcon(symbol: Symbol, modifier: Modifier = Modifier, color: Color = Mater
                         line((12 + 6 * kotlin.math.cos(a)).toFloat(), (12 + 6 * kotlin.math.sin(a)).toFloat(),
                             (12 + 9 * kotlin.math.cos(a)).toFloat(), (12 + 9 * kotlin.math.sin(a)).toFloat())
                     }
+                }
+                Symbol.PERSON -> {
+                    drawCircle(color,3.5f,Offset(12f,7f),style=Stroke(1.8f))
+                    drawArc(color,180f,180f,false,Offset(4f,13f),Size(16f,14f),style=Stroke(1.8f))
+                    line(4f,20f,20f,20f)
                 }
                 Symbol.FRIENDS -> {
                     drawCircle(color, 3f, Offset(9f, 7f), style = Stroke(1.8f))

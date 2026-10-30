@@ -1,6 +1,8 @@
 package dev.lzk.fitlog
 
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -18,14 +20,17 @@ class FriendsFlowTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
     private val models=ViewModelStore()
     private val repository=FakeFriends()
-    private fun show() {
+    private fun show(account:Boolean=false) {
         val model=FriendsViewModel(repository)
         models.put("friends",model)
-        compose.setContent { FitLogTheme { FriendsScreen(model) } }
+        compose.setContent { FitLogTheme {
+            var accountPage by androidx.compose.runtime.remember {androidx.compose.runtime.mutableStateOf(account)}
+            if(accountPage) MeScreen(model) else FriendsScreen(model,onLogin={accountPage=true})
+        } }
     }
     @After fun close() { compose.activityRule.scenario.close(); models.clear() }
     @Test fun emailCodeLoginAndLogoutKeepOfflineTrainingIndependent() {
-        show()
+        show(true)
         waitText("邮箱")
         compose.onNodeWithText("邮箱").performTextInput("person@example.invalid")
         compose.onNodeWithText("发送验证码").performScrollTo().performClick()
@@ -85,6 +90,8 @@ class FriendsFlowTest {
         show()
         waitText("我的好友 · 1")
         compose.runOnIdle { repository.profile.value=null; repository.failFriends=true }
+        waitText("去登录")
+        compose.onNodeWithText("去登录").performClick()
         waitText("邮箱")
         compose.onNodeWithText("邮箱").performTextInput("second@example.invalid")
         compose.onNodeWithText("已有验证码").performClick()

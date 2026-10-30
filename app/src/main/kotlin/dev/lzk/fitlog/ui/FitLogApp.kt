@@ -25,6 +25,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
     val templates: TemplateViewModel = viewModel(factory = AppModelFactory(container))
     val settings: SettingsViewModel = viewModel(factory = AppModelFactory(container))
     val history: HistoryViewModel = viewModel(factory = AppModelFactory(container))
+    val friendsModel: FriendsViewModel = viewModel(factory = FriendsViewModel.Factory(container.friends))
     val state by model.state.collectAsStateWithLifecycle()
     val templateState by templates.state.collectAsStateWithLifecycle()
     val templateEditor by templates.editing.collectAsStateWithLifecycle()
@@ -107,9 +108,9 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
         containerColor = MaterialTheme.colorScheme.background, contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbars) },
         bottomBar = {
-            if (route in listOf("home", "library", "friends", "settings") && !(route=="friends" && socialSubpage)) NavigationBar(
+            if (route in listOf("home", "library", "friends", "me") && !(route in listOf("friends","me") && socialSubpage)) NavigationBar(
                 modifier = Modifier.testTag("main-navigation"), containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
-                val destinations = listOf("home" to "主页", "library" to "动作", "friends" to "好友", "settings" to "设置")
+                val destinations = listOf("home" to "主页", "library" to "动作", "friends" to "好友", "me" to "我的")
                 destinations.forEachIndexed { index, (destination, label) ->
                     NavigationBarItem(selected = route == destination,
                         onClick = {
@@ -117,7 +118,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                                 nav.navigate(destination) { popUpTo("home"); launchSingleTop = true }
                             }
                         },
-                        icon = { LineIcon(listOf(Symbol.HOME, Symbol.DUMBBELL, Symbol.FRIENDS, Symbol.SETTINGS)[index], Modifier.size(23.dp),
+                        icon = { LineIcon(listOf(Symbol.HOME, Symbol.DUMBBELL, Symbol.FRIENDS, Symbol.PERSON)[index], Modifier.size(23.dp),
                             if (route == destination) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
                         label = { Text(label, maxLines = 1) })
                 }
@@ -152,10 +153,13 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                 HistoryScreen(history, state.preferences.weightUnit, templateState.exercises, onBack = { nav.popBackStack() })
             }
             composable("friends") {
-                val friendsModel: FriendsViewModel = viewModel(factory = FriendsViewModel.Factory(container.friends))
-                FriendsScreen(friendsModel,container.social,container.sharing) {socialSubpage=it}
+                FriendsScreen(friendsModel,container.social,onLogin={nav.navigate("me")}) {socialSubpage=it}
             }
-            composable("settings") { SettingsScreen(settings) }
+            composable("me") {
+                MeScreen(friendsModel,container.social,syncHistory={container.sharing.syncHistory()},
+                    onSettings={nav.navigate("settings")}) {socialSubpage=it}
+            }
+            composable("settings") { SettingsScreen(settings,onBack={nav.popBackStack()}) }
         }
     }
     if (pendingTemplateExit != null && templateEditor != null) {

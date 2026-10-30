@@ -115,7 +115,7 @@ fun OnboardingScreen(preferences: UserPreferences, message: String? = null, onSa
 }
 
 @Composable
-fun SettingsScreen(model: SettingsViewModel) {
+fun SettingsScreen(model: SettingsViewModel,onBack:(()->Unit)?=null) {
     val preferences by model.preferences.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
     val message by model.message.collectAsStateWithLifecycle()
@@ -130,7 +130,10 @@ fun SettingsScreen(model: SettingsViewModel) {
         uri?.let { model.import(context, it) }
     }
     Column(Modifier.fillMaxSize().testTag("settings-scroll").verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("设置", style = MaterialTheme.typography.headlineMedium)
+        Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+            if(onBack!=null) IconButton(onClick=onBack) {LineIcon(Symbol.BACK,Modifier.size(24.dp).semanticsLabel("返回我的"))}
+            Text("设置",style=MaterialTheme.typography.headlineMedium)
+        }
         EquipmentChoices(form)
         SplitChoices(form)
         MuscleChoices(form)

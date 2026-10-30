@@ -49,7 +49,7 @@ class WorkoutExperienceTest {
     @Test fun navigationUsesFourTabsAndIndependentHistoryAndTemplates() {
         show()
         compose.onNodeWithTag("main-navigation").assertExists()
-        listOf("主页", "动作", "好友", "设置").forEach { label ->
+        listOf("主页", "动作", "好友", "我的").forEach { label ->
             compose.onNode(hasText(label, substring = false) and hasAnyAncestor(hasTestTag("main-navigation"))).assertExists()
         }
         listOf("模板", "历史").forEach { label ->
@@ -79,8 +79,13 @@ class WorkoutExperienceTest {
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         waitText("动作库")
         compose.onNodeWithTag("main-navigation").assertExists()
-        compose.onNodeWithText("设置", substring = false).performClick()
+        compose.onNodeWithText("我的", substring = false).performClick()
+        waitText("设置")
+        compose.onNodeWithTag("open-settings").performClick()
         waitText("保存设置")
+        compose.onNodeWithTag("main-navigation").assertDoesNotExist()
+        compose.onNodeWithContentDescription("返回我的").performClick()
+        waitText("设置")
         compose.onNodeWithText("主页", substring = false).performClick()
         waitText("今日训练")
     }
