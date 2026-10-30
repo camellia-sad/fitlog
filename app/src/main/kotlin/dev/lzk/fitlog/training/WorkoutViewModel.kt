@@ -113,9 +113,10 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
         container.preparation.savePreparedExercises(container.preparation.preparedExercises.first().filterNot { it == id })
     }
 
-    fun saveSummaryFeedback(id: String, text: String) = mutate {
+    fun saveSummaryFeedback(id: String, text: String, dismiss:Boolean=true,onSaved:()->Unit={}) = mutate {
         repository.saveFeedback(id, text)
-        dismissSummary()
+        if(dismiss)dismissSummary()
+        onSaved()
     }
 
     fun addExercise(sessionId: String, exerciseId: String, count: Int = WorkoutRules.DEFAULT_SET_COUNT) = mutate {

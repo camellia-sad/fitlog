@@ -140,9 +140,10 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
                         }
                     }
                     if(post.body.isNotBlank()) Text(post.body)
-                    post.mediaPaths.chunked(3).forEach {row->
+                    if(post.mediaPaths.size==1) SocialImage(repository,post.mediaPaths.single(),Modifier.fillMaxWidth().height(240.dp))
+                    else post.mediaPaths.chunked(3).forEach {row->
                         Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-                            row.forEach {path->SocialImage(repository,path,Modifier.weight(1f).height(110.dp))}
+                            row.forEach {path->SocialImage(repository,path,Modifier.weight(1f).height(110.dp),gallery=post.mediaPaths)}
                             repeat(3-row.size){Spacer(Modifier.weight(1f))}
                         }
                     }

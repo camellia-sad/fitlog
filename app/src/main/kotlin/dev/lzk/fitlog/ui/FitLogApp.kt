@@ -1,6 +1,8 @@
 package dev.lzk.fitlog.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -11,6 +13,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.launch
 import dev.lzk.fitlog.AppContainer
 import dev.lzk.fitlog.domain.*
 import dev.lzk.fitlog.features.*
@@ -43,6 +46,8 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
     val snackbars = remember { SnackbarHostState() }
     var socialSubpage by remember { mutableStateOf(false) }
     var finishing by rememberSaveable { mutableStateOf(false) }
+    var sharingWorkout by remember {mutableStateOf<Workout?>(null)}
+    val shareScope=rememberCoroutineScope()
     var pendingTemplateExit by rememberSaveable { mutableStateOf<String?>(null) }
     var resumeWorkoutAfterExit by rememberSaveable { mutableStateOf(false) }
     val monday = remember { LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) }
@@ -150,7 +155,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             composable("templates") { TemplateScreen(templates, state.workout == null, onBack = { nav.popBackStack() }, onExitEditor = { requestTemplateExit("template-list", false) }) { selectedTemplateId = it; selectionChanged = true; nav.popBackStack("home", false) } }
             composable("history") {
                 LaunchedEffect(Unit) { history.selectDate(LocalDate.now()) }
-                HistoryScreen(history, state.preferences.weightUnit, templateState.exercises, onBack = { nav.popBackStack() })
+                HistoryScreen(history, state.preferences.weightUnit, templateState.exercises, onBack = { nav.popBackStack() },onShare={sharingWorkout=it})
             }
             composable("friends") {
                 FriendsScreen(friendsModel,container.social,onLogin={nav.navigate("me")}) {socialSubpage=it}
@@ -191,11 +196,27 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
         var feeling by rememberSaveable(summary.session.id) { mutableStateOf(summary.session.feedback.orEmpty()) }
         AlertDialog(onDismissRequest = model::dismissSummary, icon = { PixelPuppy(Modifier.size(64.dp), if (summary.allSetsCompleted) PuppyPose.CELEBRATE else PuppyPose.REST) },
             title = { Text(if (summary.allSetsCompleted) "全部目标已完成" else "本次训练已结束") }, text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     WorkoutDetails(summary, state.preferences.weightUnit)
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                        Text("训练感想",Modifier.weight(1f),style=MaterialTheme.typography.titleSmall)
+                        TextButton(onClick={
+                            model.saveSummaryFeedback(summary.session.id,feeling,dismiss=false) {
+                                sharingWorkout=summary.copy(session=summary.session.copy(feedback=feeling))
+                            }
+                        }){Text("分享到动态")}
+                    }
                     OutlinedTextField(feeling, { feeling = it.take(2000) }, label = { Text("训练感想（选填）") }, maxLines = 2)
                 }
             },
             confirmButton = { TextButton(onClick = { model.saveSummaryFeedback(summary.session.id, feeling) }) { Text("完成") } })
+    }
+    sharingWorkout?.let {workout->
+        WorkoutShareDialog(workout,container.friends,container.social,onClose={sharingWorkout=null},
+            onLogin={sharingWorkout=null;model.dismissSummary();nav.navigate("me"){popUpTo("home");launchSingleTop=true}},
+            onPublished={
+                sharingWorkout=null;model.dismissSummary()
+                shareScope.launch {snackbars.showSnackbar("已分享到动态")}
+            })
     }
 }

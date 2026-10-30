@@ -33,7 +33,7 @@ import java.time.temporal.TemporalAdjusters
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HistoryScreen(model: HistoryViewModel, unit: WeightUnit, exercises: List<Exercise>, onBack: () -> Unit) {
+fun HistoryScreen(model: HistoryViewModel, unit: WeightUnit, exercises: List<Exercise>, onBack: () -> Unit,onShare:((Workout)->Unit)?=null) {
     val year by model.year.collectAsStateWithLifecycle()
     val all by model.history.collectAsStateWithLifecycle()
     val date by model.selectedDate.collectAsStateWithLifecycle()
@@ -100,6 +100,7 @@ fun HistoryScreen(model: HistoryViewModel, unit: WeightUnit, exercises: List<Exe
                             style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         workout.session.feedback?.let { feeling -> Text(feeling, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        if(onShare!=null && workout.session.status==SessionStatus.FINISHED) TextButton(onClick={onShare(workout)}){Text("分享到动态")}
                     }
                 }
             }

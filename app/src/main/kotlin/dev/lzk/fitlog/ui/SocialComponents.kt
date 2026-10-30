@@ -7,6 +7,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
@@ -42,8 +43,9 @@ internal object AvatarImages {
     fun clear(){images.evictAll()}
 }
 
-@Composable internal fun SocialImage(repository:SocialRepository,path:String,modifier:Modifier=Modifier,avatar:Boolean=false,
+@Composable internal fun SocialImage(repository:SocialRepository,path:String,modifier:Modifier=Modifier,avatar:Boolean=false,previewEnabled:Boolean=true,gallery:List<String> = listOf(path),fullSize:Boolean=false,onLongClick:(()->Unit)?=null,
     fallback:@Composable ()->Unit={Text("…",style=MaterialTheme.typography.labelSmall)}) {
+    var preview by remember(path){mutableStateOf(false)}
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     val profileFlow=remember(repository) {
         (repository as? FriendsRepository)?.profile ?: kotlinx.coroutines.flow.MutableStateFlow<SocialProfile?>(null)
@@ -63,7 +65,7 @@ internal object AvatarImages {
                     BitmapFactory.decodeByteArray(bytes,0,bytes.size,bounds)
                     require(bounds.outWidth>0 && bounds.outHeight>0 && bounds.outWidth.toLong()*bounds.outHeight<=64_000_000) {"图片尺寸过大"}
                     var sample=1
-                    while(maxOf(bounds.outWidth,bounds.outHeight)/sample>(if(avatar)128 else 800)) sample*=2
+                    while(maxOf(bounds.outWidth,bounds.outHeight)/sample>(if(avatar)128 else if(fullSize)1600 else 800)) sample*=2
                     val options=BitmapFactory.Options().apply {inSampleSize=sample}
                     BitmapFactory.decodeByteArray(bytes,0,bytes.size,options)
                 }
@@ -74,10 +76,11 @@ internal object AvatarImages {
             finally {bitmap=null}
         }
     }
-    Box(modifier,contentAlignment=Alignment.Center) {
-        bitmap?.let {Image(it.asImageBitmap(),contentDescription="图片",modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop)}
+    Box(modifier.then(if(!avatar && previewEnabled)Modifier.combinedClickable(onClickLabel="查看大图",onClick={preview=true},onLongClick=onLongClick) else Modifier),contentAlignment=Alignment.Center) {
+        bitmap?.let {Image(it.asImageBitmap(),contentDescription="图片",modifier=Modifier.fillMaxSize(),contentScale=if(avatar)ContentScale.Crop else ContentScale.Fit)}
             ?: if(avatar || !failed) fallback() else Text("图片暂不可用",style=MaterialTheme.typography.labelSmall)
     }
+    if(preview) SocialPhotoViewer(repository,gallery.ifEmpty{listOf(path)},path){preview=false}
 }
 
 @Composable internal fun SocialAvatar(repository:SocialRepository?,profile:SocialProfile,onClick:()->Unit) {

@@ -119,12 +119,12 @@ fun ChatScreen(repository:SocialRepository,me:SocialProfile,friend:Friend,friend
                                     }
                                 }
                                 if(message.body.isNotBlank()) Text(message.body)
-                                message.mediaPath?.let {SocialImage(repository,it,Modifier.fillMaxWidth().height(180.dp))}
+                                message.mediaPath?.let {SocialImage(repository,it,Modifier.fillMaxWidth().height(180.dp),onLongClick={menu=message})}
                                 if(message.forwarded.isNotEmpty()) {
                                     Text("聊天记录",style=MaterialTheme.typography.titleSmall)
                                     message.forwarded.forEach {part->
                                         Text(part.sender+"："+part.body,maxLines=5)
-                                        part.mediaPath?.let {SocialImage(repository,it,Modifier.fillMaxWidth().height(140.dp))}
+                                        part.mediaPath?.let {SocialImage(repository,it,Modifier.fillMaxWidth().height(140.dp),onLongClick={menu=message})}
                                     }
                                 }
                             }

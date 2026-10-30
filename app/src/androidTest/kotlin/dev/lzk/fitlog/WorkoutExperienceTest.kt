@@ -46,6 +46,26 @@ class WorkoutExperienceTest {
     private suspend fun template() = container.training.saveTemplate(TemplateDraft(name = "自己的推日", exercises = listOf(
         TemplateExercise("one","barbell-bench-press",0,1,8,12,37_500,90))))
 
+    @Test fun shareShortcutSavesReflectionBeforeGuestLoginPrompt() {
+        val id=runBlocking {
+            val workout=container.workouts.startWorkout()
+            container.workouts.addExercise(workout.session.id,"barbell-bench-press",1,8,12)
+            workout.session.id
+        }
+        show()
+        compose.onNodeWithText("继续训练").performScrollTo().performClick()
+        waitText("完成本组")
+        compose.onNodeWithText("完成本组").performClick()
+        waitText("全部目标已完成")
+        compose.onNodeWithText("训练感想（选填）").performTextInput("记录今天的进步")
+        compose.onNodeWithText("分享到动态").performClick()
+        waitText("登录后分享到动态")
+        assertEquals("记录今天的进步",runBlocking {container.workouts.observeWorkout(id).first()!!.session.feedback})
+        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithText("完成").performClick()
+        waitText("今日训练")
+    }
+
     @Test fun navigationUsesFourTabsAndIndependentHistoryAndTemplates() {
         show()
         compose.onNodeWithTag("main-navigation").assertExists()
