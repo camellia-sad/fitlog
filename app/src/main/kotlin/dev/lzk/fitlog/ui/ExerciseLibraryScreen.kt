@@ -64,9 +64,7 @@ fun ExerciseLibraryScreen(state: WorkoutUiState, model: WorkoutViewModel, onAdd:
             items(state.exercises, key = { it.id }) { exercise ->
                 SoftCard(Modifier.fillMaxWidth().clickable { detail = exercise }) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(12.dp)) {
-                            LineIcon(Symbol.DUMBBELL, Modifier.padding(12.dp).size(24.dp))
-                        }
+                        if(ExerciseAnimations.has(exercise.id)) ExerciseGif(exercise.id,exercise.nameZh,Modifier.size(72.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             Text(exercise.nameZh, style = MaterialTheme.typography.titleMedium)
                             Text("${exercise.equipmentType.label()} · ${exercise.primaryMuscles.joinToString("、") { it.label() }}",
@@ -90,8 +88,8 @@ fun ExerciseLibraryScreen(state: WorkoutUiState, model: WorkoutViewModel, onAdd:
                 verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text(exercise.nameZh, style = MaterialTheme.typography.headlineSmall)
                 Text(exercise.nameEn, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("${exercise.equipmentType.label()} · ${exercise.primaryMuscles.joinToString("、") { it.label() }}")
-                MuscleDiagram(exercise.primaryMuscles, exercise.secondaryMuscles)
+                Text(exercise.equipmentType.label())
+                if(ExerciseAnimations.has(exercise.id)) ExerciseGif(exercise.id,exercise.nameZh,Modifier.fillMaxWidth().height(220.dp))
                 exercise.instructions?.let { Text(it) }
                 Row {
                     TextButton(onClick = { model.favorite(exercise); detail = null }) { Text(if (exercise.isFavorite) "取消收藏" else "收藏动作") }

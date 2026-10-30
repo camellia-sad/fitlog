@@ -92,9 +92,9 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
                     SoftCard {
                         Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                             SocialAvatar(repository,current.profile){}
-                            Column {
+                            Column(Modifier.weight(1f)) {
                                 OneLineText(current.profile.nickname,style=MaterialTheme.typography.titleLarge)
-                                androidx.compose.foundation.text.selection.SelectionContainer {Text("FitLog ID："+current.profile.fitlogId,style=MaterialTheme.typography.bodySmall)}
+                                FitLogIdentityRow(current.profile.fitlogId)
                                 Text(current.status.label,color=MaterialTheme.colorScheme.primary)
                             }
                         }
@@ -232,7 +232,7 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
                         TextButton(onClick={onClose();onPerson(comment.ownerId)}){Text(comment.nickname)}
                         Text(comment.body)
                         Text(comment.createdAt.socialTime(),style=MaterialTheme.typography.labelSmall)
-                        if(comment.ownerId==me.id || post.ownerId==me.id) TextButton(onClick={launch {
+                        if(comment.ownerId==me.id) TextButton(onClick={launch {
                             repository.deleteComment(post.id,comment.id);comments=comments.filterNot {it.id==comment.id};onChanged()
                         }},enabled=!busy){Text("删除")}
                     }

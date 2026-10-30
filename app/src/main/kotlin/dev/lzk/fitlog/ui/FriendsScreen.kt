@@ -138,7 +138,5 @@ fun FriendsScreen(model:FriendsViewModel,social:SocialRepository?=null,
 
 @Composable internal fun ProfileIdentity(profile:SocialProfile) {
     OneLineText(profile.nickname,style=MaterialTheme.typography.titleLarge)
-    androidx.compose.foundation.text.selection.SelectionContainer {
-        Text("FitLog ID：${profile.fitlogId}",style=MaterialTheme.typography.bodySmall)
-    }
+    FitLogIdentityRow(profile.fitlogId)
 }

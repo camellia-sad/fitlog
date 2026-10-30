@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.*
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.text.TextRange
@@ -43,6 +44,22 @@ class SearchAndEmptyStateTest {
         models.clear()
         container.close()
         context.deleteDatabase(name)
+    }
+
+    @Test fun suppliedGifReplacesLibraryIconAndMuscleDiagramInDetail() {
+        val model=WorkoutViewModel(container);models.put("gif",model)
+        val item=dev.lzk.fitlog.domain.Exercise("barbell-bench-press","杠铃卧推","Bench",
+            dev.lzk.fitlog.domain.EquipmentType.BARBELL,setOf(dev.lzk.fitlog.domain.Muscle.CHEST))
+        compose.setContent {FitLogTheme {ExerciseLibraryScreen(WorkoutUiState(loading=false,exercises=listOf(item)),model,{})}}
+        compose.waitUntil(15_000) {
+            val pixels=compose.onNodeWithContentDescription("杠铃卧推动作演示").captureToImage().toPixelMap()
+            val colors=mutableSetOf<androidx.compose.ui.graphics.Color>()
+            for(y in 0 until pixels.height step 8)for(x in 0 until pixels.width step 8)colors.add(pixels[x,y])
+            colors.size>4
+        }
+        compose.onNodeWithText("杠铃卧推").performClick()
+        compose.waitUntil(15_000){compose.onAllNodesWithContentDescription("杠铃卧推动作演示").fetchSemanticsNodes().size==2}
+        compose.onAllNodes(hasContentDescription("肌群",substring=true)).assertCountEquals(0)
     }
 
     @Test fun deletingAndEditingSearchSurviveLateQueryResults() {

@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -65,7 +66,7 @@ fun ChatScreen(repository:SocialRepository,me:SocialProfile,friend:Friend,friend
         if(index>=0) {list.animateScrollToItem(index+1);locateMessage="已定位原消息";locate=null}
         else if(!busy) {controller.locate(id)}
     }
-    Column(Modifier.fillMaxSize().padding(horizontal=16.dp)) {
+    Column(Modifier.fillMaxSize().imePadding().padding(horizontal=16.dp).testTag("chat-screen")) {
         SocialHeader(friend.displayName,onBack) {TextButton(onClick={confirming="clear"}) {Text("清空")}}
         Text(friend.presence.label,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.primary)
         error?.let {Text(it,color=MaterialTheme.colorScheme.error)}
@@ -139,9 +140,9 @@ fun ChatScreen(repository:SocialRepository,me:SocialProfile,friend:Friend,friend
                 TextButton(onClick={reply=null}) {Text("取消")}
             }
         }
-        Row(Modifier.imePadding().padding(bottom=8.dp)) {
+        Row(Modifier.fillMaxWidth().padding(bottom=8.dp).testTag("chat-composer"),verticalAlignment=androidx.compose.ui.Alignment.Bottom) {
             TextButton(onClick=picker,enabled=!busy) {Text("图片")}
-            OutlinedTextField(text,{text=it.take(8000)},modifier=Modifier.weight(1f),maxLines=4,placeholder={Text("发消息")})
+            OutlinedTextField(text,{text=it.take(8000)},modifier=Modifier.weight(1f).testTag("chat-input"),maxLines=4,placeholder={Text("发消息")})
             TextButton(onClick={
                 val draft=MessageDraft(body=text,replyId=reply?.id)
                 controller.send(draft) {text="";reply=null}

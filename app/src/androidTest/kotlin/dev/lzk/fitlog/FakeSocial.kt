@@ -13,6 +13,9 @@ internal class FakeSocial:FriendsRepository,SocialRepository {
     var rows=listOf<ChatMessage>()
     var queue=listOf<MessageDraft>()
     var posts=listOf<SocialPost>()
+    var commentRows=listOf<SocialComment>()
+    var imageBytes=ByteArray(0)
+    var imageReads=0
     var preference=SharingPreferences()
     var bound:String?=null
     var lastReply:String?=null
@@ -47,14 +50,14 @@ internal class FakeSocial:FriendsRepository,SocialRepository {
     override suspend fun publish(draft:PostDraft){posts=listOf(SocialPost(draft.id,me.id,me.nickname,null,draft.body,draft.mediaPaths,Instant.now(),0,false,0))+posts}
     override suspend fun deletePost(id:String){posts=posts.filterNot{it.id==id}}
     override suspend fun like(id:String,liked:Boolean){}
-    override suspend fun comments(postId:String,before:SocialCursor?)=emptyList<SocialComment>()
+    override suspend fun comments(postId:String,before:SocialCursor?)=commentRows
     override suspend fun comment(postId:String,text:String,id:String){}
-    override suspend fun deleteComment(postId:String,id:String){}
+    override suspend fun deleteComment(postId:String,id:String){commentRows=commentRows.filterNot{it.id==id}}
     override suspend fun person(id:String)=SocialPerson(if(id==me.id)me else peer,SharingPreferences(),PresenceStatus.ONLINE,null,null)
     override suspend fun sharedHistory(id:String,before:SocialCursor?)=emptyList<SharedWorkout>()
     override suspend fun blocked()=emptyList<SocialProfile>()
     override suspend fun uploadImage(jpeg:ByteArray)="image"
-    override suspend fun image(path:String)=ByteArray(0)
+    override suspend fun image(path:String):ByteArray {imageReads++;return imageBytes}
     override suspend fun saveAvatar(path:String){}
     override suspend fun heartbeat(deviceId:String,status:PresenceStatus,training:LiveTraining?){}
     override suspend fun uploadWorkout(workout:Workout){}

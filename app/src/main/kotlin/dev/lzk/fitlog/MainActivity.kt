@@ -65,6 +65,7 @@ class MainActivity : ComponentActivity() {
         (application as FitLogApplication).container.sharing.foreground.value = true
     }
     override fun onStop() {
+        AvatarImages.clear()
         (application as FitLogApplication).container.sharing.foreground.value = false
         super.onStop()
     }

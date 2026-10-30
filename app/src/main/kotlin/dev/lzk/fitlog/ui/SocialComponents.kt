@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.lzk.fitlog.domain.*
 import kotlinx.coroutines.*
 import java.io.ByteArrayOutputStream
@@ -32,24 +33,41 @@ import java.time.format.DateTimeFormatter
 internal fun Instant.socialTime():String =
     DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.systemDefault()).format(this)
 
-@Composable internal fun SocialImage(repository:SocialRepository,path:String,modifier:Modifier=Modifier) {
+internal object AvatarImages {
+    private val images=object:android.util.LruCache<String,android.graphics.Bitmap>(2*1024*1024) {
+        override fun sizeOf(key:String,value:android.graphics.Bitmap)=value.allocationByteCount
+    }
+    fun get(key:String)=images.get(key)
+    fun put(key:String,bitmap:android.graphics.Bitmap){images.put(key,bitmap)}
+    fun clear(){images.evictAll()}
+}
+
+@Composable internal fun SocialImage(repository:SocialRepository,path:String,modifier:Modifier=Modifier,avatar:Boolean=false,
+    fallback:@Composable ()->Unit={Text("…",style=MaterialTheme.typography.labelSmall)}) {
     val lifecycle=LocalLifecycleOwner.current.lifecycle
-    var bitmap by remember(path) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val profileFlow=remember(repository) {
+        (repository as? FriendsRepository)?.profile ?: kotlinx.coroutines.flow.MutableStateFlow<SocialProfile?>(null)
+    }
+    val currentProfile by profileFlow.collectAsStateWithLifecycle()
+    val account=currentProfile?.id.orEmpty()
+    val cacheKey=System.identityHashCode(repository).toString()+":"+account+":"+path
+    var bitmap by remember(cacheKey) { mutableStateOf(if(avatar) AvatarImages.get(cacheKey) else null) }
     var failed by remember(path) { mutableStateOf(false) }
-    LaunchedEffect(repository,path,lifecycle) {
+    LaunchedEffect(repository,path,lifecycle,cacheKey) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             try {
-                bitmap=withContext(Dispatchers.IO) {
+                bitmap=bitmap ?: withContext(Dispatchers.IO) {
                     val bytes=repository.image(path)
                     // Decode at thumbnail size; source is bounded to 2 MB and 1600 px by upload.
                     val bounds=BitmapFactory.Options().apply {inJustDecodeBounds=true}
                     BitmapFactory.decodeByteArray(bytes,0,bytes.size,bounds)
                     require(bounds.outWidth>0 && bounds.outHeight>0 && bounds.outWidth.toLong()*bounds.outHeight<=64_000_000) {"图片尺寸过大"}
                     var sample=1
-                    while(maxOf(bounds.outWidth,bounds.outHeight)/sample>800) sample*=2
+                    while(maxOf(bounds.outWidth,bounds.outHeight)/sample>(if(avatar)128 else 800)) sample*=2
                     val options=BitmapFactory.Options().apply {inSampleSize=sample}
                     BitmapFactory.decodeByteArray(bytes,0,bytes.size,options)
                 }
+                if(avatar)bitmap?.let {AvatarImages.put(cacheKey,it)}
                 awaitCancellation()
             } catch(e:CancellationException) {throw e}
             catch(_:Exception) { failed=true }
@@ -58,13 +76,13 @@ internal fun Instant.socialTime():String =
     }
     Box(modifier,contentAlignment=Alignment.Center) {
         bitmap?.let {Image(it.asImageBitmap(),contentDescription="图片",modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop)}
-            ?: Text(if(failed) "图片暂不可用" else "…",style=MaterialTheme.typography.labelSmall)
+            ?: if(avatar || !failed) fallback() else Text("图片暂不可用",style=MaterialTheme.typography.labelSmall)
     }
 }
 
 @Composable internal fun SocialAvatar(repository:SocialRepository?,profile:SocialProfile,onClick:()->Unit) {
     Surface(onClick=onClick,shape=CircleShape,color=MaterialTheme.colorScheme.primaryContainer,modifier=Modifier.size(48.dp).semanticsLabel(profile.nickname+"的头像")) {
-        if(repository!=null && profile.avatarPath!=null) SocialImage(repository,requireNotNull(profile.avatarPath),Modifier.fillMaxSize().clip(CircleShape))
+        if(repository!=null && profile.avatarPath!=null) SocialImage(repository,requireNotNull(profile.avatarPath),Modifier.fillMaxSize().clip(CircleShape),avatar=true) {Text(profile.nickname.take(1),style=MaterialTheme.typography.titleLarge)}
         else Box(contentAlignment=Alignment.Center) {Text(profile.nickname.take(1),style=MaterialTheme.typography.titleLarge)}
     }
 }
@@ -107,4 +125,21 @@ internal fun Instant.socialTime():String =
         }
     }
     return {picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))}
+}
+
+@Composable internal fun FitLogIdentityRow(id:String) {
+    val clipboard=androidx.compose.ui.platform.LocalClipboard.current
+    val scope=rememberCoroutineScope()
+    var copied by remember(id){mutableStateOf(false)}
+    Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.fillMaxWidth()) {
+        androidx.compose.foundation.text.selection.SelectionContainer(Modifier.weight(1f)) {
+            Text("FitLog ID："+id,style=MaterialTheme.typography.bodySmall)
+        }
+        TextButton(onClick={scope.launch {
+            clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("FitLog ID",id)))
+            copied=true;delay(1500);copied=false
+        }},modifier=Modifier.semanticsLabel("复制 FitLog ID")) {
+            Text(if(copied)"已复制" else "复制",maxLines=1)
+        }
+    }
 }

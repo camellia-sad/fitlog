@@ -71,7 +71,7 @@ fun MeScreen(model:FriendsViewModel,social:SocialRepository?=null,syncHistory:su
                     }else Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                         SocialAvatar(social,current){editing=true}
                         Column(Modifier.weight(1f)) {
-                            ProfileIdentity(current)
+                            OneLineText(current.nickname,style=MaterialTheme.typography.titleLarge)
                             Text("我的资料与 FitLog ID",style=MaterialTheme.typography.bodySmall)
                         }
                         LineIcon(Symbol.ARROW,Modifier.size(20.dp))

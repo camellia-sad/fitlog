@@ -125,7 +125,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             }
         },
     ) { padding ->
-        NavHost(nav, startDestination = "home", modifier = Modifier.fillMaxSize().padding(padding)) {
+        NavHost(nav, startDestination = "home", modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             composable("home") {
                 HomeScreen(state, onStart = { onWorkoutStarted(); model.startWorkout(selectedTemplateId); goWorkout() },
                     onContinue = { onWorkoutStarted(); model.setPaused(false); goWorkout() },
