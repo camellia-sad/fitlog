@@ -49,7 +49,7 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
         }
     }
     val setsScroll = rememberLazyListState()
-    LaunchedEffect(exercise?.id) { setsScroll.scrollToItem(0) }
+    LaunchedEffect(exercise?.id) { setsScroll.requestScrollToItem(0) }
     val now by produceState(Instant.now(), workout?.session?.id) {
         while (true) { value = Instant.now(); delay(1_000) }
     }

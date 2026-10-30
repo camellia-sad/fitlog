@@ -14,6 +14,9 @@ class AppContainer(context: Context, databaseName: String = "fitlog.db") : AutoC
     val preferences: PreferencesRepository = settingsStore
     val preparation: PreparationRepository = settingsStore
     val backups: BackupRepository = JsonBackupRepository(database)
+    val friends: FriendsRepository by lazy {
+        SupabaseFriendsRepository(context.applicationContext, BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_PUBLISHABLE_KEY, databaseName)
+    }
     val ready = scope.async { ExerciseCatalog(context.applicationContext, database).initialize() }
     fun initialize() { ready.start() }
     override fun close() { scope.cancel(); database.close() }

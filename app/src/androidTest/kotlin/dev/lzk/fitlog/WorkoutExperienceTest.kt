@@ -46,10 +46,10 @@ class WorkoutExperienceTest {
     private suspend fun template() = container.training.saveTemplate(TemplateDraft(name = "自己的推日", exercises = listOf(
         TemplateExercise("one","barbell-bench-press",0,1,8,12,37_500,90))))
 
-    @Test fun navigationUsesThreeTabsAndIndependentHistoryAndTemplates() {
+    @Test fun navigationUsesFourTabsAndIndependentHistoryAndTemplates() {
         show()
         compose.onNodeWithTag("main-navigation").assertExists()
-        listOf("主页", "动作", "设置").forEach { label ->
+        listOf("主页", "动作", "好友", "设置").forEach { label ->
             compose.onNode(hasText(label, substring = false) and hasAnyAncestor(hasTestTag("main-navigation"))).assertExists()
         }
         listOf("模板", "历史").forEach { label ->

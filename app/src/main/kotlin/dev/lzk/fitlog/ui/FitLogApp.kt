@@ -106,9 +106,9 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
         containerColor = MaterialTheme.colorScheme.background, contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbars) },
         bottomBar = {
-            if (route in listOf("home", "library", "settings")) NavigationBar(
+            if (route in listOf("home", "library", "friends", "settings")) NavigationBar(
                 modifier = Modifier.testTag("main-navigation"), containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
-                val destinations = listOf("home" to "主页", "library" to "动作", "settings" to "设置")
+                val destinations = listOf("home" to "主页", "library" to "动作", "friends" to "好友", "settings" to "设置")
                 destinations.forEachIndexed { index, (destination, label) ->
                     NavigationBarItem(selected = route == destination,
                         onClick = {
@@ -116,7 +116,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                                 nav.navigate(destination) { popUpTo("home"); launchSingleTop = true }
                             }
                         },
-                        icon = { LineIcon(listOf(Symbol.HOME, Symbol.DUMBBELL, Symbol.SETTINGS)[index], Modifier.size(23.dp),
+                        icon = { LineIcon(listOf(Symbol.HOME, Symbol.DUMBBELL, Symbol.FRIENDS, Symbol.SETTINGS)[index], Modifier.size(23.dp),
                             if (route == destination) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
                         label = { Text(label, maxLines = 1) })
                 }
@@ -148,6 +148,10 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             composable("history") {
                 LaunchedEffect(Unit) { history.selectDate(LocalDate.now()) }
                 HistoryScreen(history, state.preferences.weightUnit, templateState.exercises, onBack = { nav.popBackStack() })
+            }
+            composable("friends") {
+                val friendsModel: FriendsViewModel = viewModel(factory = FriendsViewModel.Factory(container.friends))
+                FriendsScreen(friendsModel)
             }
             composable("settings") { SettingsScreen(settings) }
         }
