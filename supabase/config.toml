@@ -1,0 +1,2 @@
+[functions.chat-maintenance]
+verify_jwt = false

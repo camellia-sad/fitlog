@@ -16,6 +16,7 @@ class ChatController(
     suspend fun refresh() {
         if (browsingHistory.value || busy.value) return
         try {
+            if(messages.value.isEmpty()) messages.value=repository.localMessages(peer)
             pending.value = repository.pending(peer)
             messages.value = repository.messages(peer)
             repository.markRead(peer)

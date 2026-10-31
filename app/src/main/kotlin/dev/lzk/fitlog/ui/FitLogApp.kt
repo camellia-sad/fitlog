@@ -139,8 +139,9 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                     selectedTemplateId = selectedTemplateId,
                     onSelectTemplate = { selectedTemplateId = it; selectionChanged = true },
                     prepared = state.preparedExerciseIds.mapNotNull { id -> templateState.exercises.find { it.id == id } },
-                    onRemovePrepared = model::removePreparedExercise)
+                    onRemovePrepared = model::removePreparedExercise, updates=container.updates)
             }
+            composable("backups") {BackupScreen(container,onBack={nav.popBackStack()},onLogin={nav.navigate("me")})}
             composable("library") {
                 ExerciseLibraryScreen(state, model, onTemplates = { nav.navigate("templates") }, onAdd = { exercise -> model.startAndAddExercise(exercise.id)
                     if (state.workout == null) {
@@ -164,7 +165,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                 MeScreen(friendsModel,container.social,syncHistory={container.sharing.syncHistory()},
                     onSettings={nav.navigate("settings")}) {socialSubpage=it}
             }
-            composable("settings") { SettingsScreen(settings,onBack={nav.popBackStack()}) }
+            composable("settings") { SettingsScreen(settings,onBackups={nav.navigate("backups")},onBack={nav.popBackStack()}) }
         }
     }
     if (pendingTemplateExit != null && templateEditor != null) {

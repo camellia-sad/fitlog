@@ -25,7 +25,7 @@ import java.util.Locale
 fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Unit, onLibrary: () -> Unit,
     weekly: List<Workout> = emptyList(), templates: List<WorkoutTemplate> = emptyList(),
     onHistory: () -> Unit = {}, selectedTemplateId: String? = null, onSelectTemplate: (String?) -> Unit = {},
-    prepared: List<Exercise> = emptyList(), onRemovePrepared: (String) -> Unit = {}, plan: TrainingPlan? = null) {
+    prepared: List<Exercise> = emptyList(), onRemovePrepared: (String) -> Unit = {}, plan: TrainingPlan? = null, updates:dev.lzk.fitlog.updates.AppUpdates? = null) {
     val workout = state.workout
     var pickingTemplate by remember { mutableStateOf(false) }
     val selectedTemplate = templates.find { it.id == selectedTemplateId }
@@ -158,6 +158,7 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
                 }
             }
         }
+        updates?.let {UpdateEntry(it)}
         Spacer(Modifier.height(4.dp))
     }
     if (pickingTemplate) AlertDialog(onDismissRequest = { pickingTemplate = false }, title = { Text("选择训练模板") },

@@ -36,6 +36,7 @@ data class SharedWorkout(val id:String,val localId:String,val startedAt:Instant,
     val status:String,val completedSets:Int,val totalSets:Int,val durationSeconds:Long,val exercises:List<String>)
 
 interface SocialRepository {
+    suspend fun localMessages(peerId:String):List<ChatMessage> = emptyList()
     suspend fun messages(peerId:String,before:SocialCursor?=null):List<ChatMessage>
     suspend fun messageContext(peerId:String,id:String):List<ChatMessage>
     suspend fun send(peerId:String,draft:MessageDraft):ChatMessage
@@ -54,6 +55,7 @@ interface SocialRepository {
     suspend fun person(id:String):SocialPerson
     suspend fun sharedHistory(id:String,before:SocialCursor?=null):List<SharedWorkout>
     suspend fun blocked():List<SocialProfile>
+    suspend fun uploadChatImage(jpeg:ByteArray):String = uploadImage(jpeg)
     suspend fun uploadImage(jpeg:ByteArray):String
     suspend fun image(path:String):ByteArray
     suspend fun saveAvatar(path:String)

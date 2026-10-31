@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 interface TrainingDao {
     @Query("SELECT * FROM template_drafts ORDER BY templateId IS NOT NULL, id")
     fun observeTemplateDrafts(): Flow<List<TemplateDraftEntity>>
+    @Query("SELECT * FROM template_drafts ORDER BY id") suspend fun allDrafts(): List<TemplateDraftEntity>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putTemplateDraft(draft: TemplateDraftEntity)
     @Query("DELETE FROM template_drafts WHERE id = :id") suspend fun deleteTemplateDraft(id: String)
 

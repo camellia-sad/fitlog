@@ -73,7 +73,7 @@ class SocialFlowTest {
         compose.waitUntil(15_000){fake.lastForward==listOf("original")}
         compose.waitUntil(15_000){compose.onAllNodesWithText("转发给好友").fetchSemanticsNodes().isEmpty()}
         compose.onNodeWithText("原始消息").performTouchInput{longClick()}
-        compose.onNodeWithText("仅从我的所有设备删除").performClick()
+        compose.onNodeWithText("仅从本机删除").performClick()
         compose.waitUntil(15_000){fake.rows.none{it.id=="original"}}
     }
     @Test fun sharingRequiresExplicitBindingAndCanBeCancelled() {

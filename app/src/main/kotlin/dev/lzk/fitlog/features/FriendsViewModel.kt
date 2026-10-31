@@ -32,6 +32,7 @@ class FriendsViewModel(private val repository: FriendsRepository) : ViewModel() 
     }
     fun refresh() = execute {
         if (!configured) return@execute
+        if(profile.value!=null && friends.value.isEmpty()) friends.value=repository.cachedFriends()
         repository.refreshProfile()
         friends.value=if(profile.value==null) emptyList() else repository.friends()
     }

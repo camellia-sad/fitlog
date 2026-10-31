@@ -115,7 +115,7 @@ fun OnboardingScreen(preferences: UserPreferences, message: String? = null, onSa
 }
 
 @Composable
-fun SettingsScreen(model: SettingsViewModel,onBack:(()->Unit)?=null) {
+fun SettingsScreen(model: SettingsViewModel,onBack:(()->Unit)?=null,onBackups:(()->Unit)?=null) {
     val preferences by model.preferences.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
     val message by model.message.collectAsStateWithLifecycle()
@@ -152,8 +152,9 @@ fun SettingsScreen(model: SettingsViewModel,onBack:(()->Unit)?=null) {
             try { error = null; model.save(form.build()) } catch (e: Exception) { error = e.message }
         }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = !busy) { Text("保存设置") }
         HorizontalDivider()
-        Text("本地备份", style = MaterialTheme.typography.titleLarge)
-        Text("备份包含动作、收藏与归档、模板、循环计划和训练记录。偏好保留在本机。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("备份与恢复", style = MaterialTheme.typography.titleLarge)
+        if(onBackups!=null) Button(onClick=onBackups,enabled=!busy,modifier=Modifier.fillMaxWidth()) {Text("云端备份与恢复")}
+        Text("JSON 包含训练、动作、模板、计划、偏好、草稿和当前账号的聊天数据区。图片保留在本机，可随云端备份恢复。", color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedButton(onClick = { exporter.launch("FitLog-${java.time.LocalDate.now()}.json") }, enabled = !busy,
             modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("导出 JSON 备份") }
         OutlinedButton(onClick = { confirmImport = true }, enabled = !busy,
@@ -162,11 +163,11 @@ fun SettingsScreen(model: SettingsViewModel,onBack:(()->Unit)?=null) {
         message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
         HorizontalDivider()
         PersonalDataDeleteButton()
-        Text("FitLog · 完全离线", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("FitLog · 训练离线可用", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(16.dp))
     }
     if (confirmImport) AlertDialog(onDismissRequest = { confirmImport = false }, title = { Text("合并备份数据？") },
-        text = { Text("相同记录不会重复导入，同 ID 的不同训练、模板或计划会取消整批导入。动作收藏和归档状态采用备份值，偏好保持当前设置。建议先导出本机备份。") },
+        text = { Text("相同记录不会重复导入，同 ID 的不同训练、模板或计划会取消整批导入。动作收藏、归档及偏好采用备份值，旧版备份不改变偏好。建议先导出本机备份。") },
         confirmButton = { TextButton(onClick = { confirmImport = false; importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }) { Text("选择备份") } },
         dismissButton = { TextButton(onClick = { confirmImport = false }) { Text("取消") } })
 }

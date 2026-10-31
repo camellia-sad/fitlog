@@ -14,13 +14,32 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SocialCacheTest {
     private val context=ApplicationProvider.getApplicationContext<Context>()
-    @Test fun messageCacheIsOwnerScopedBoundedAndDeletionDoesNotAffectOtherAccount()=runBlocking {
+    @get:Rule val migration=androidx.room.testing.MigrationTestHelper(
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation(),SocialCacheDatabase::class.java.canonicalName!!,
+        androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory())
+    @Test fun versionOneChatAndOutboxSurviveUpgradeToPersistentHistory()=runBlocking {
+        val name="social-upgrade-test.db"
+        migration.createDatabase(name,1).apply {
+            execSQL("INSERT INTO cached_messages VALUES('a','b','message',123,'{}')")
+            execSQL("INSERT INTO message_outbox VALUES('a','b','draft','{}',123)")
+            close()
+        }
+        migration.runMigrationsAndValidate(name,2,true,SocialCacheDatabase.MIGRATION_1_2).close()
+        val db=Room.databaseBuilder(context,SocialCacheDatabase::class.java,name).addMigrations(SocialCacheDatabase.MIGRATION_1_2).build()
+        try {
+            assertEquals("message",db.dao().messages("a","b").single().id)
+            assertEquals("draft",db.dao().pending("a","b").single().id)
+            assertTrue(db.dao().posts("a").isEmpty())
+        }finally {db.close();context.deleteDatabase(name)}
+    }
+    @Test fun localHistoryIsOwnerScopedPersistsBeyondViewWindowAndDeletionIsIsolated()=runBlocking {
         val database=Room.inMemoryDatabaseBuilder(context,SocialCacheDatabase::class.java).build()
         try {
             val dao=database.dao()
             dao.put((0..1600).map {CachedMessageEntity("a","peer","m$it",it.toLong(),"{}")})
             dao.put(listOf(CachedMessageEntity("b","peer","m1600",1600,"{}")))
-            dao.trim("a")
+            assertEquals(1601,dao.all("a").size)
+            assertEquals(50,dao.page("a","peer",Long.MAX_VALUE,"~").size)
             assertEquals(150,dao.messages("a","peer").size)
             assertEquals("m1600",dao.messages("a","peer").first().id)
             dao.remove("a","peer","m1600")

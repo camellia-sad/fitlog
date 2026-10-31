@@ -130,12 +130,12 @@ open class SupabaseFriendsRepository(context: Context, private val baseUrl: Stri
     private fun decodeProfile(value: JSONObject) = SocialProfile(value.getString("id"), value.getString("fitlog_id"),
         value.getString("nickname"), value.optString("bio"), value.optString("avatar_path").takeIf { it.isNotBlank() && it!="null" })
 
-    protected suspend fun authorizedBinary(path:String,method:String="GET",payload:ByteArray?=null,mime:String="image/jpeg"):ByteArray {
-        val expectedOwner=requireProfileId()
+    protected suspend fun authorizedBinary(path:String,method:String="GET",payload:ByteArray?=null,mime:String="image/jpeg",
+        expectedOwner:String=requireProfileId(),maxBytes:Int=4_000_000):ByteArray {
         return lock.withLock {
             check(profile.value?.id==expectedOwner) {"账号已切换"}
             refreshToken()
-            try {requestBytes(path,method,payload,requireNotNull(session).getString("access_token"),null,mime)}
+            try {requestBytes(path,method,payload,requireNotNull(session).getString("access_token"),null,mime,maxBytes)}
             catch(e:CloudException) {
                 if(e.status==401) {store.clear();session=null;_profile.value=null}
                 throw e
@@ -147,7 +147,7 @@ open class SupabaseFriendsRepository(context: Context, private val baseUrl: Stri
         token: String? = null, prefer: String? = null): String =
         String(requestBytes(path,method,body?.toString()?.toByteArray(Charsets.UTF_8),token,prefer,"application/json; charset=utf-8"),Charsets.UTF_8)
 
-    private suspend fun requestBytes(path:String,method:String,payload:ByteArray?,token:String?,prefer:String?,mime:String):ByteArray = withContext(Dispatchers.IO) {
+    private suspend fun requestBytes(path:String,method:String,payload:ByteArray?,token:String?,prefer:String?,mime:String,maxBytes:Int=4_000_000):ByteArray = withContext(Dispatchers.IO) {
         check(configured) { "尚未配置云端连接" }
         val connection = URI(baseUrl.trimEnd('/') + path).toURL().openConnection() as HttpsURLConnection
         try {
@@ -169,7 +169,7 @@ open class SupabaseFriendsRepository(context: Context, private val baseUrl: Stri
                 while(true) {
                     val count=input.read(buffer)
                     if(count<0) break
-                    require(output.size()+count<=4_000_000) {"云端响应过大"}
+                    require(output.size()+count<=maxBytes) {"云端响应过大"}
                     output.write(buffer,0,count)
                 }
                 output.toByteArray()

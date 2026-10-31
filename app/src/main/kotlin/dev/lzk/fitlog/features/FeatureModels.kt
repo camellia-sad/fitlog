@@ -126,7 +126,7 @@ class SettingsViewModel(container: AppContainer) : FeatureModel(container) {
     fun save(value: UserPreferences) = execute { container.preferences.save(value.copy(onboardingCompleted = true)); message.value = "设置已保存" }
 
     fun export(context: Context, uri: Uri) = transfer {
-        val text = container.backups.exportJson()
+        val text = container.portableBackups.exportLocalJson()
         withContext(Dispatchers.IO) {
             requireNotNull(context.contentResolver.openOutputStream(uri, "wt")) { "无法打开导出位置" }
                 .bufferedWriter().use { it.write(text) }
@@ -150,7 +150,7 @@ class SettingsViewModel(container: AppContainer) : FeatureModel(container) {
                 output.toString("UTF-8")
             }
         }
-        val result = withContext(Dispatchers.IO) { container.backups.importJson(text) }
+        val result = withContext(Dispatchers.IO) { container.portableBackups.importLocalJson(text) }
         message.value = "导入完成：新增 ${result.sessionsAdded} 次训练、${result.templatesAdded} 个模板、${result.exercisesAdded} 个动作"
     }
 

@@ -13,12 +13,14 @@ class AppContainer(context: Context, databaseName: String = "fitlog.db") : AutoC
     private val settingsStore = UserPreferencesStore(context.applicationContext, scope, "$databaseName.preferences_pb")
     val preferences: PreferencesRepository = settingsStore
     val preparation: PreparationRepository = settingsStore
-    val backups: BackupRepository = JsonBackupRepository(database)
+    val backups = JsonBackupRepository(database, settingsStore, settingsStore)
     private val socialDelegate = lazy {
         SupabaseSocialRepository(context.applicationContext, BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_PUBLISHABLE_KEY, databaseName)
     }
     val social get() = socialDelegate.value
     val friends: FriendsRepository get() = social
+    val portableBackups by lazy {PortableBackupRepository(backups,social)}
+    val updates by lazy {dev.lzk.fitlog.updates.AppUpdates(context,BuildConfig.UPDATE_MANIFEST_URL,databaseName)}
     val sharing by lazy { dev.lzk.fitlog.features.TrainingSharing(scope, workouts, training, social) }
     val ready = scope.async { ExerciseCatalog(context.applicationContext, database).initialize() }
     fun initialize() { ready.start() }

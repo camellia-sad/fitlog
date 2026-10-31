@@ -6,12 +6,14 @@ import dev.lzk.fitlog.domain.*
 import java.time.LocalDate
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlinx.coroutines.flow.first
 
-class JsonBackupRepository(private val database: FitLogDatabase) : BackupRepository {
+class JsonBackupRepository(private val database: FitLogDatabase,
+    private val preferences: PreferencesRepository? = null, private val preparation: PreparationRepository? = null) : BackupRepository {
     companion object { const val MAX_BYTES = 32 * 1024 * 1024 }
     private val dao = database.trainingDao()
     private val tableNames = listOf("exercises", "exercise_muscles", "workout_templates",
-        "template_exercises", "workout_sessions", "session_exercises", "set_records", "training_plans", "plan_days")
+        "template_exercises", "workout_sessions", "session_exercises", "set_records", "training_plans", "plan_days", "template_drafts")
 
     override suspend fun exportJson(): String = database.withTransaction {
         val data = JSONObject()
@@ -34,10 +36,19 @@ class JsonBackupRepository(private val database: FitLogDatabase) : BackupReposit
             }
             data.put(table, rows)
         }
-        JSONObject().put("format", "FitLog").put("schemaVersion", 2).put("data", data).toString()
+        JSONObject().put("format", "FitLog").put("schemaVersion", 3).put("data", data).apply {
+            preferences?.let {put("preferences",it.preferences.first().backupJson())}
+            preparation?.let {put("preparedExercises",JSONArray(it.preparedExercises.first()))}
+        }.toString()
     }
 
-    override suspend fun importJson(json: String): ImportResult {
+    override suspend fun importJson(json: String): ImportResult = importData(json,true)
+    private class PreviewRollback:RuntimeException()
+    suspend fun validateJson(json:String) {
+        try {database.withTransaction {importData(json,false);throw PreviewRollback()}}
+        catch(_:PreviewRollback) { }
+    }
+    private suspend fun importData(json:String,applyPreferences:Boolean):ImportResult {
         require(json.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) { "备份最大支持 32 MB" }
         var depth = 0
         var quoted = false
@@ -53,8 +64,24 @@ class JsonBackupRepository(private val database: FitLogDatabase) : BackupReposit
         }
         val root = JSONObject(json)
         val version = root.integer("schemaVersion")
-        require(root.getString("format") == "FitLog" && version in 1..2) { "不支持的备份版本" }
+        require(root.getString("format") == "FitLog" && version in 1..3) { "不支持的备份版本" }
+        val restoredPreferences = if(version>=3) root.optJSONObject("preferences")?.backupPreferences() else null
+        val prepared = if(version>=3) root.optJSONArray("preparedExercises")?.strings() else null
+        require(prepared==null || prepared.size<=30 && prepared.distinct().size==prepared.size) {"待开始动作无效"}
         val data = root.getJSONObject("data")
+        val drafts = if(version>=3) data.rows("template_drafts") {
+            TemplateDraftEntity(it.text("id"),it.optionalText("templateId"),it.text("content"))
+        } else emptyList()
+        require(drafts.distinctBy {it.id}.size==drafts.size) {"模板草稿重复"}
+        drafts.forEach {row->
+            require(row.id==templateDraftKey(row.templateId) && row.content.length<=1_000_000) {"模板草稿无效"}
+            val draft=row.toDraft()
+            require(draft.name.length<=200 && draft.exercises.size<=30) {"模板草稿过大"}
+            draft.exercises.forEach {
+                WorkoutRules.setCount(it.targetSetCount);WorkoutRules.repRange(it.targetRepMin,it.targetRepMax)
+                WorkoutRules.draft(it.defaultWeightGrams,0);WorkoutRules.rest(it.restSeconds)
+            }
+        }
         val incoming = Bundle(
             data.rows("exercises") { ExerciseEntity(it.text("id"), it.text("nameZh"), it.text("nameEn"), it.text("equipmentType"),
                 it.optionalText("instructions"), it.optionalInt("estimatedSecondsPerSet"), it.optionalText("mediaAssetPath"),
@@ -77,7 +104,7 @@ class JsonBackupRepository(private val database: FitLogDatabase) : BackupReposit
             if (version >= 2) data.rows("plan_days") { PlanDayEntity(it.text("planId"), it.integer("dayIndex"), it.optionalText("templateId")) } else emptyList(),
         )
         incoming.validateValues()
-        return database.withTransaction {
+        val result = database.withTransaction {
             val existing = Bundle(dao.allExercises(), dao.allMuscles(), dao.allTemplates(), dao.allTemplateExercises(),
                 dao.allSessions(), dao.allSessionExercises(), dao.allSets(), dao.allPlans(), dao.allPlanDays())
             val localExercises = existing.exercises.associateBy { it.id }
@@ -107,6 +134,13 @@ class JsonBackupRepository(private val database: FitLogDatabase) : BackupReposit
                 existing.sessionExercises + sessionExercises, existing.sets + sets,
                 existing.plans + plans, existing.planDays + planDays).validateRelations()
 
+            val importedDrafts=fresh(drafts,dao.allDrafts()) {it.id}
+            val exerciseIds=(existing.exercises+newExercises).map {it.id}.toSet()
+            require(prepared.orEmpty().all {it in exerciseIds}) {"待开始动作不存在"}
+            importedDrafts.forEach {row->
+                require(row.templateId==null || (existing.templates+templates).any {it.id==row.templateId}) {"草稿模板不存在"}
+                require(row.toDraft().exercises.all {it.exerciseId in exerciseIds}) {"草稿动作不存在"}
+            }
             dao.importExercises(newExercises)
             dao.importMuscles(muscles)
             incoming.exercises.forEach { item ->
@@ -119,8 +153,14 @@ class JsonBackupRepository(private val database: FitLogDatabase) : BackupReposit
             database.workoutDao().insertSets(sets)
             dao.importPlans(plans)
             dao.insertPlanDays(planDays)
+            importedDrafts.forEach {dao.putTemplateDraft(it)}
             ImportResult(sessions.size, templates.size, newExercises.size)
         }
+        if(applyPreferences) {
+            restoredPreferences?.let {preferences?.save(it)}
+            prepared?.let {preparation?.savePreparedExercises(it)}
+        }
+        return result
     }
 
     private fun <T> fresh(incoming: List<T>, existing: List<T>, key: (T) -> String): List<T> {

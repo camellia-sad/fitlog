@@ -55,7 +55,7 @@ fun ChatScreen(repository:SocialRepository,me:SocialProfile,friend:Friend,friend
         onDispose {lifecycle.removeObserver(observer)}
     }
     val picker=rememberImagePicker(onImage={jpeg->
-        val path=repository.uploadImage(jpeg)
+        val path=repository.uploadChatImage(jpeg)
         controller.send(MessageDraft(body=text,mediaPath=path,replyId=reply?.id)) {text="";reply=null}
     },onError={controller.error.value=it})
     BackHandler(onBack=onBack)
@@ -158,7 +158,7 @@ fun ChatScreen(repository:SocialRepository,me:SocialProfile,friend:Friend,friend
                     if(message.forwarded.isEmpty()) TextButton(onClick={selected=setOf(message.id);menu=null}) {Text("多选合并转发")}
                     if(message.sender==me.id) TextButton(onClick={controller.withdraw(message);menu=null}) {Text("撤回")}
                 }
-                TextButton(onClick={controller.delete(message);menu=null}) {Text("仅从我的所有设备删除")}
+                TextButton(onClick={controller.delete(message);menu=null}) {Text("仅从本机删除")}
             }
         },confirmButton={TextButton(onClick={menu=null}){Text("关闭")}})
     }
@@ -173,7 +173,7 @@ fun ChatScreen(repository:SocialRepository,me:SocialProfile,friend:Friend,friend
         }
     },confirmButton={TextButton(onClick={forwarding=false}){Text("取消")}})
     if(confirming=="clear") AlertDialog(onDismissRequest={confirming=null},title={Text("清空聊天记录？")},
-        text={Text("只从自己的所有设备清空，对方的记录保留。")},
+        text={Text("清空本机聊天记录，对方的记录保留。已上传的旧备份仍可能包含这些记录，可在云端备份页删除。")},
         confirmButton={TextButton(onClick={controller.clear();confirming=null}){Text("清空")}},
         dismissButton={TextButton(onClick={confirming=null}){Text("取消")}})
 }

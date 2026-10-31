@@ -16,6 +16,7 @@ interface FriendsRepository {
     suspend fun verifyCode(email: String, code: String)
     suspend fun refreshProfile()
     suspend fun saveProfile(nickname: String, bio: String)
+    suspend fun cachedFriends():List<Friend> = emptyList()
     suspend fun friends(): List<Friend>
     suspend fun find(fitlogId: String): SocialProfile?
     suspend fun act(peerId: String, action: String)
