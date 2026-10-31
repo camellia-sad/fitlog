@@ -40,14 +40,19 @@ class RoomWorkoutRepository(
         template?.exercises?.sortedBy { it.sortOrder }?.forEachIndexed { index, item ->
             val source = dao.exercise(item.exerciseId) ?: missing("模板动作不存在")
             WorkoutRules.input(!source.isArchived, "模板包含已归档动作，请先修改模板")
+            WorkoutRules.input(source.recordMetric!="SECONDS" || item.defaultWeightGrams==0L,"时长动作不记录重量")
             val id = newId()
             dao.insertSessionExercise(SessionExerciseEntity(id, session.id, source.id, index, source.nameZh,
-                item.targetSetCount, item.targetRepMin, item.targetRepMax, item.restSeconds))
+                item.targetSetCount, item.targetRepMin, item.targetRepMax, item.restSeconds,source.recordMetric))
             dao.insertSets((1..item.targetSetCount).map { setIndex ->
                 SetEntity(newId(), id, setIndex, item.defaultWeightGrams, item.targetRepMin)
             })
         }
-        exerciseIds.forEach { addExercise(session.id, it, WorkoutRules.DEFAULT_SET_COUNT, WorkoutRules.DEFAULT_REP_MIN, WorkoutRules.DEFAULT_REP_MAX) }
+        exerciseIds.forEach {
+            val source=dao.exercise(it) ?: missing("动作不存在")
+            val metric=RecordMetric.valueOf(source.recordMetric)
+            addExercise(session.id,it,WorkoutRules.DEFAULT_SET_COUNT,metric.defaultMin,metric.defaultMax)
+        }
         workout(session.id)
     }
 
@@ -58,11 +63,12 @@ class RoomWorkoutRepository(
             activeSession(sessionId)
             val source = dao.exercise(exerciseId) ?: missing("动作不存在")
             WorkoutRules.input(!source.isArchived, "动作已归档")
-            val previous = dao.lastPerformance(exerciseId, sessionId)?.sets
+            val previous = dao.lastPerformance(exerciseId, sessionId)?.takeIf {it.exercise.recordMetricSnapshot==source.recordMetric}?.sets
                 ?.filter { it.status == "COMPLETED" }?.sortedBy { it.setIndex }.orEmpty()
             val id = newId()
             dao.insertSessionExercise(SessionExerciseEntity(
                 id, sessionId, exerciseId, dao.nextExerciseOrder(sessionId), source.nameZh, setCount, repMin, repMax,
+                recordMetricSnapshot=source.recordMetric,
             ))
             dao.insertSets((1..setCount).map { index ->
                 val reference = previous.getOrNull(index - 1) ?: previous.lastOrNull()
@@ -75,6 +81,7 @@ class RoomWorkoutRepository(
         database.withTransaction {
             WorkoutRules.draft(weightGrams, reps)
             val record = editableSet(sessionExerciseId, setId)
+            validateMetric(requireNotNull(dao.sessionExercise(sessionExerciseId)),weightGrams)
             dao.updateSet(record.copy(weightGrams = weightGrams, reps = reps))
         }
     }
@@ -91,6 +98,7 @@ class RoomWorkoutRepository(
                 throw WorkoutException(WorkoutError.INVALID_INPUT, "调整后的数值超出范围")
             }
             WorkoutRules.draft(weight, reps)
+            validateMetric(requireNotNull(dao.sessionExercise(sessionExerciseId)),weight)
             dao.updateSet(record.copy(weightGrams = weight, reps = reps))
         }
     }
@@ -130,6 +138,7 @@ class RoomWorkoutRepository(
             WorkoutRules.completion(weightGrams, reps)
             WorkoutRules.rest(restSeconds)
             val source = dao.sessionExercise(sessionExerciseId) ?: missing("会话动作不存在")
+            validateMetric(source,weightGrams)
             val record = ownedSet(source.id, setId)
             val owner = dao.session(source.sessionId) ?: missing("会话不存在")
             if (finishWhenAllDone && record.status == "COMPLETED" && owner.status == "FINISHED")
@@ -242,5 +251,8 @@ class RoomWorkoutRepository(
         return record
     }
 
+    private fun validateMetric(exercise:SessionExerciseEntity,weight:Long) {
+        WorkoutRules.input(exercise.recordMetricSnapshot!="SECONDS" || weight==0L,"时长动作不记录重量")
+    }
     private fun missing(message: String): Nothing = throw WorkoutException(WorkoutError.NOT_FOUND, message)
 }

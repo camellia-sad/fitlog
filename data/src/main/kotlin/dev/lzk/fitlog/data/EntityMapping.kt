@@ -11,7 +11,7 @@ internal fun ExerciseRow.toDomain() = Exercise(
     secondaryMuscles = muscles.filter { it.role == "SECONDARY" }.map { Muscle.valueOf(it.muscle) }.toSet(),
     instructions = exercise.instructions, estimatedSecondsPerSet = exercise.estimatedSecondsPerSet,
     mediaAssetPath = exercise.mediaAssetPath, isFavorite = exercise.isFavorite,
-    isCustom = exercise.isCustom, isArchived = exercise.isArchived,
+    isCustom = exercise.isCustom, isArchived = exercise.isArchived, recordMetric=RecordMetric.valueOf(exercise.recordMetric),
 )
 
 internal fun SessionEntity.toDomain() = WorkoutSession(
@@ -28,7 +28,7 @@ internal fun SetEntity.toDomain() = SetRecord(
 internal fun SessionExerciseRow.toDomain() = SessionExercise(
     exercise.id, exercise.sessionId, exercise.exerciseId, exercise.sortOrder,
     exercise.exerciseNameSnapshot, exercise.targetSetCountSnapshot,
-    exercise.targetRepMinSnapshot, exercise.targetRepMaxSnapshot, sets.sortedBy { it.setIndex }.map { it.toDomain() }, exercise.restSecondsSnapshot,
+    exercise.targetRepMinSnapshot, exercise.targetRepMaxSnapshot, sets.sortedBy { it.setIndex }.map { it.toDomain() }, exercise.restSecondsSnapshot, RecordMetric.valueOf(exercise.recordMetricSnapshot),
 )
 
 internal fun WorkoutRow.toDomain() = Workout(session.toDomain().copy(isExtra = isExtra), exercises.sortedBy { it.exercise.sortOrder }.map { it.toDomain() })

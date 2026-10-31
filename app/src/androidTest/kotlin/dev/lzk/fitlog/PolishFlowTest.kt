@@ -95,7 +95,7 @@ class PolishFlowTest {
             val second=IntArray(first.size);bitmap.getPixels(second,0,bitmap.width,0,0,bitmap.width,bitmap.height)
             assertFalse(id,first.contentEquals(second));bitmap.recycle()
         }
-        assertFalse(ExerciseAnimations.has("standing-calf-raise"))
+        assertTrue(ExerciseAnimations.has("standing-calf-raise"))
     }
     @Test fun keyboardLeavesComposerAboveImeAndLatestMessageVisible() {
         var imePixels=0

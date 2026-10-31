@@ -105,7 +105,7 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
 
     fun startAndAddExercise(exerciseId: String) = mutate {
         val workout = repository.observeActiveWorkout().first()
-        if (workout != null) selection.value = add(workout.session.id, exerciseId)
+        if (workout != null) selection.value = addDefault(workout.session.id, exerciseId,WorkoutRules.DEFAULT_SET_COUNT)
         else container.preparation.savePreparedExercises((container.preparation.preparedExercises.first() + exerciseId).distinct())
     }
 
@@ -120,9 +120,13 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun addExercise(sessionId: String, exerciseId: String, count: Int = WorkoutRules.DEFAULT_SET_COUNT) = mutate {
-        selection.value = add(sessionId, exerciseId, count)
+        selection.value = addDefault(sessionId, exerciseId, count)
     }
 
+    private suspend fun addDefault(sessionId:String,id:String,count:Int):String {
+        val metric=repository.observeExercises().first().find {it.id==id}?.recordMetric ?: RecordMetric.REPETITIONS
+        return add(sessionId,id,count,metric.defaultMin,metric.defaultMax)
+    }
     fun updateDraft(sessionExerciseId: String, setId: String, weightGrams: Long, reps: Int) = mutate {
         update(sessionExerciseId, setId, weightGrams, reps)
     }

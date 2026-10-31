@@ -13,7 +13,7 @@ fun Workout.socialPostText(feeling:String=session.feedback.orEmpty()):String {
             val completed=exercise.sets.filter{it.status==SetStatus.COMPLETED}
             if(completed.isNotEmpty()) {
                 val line="\n"+exercise.exerciseNameSnapshot+"："+completed.joinToString(" / "){
-                    WeightUnits.format(it.weightGrams,WeightUnit.KG)+" kg × "+it.reps
+                    it.displayValue(exercise.recordMetricSnapshot)
                 }
                 if(length+line.length<=4000)append(line)
             }

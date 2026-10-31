@@ -74,7 +74,7 @@ class PortableBackupRepository(private val core:JsonBackupRepository,private val
                 files[name]=output.toByteArray();zip.closeEntry()
             }
         }
-        val manifest=JSONObject(String(files["manifest.json"] ?: error("备份缺少清单"),Charsets.UTF_8))
+        val manifest=parseBackupObject(String(files["manifest.json"] ?: error("备份缺少清单"),Charsets.UTF_8))
         require(manifest.getString("format")=="FitLogArchive" && manifest.getInt("version")==1) {"不支持的完整备份版本"}
         val hashes=manifest.getJSONObject("files")
         require(hashes.keys().asSequence().toSet()==files.keys-"manifest.json") {"备份清单不完整"}
@@ -84,7 +84,7 @@ class PortableBackupRepository(private val core:JsonBackupRepository,private val
         val chat=files["chat/messages.json"]?.toString(Charsets.UTF_8)
         require(include==(chat!=null)) {"聊天备份内容缺失"}
         val media=linkedMapOf<String,ByteArray>()
-        val posts=files["social/posts.json"]?.let {JSONObject(it.toString(Charsets.UTF_8))}
+        val posts=files["social/posts.json"]?.let {parseBackupObject(it.toString(Charsets.UTF_8))}
         if(posts!=null) {
             val account=social.profile.value?.id ?: error("恢复动态图片需要先登录")
             require(owner==account) {"备份不属于当前账号"}
@@ -144,7 +144,7 @@ class PortableBackupRepository(private val core:JsonBackupRepository,private val
     suspend fun importLocalJson(text:String):ImportResult=withContext(Dispatchers.IO) {
         social.localGate.withLock {
             require(text.toByteArray().size<=JsonBackupRepository.MAX_BYTES) {"本地 JSON 备份最大 32 MB"}
-            val root=JSONObject(text)
+            val root=parseBackupObject(text)
             val chat=root.optJSONObject("chat")?.toString()
             val posts=root.optJSONObject("publishedPosts")
             val owner=social.profile.value?.id

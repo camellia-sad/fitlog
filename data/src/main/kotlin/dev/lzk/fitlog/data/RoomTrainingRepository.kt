@@ -44,6 +44,7 @@ class RoomTrainingRepository(private val database: FitLogDatabase, private val c
         draft.exercises.forEach {
             val exercise = workouts.exercise(it.exerciseId) ?: error("动作不存在")
             WorkoutRules.input(!exercise.isArchived, "模板包含已归档动作")
+            WorkoutRules.input(exercise.recordMetric!="SECONDS" || it.defaultWeightGrams==0L,"时长动作不记录重量")
         }
         val existing = draft.id?.let { dao.template(it) }
         if (draft.id != null && existing == null) throw WorkoutException(WorkoutError.NOT_FOUND, "模板不存在")

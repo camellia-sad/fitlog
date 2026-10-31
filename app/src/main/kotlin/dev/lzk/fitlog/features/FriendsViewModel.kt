@@ -16,9 +16,12 @@ class FriendsViewModel(private val repository: FriendsRepository) : ViewModel() 
     val busy = MutableStateFlow(false)
     val message = MutableStateFlow<String?>(null)
     val codeSent = MutableStateFlow(false)
+    private var refreshJob:kotlinx.coroutines.Job?=null
+    private var refreshFailure:String?=null
     init { refresh() }
     private fun execute(action: suspend () -> Unit) {
         if (busy.value) return
+        refreshJob?.cancel()
         viewModelScope.launch {
             busy.value=true; message.value=null
             try { action() }
@@ -30,12 +33,25 @@ class FriendsViewModel(private val repository: FriendsRepository) : ViewModel() 
             finally { busy.value=false }
         }
     }
-    fun refresh() = execute {
-        if (!configured) return@execute
-        if(profile.value!=null && friends.value.isEmpty()) friends.value=repository.cachedFriends()
-        repository.refreshProfile()
-        friends.value=if(profile.value==null) emptyList() else repository.friends()
+    fun refresh() {
+        if(!configured || busy.value || refreshJob?.isActive==true) return
+        refreshJob=viewModelScope.launch {
+            try {
+                if(profile.value!=null && friends.value.isEmpty()) friends.value=repository.cachedFriends()
+                repository.refreshProfile()
+                val account=profile.value?.id
+                val rows=if(account==null) emptyList() else repository.friends()
+                if(profile.value?.id==account) friends.value=rows
+                if(message.value==refreshFailure) message.value=null
+                refreshFailure=null
+            } catch(e:CancellationException) {throw e}
+            catch(e:Exception) {
+                if(profile.value==null) {friends.value=emptyList();found.value=null}
+                if(friends.value.isEmpty()) {refreshFailure=e.message ?: "暂时无法连接，联网后自动重试";message.value=refreshFailure}
+            }
+        }
     }
+
     fun requestCode(email:String)=execute { repository.requestCode(email); codeSent.value=true; message.value="验证码已发送，请查收邮箱" }
     fun verify(email:String,code:String)=execute {
         friends.value=emptyList(); found.value=null

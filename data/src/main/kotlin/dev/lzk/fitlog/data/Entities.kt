@@ -20,6 +20,7 @@ data class ExerciseEntity(
     val isFavorite: Boolean,
     val isCustom: Boolean,
     val isArchived: Boolean,
+    @ColumnInfo(defaultValue = "'REPETITIONS'") val recordMetric:String = "REPETITIONS",
 )
 
 @Entity(
@@ -70,6 +71,7 @@ data class SessionExerciseEntity(
     val targetRepMinSnapshot: Int,
     val targetRepMaxSnapshot: Int,
     val restSecondsSnapshot: Int? = null,
+    @ColumnInfo(defaultValue = "'REPETITIONS'") val recordMetricSnapshot:String = "REPETITIONS",
 )
 
 @Entity(

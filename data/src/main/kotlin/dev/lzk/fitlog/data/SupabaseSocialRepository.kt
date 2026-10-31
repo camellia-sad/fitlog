@@ -320,7 +320,7 @@ class SupabaseSocialRepository(
             .put("total_sets",workout.plannedSetCount).put("duration_seconds",workout.elapsedDuration(now).seconds)
             .put("exercises",JSONArray(workout.exercises.map {e->
                 e.exerciseNameSnapshot+" · "+e.sets.filter{it.status==SetStatus.COMPLETED}
-                    .joinToString(" / "){"${WeightUnits.format(it.weightGrams,WeightUnit.KG)} kg × ${it.reps}"}
+                    .joinToString(" / "){it.displayValue(e.recordMetricSnapshot)}
             }))
         rpc("social_training",JSONObject().put("p_action","upload").put("p_local_id",workout.session.id).put("p_snapshot",j),owner)
     }

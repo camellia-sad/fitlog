@@ -22,6 +22,7 @@ internal fun JSONObject.socialProfile()=SocialProfile(getString("id"),getString(
     optString("bio"),optional("avatar_path"))
 internal fun LiveTraining.toJson()=JSONObject().put("session_id",sessionId).put("label",label).put("exercise",exercise)
     .put("weight_grams",weightGrams).put("reps",reps).put("set_index",setIndex).put("done",done).put("total",total)
-    .put("rest_ends_at",restEndsAt?.toString())
+    .put("rest_ends_at",restEndsAt?.toString()).put("record_metric",recordMetric.name)
 internal fun JSONObject.liveTraining()=LiveTraining(optString("session_id"),optString("label"),optString("exercise"),
-    optLong("weight_grams"),optInt("reps"),optInt("set_index"),optInt("done"),optInt("total"),optString("rest_ends_at").toSocialInstant())
+    optLong("weight_grams"),optInt("reps"),optInt("set_index"),optInt("done"),optInt("total"),optString("rest_ends_at").toSocialInstant(),
+    runCatching {RecordMetric.valueOf(optString("record_metric"))}.getOrDefault(RecordMetric.REPETITIONS))

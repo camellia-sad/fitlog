@@ -70,7 +70,7 @@ internal class LocalChatStore(context:Context,private val db:SocialCacheDatabase
     }
     fun validate(owner:String,text:String):Pair<List<CachedMessageEntity>,List<OutboxEntity>> {
         require(text.toByteArray().size<=32*1024*1024) {"聊天记录超过 32 MB"}
-        val root=JSONObject(text)
+        val root=parseBackupObject(text)
         require(root.getString("format")=="FitLogChat" && root.getInt("version")==1 && root.getString("owner")==owner) {"聊天备份不属于当前账号"}
         val rows=root.getJSONArray("messages").objects().map {j->
             val peer=j.getString("peer");java.util.UUID.fromString(peer)

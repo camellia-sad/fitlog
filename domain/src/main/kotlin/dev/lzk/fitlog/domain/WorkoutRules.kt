@@ -19,18 +19,18 @@ object WorkoutRules {
 
     fun draft(weightGrams: Long, reps: Int) {
         input(weightGrams >= 0, "重量不能为负数")
-        input(reps >= 0, "次数不能为负数")
+        input(reps >= 0, "记录数值不能为负数")
     }
 
     fun completion(weightGrams: Long, reps: Int) {
         draft(weightGrams, reps)
-        input(reps > 0, "完成组的次数必须大于零")
+        input(reps > 0, "完成组的记录数值必须大于零")
     }
 
     fun rest(seconds: Int) = input(seconds in 0..3600, "休息时长须在 0～3600 秒之间")
 
     fun setCount(count: Int) = input(count in 1..MAX_SET_COUNT, "组数须在 1 到 $MAX_SET_COUNT 之间")
-    fun repRange(min: Int, max: Int) = input(min > 0 && max >= min, "目标次数范围无效")
+    fun repRange(min: Int, max: Int) = input(min > 0 && max >= min, "目标数值范围无效")
 
     fun active(status: SessionStatus) {
         if (status != SessionStatus.ACTIVE) throw WorkoutException(WorkoutError.SESSION_NOT_ACTIVE, "会话不处于训练中")

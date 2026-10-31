@@ -52,11 +52,11 @@ class RoomWorkoutRepositoryTest {
 
     @Test fun catalogIsSearchableRelationalAndIdempotent() = runBlocking {
         ExerciseCatalog(context, db).initialize()
-        assertEquals(42, repository.observeExercises().first().size)
-        assertEquals(bench, repository.observeExercises("Barbell Bench").first().single().id)
+        assertEquals(50, repository.observeExercises().first().size)
+        assertEquals(setOf(bench,"incline-barbell-bench-press"), repository.observeExercises("Barbell Bench").first().map {it.id}.toSet())
         assertTrue(repository.observeExercises("卧推").first().size >= 2)
         val filtered = repository.observeExercises("", EquipmentType.BARBELL, Muscle.CHEST).first()
-        assertEquals(listOf(bench), filtered.map { it.id })
+        assertEquals(setOf(bench,"incline-barbell-bench-press"), filtered.map { it.id }.toSet())
         assertTrue(repository.observeExercises("%").first().isEmpty())
     }
 
@@ -219,7 +219,7 @@ class RoomWorkoutRepositoryTest {
         val exercise = add(id)
         db.openHelper.writableDatabase.execSQL("UPDATE exercises SET nameZh = '新名称', isArchived = 1 WHERE id = ?", arrayOf(bench))
         assertEquals("杠铃卧推", workout(id).exercises.single().exerciseNameSnapshot)
-        assertTrue(repository.observeExercises("Barbell Bench").first().isEmpty())
+        assertTrue(repository.observeExercises("Barbell Bench").first().none {it.id==bench})
         expect(WorkoutError.INVALID_INPUT) { add(id) }
         repository.completeSet(exercise.id, exercise.sets.first().id, 40_000, 8)
         assertEquals(1, workout(id).completedSetCount)

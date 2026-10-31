@@ -104,7 +104,7 @@ class TrainingFeaturesTest {
             val result = backup.importJson(json)
             assertEquals(1, result.sessionsAdded)
             assertEquals(1, result.templatesAdded)
-            assertEquals(43, result.exercisesAdded)
+            assertEquals(51, result.exercisesAdded)
             val restoredWorkouts = RoomWorkoutRepository(restored, clock)
             val record = requireNotNull(restoredWorkouts.observeActiveWorkout().first())
             assertEquals(SessionStatus.PAUSED, record.session.status)
@@ -112,7 +112,7 @@ class TrainingFeaturesTest {
             assertEquals(37_500L, record.exercises.first().sets.last().weightGrams)
             assertEquals(1, record.completedSetCount)
             assertNotNull(restored.workoutDao().exercise(custom))
-            assertTrue(restoredWorkouts.observeExercises("杠铃卧推").first().single().isFavorite)
+            assertTrue(restoredWorkouts.observeExercises("杠铃卧推").first().single {it.id==bench}.isFavorite)
             assertEquals(ImportResult(0, 0, 0), backup.importJson(json))
         } finally { restored.close() }
     }
@@ -174,7 +174,7 @@ class TrainingFeaturesTest {
         assertTrue(exercise.isFavorite && exercise.isArchived)
         assertEquals("杠铃卧推", current().exercises.single().exerciseNameSnapshot)
         training.setArchived(bench, false)
-        assertEquals(42, workouts.observeExercises().first().size)
+        assertEquals(50, workouts.observeExercises().first().size)
     }
 
     @Test fun preferencesPersistUnitsAndDoNotRewriteWeights() = runBlocking {

@@ -124,9 +124,11 @@ private fun TemplateEditor(draft: TemplateDraft, exercises: List<Exercise>, unit
             }
             items(draft.exercises, key = { it.id }) { item ->
                 val index = draft.exercises.indexOf(item)
+                val metric=exercises.find {it.id==item.exerciseId}?.recordMetric ?: RecordMetric.REPETITIONS
                 SoftCard {
                     Text(exercises.find { it.id == item.exerciseId }?.nameZh ?: "已归档动作", style = MaterialTheme.typography.titleMedium)
-                    Text("${item.targetSetCount} 组 × ${item.targetRepMin}–${item.targetRepMax} 次 · ${WeightUnits.format(item.defaultWeightGrams, unit)} ${unit.label} · 休息 ${item.restSeconds} 秒",
+                    Text("${item.targetSetCount} 组 × ${item.targetRepMin}–${item.targetRepMax} ${metric.unit}"+
+                        (if(metric==RecordMetric.SECONDS) "" else " · ${WeightUnits.format(item.defaultWeightGrams, unit)} ${unit.label}")+" · 休息 ${item.restSeconds} 秒",
                         style = MaterialTheme.typography.bodySmall)
                     FlowRow {
                         TextButton(onClick = { editing = item }, enabled = !saving) { Text("调整") }
@@ -170,7 +172,8 @@ private fun TemplateEditor(draft: TemplateDraft, exercises: List<Exercise>, unit
                     }
                     items(matches, key = { it.id }) { exercise ->
                         TextButton(onClick = {
-                            onChange(draft.copy(exercises = draft.exercises + TemplateExercise(UUID.randomUUID().toString(), exercise.id, draft.exercises.size)))
+                            onChange(draft.copy(exercises = draft.exercises + TemplateExercise(UUID.randomUUID().toString(), exercise.id, draft.exercises.size,
+                                targetRepMin=exercise.recordMetric.defaultMin,targetRepMax=exercise.recordMetric.defaultMax)))
                             selecting = false
                         }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(exercise.nameZh, maxLines = 1) }
                     }
@@ -179,7 +182,7 @@ private fun TemplateEditor(draft: TemplateDraft, exercises: List<Exercise>, unit
         }
     }
     editing?.let { item ->
-        TemplateItemDialog(item, unit, onDismiss = { editing = null }) { updated ->
+        TemplateItemDialog(item, unit,exercises.find {it.id==item.exerciseId}?.recordMetric ?: RecordMetric.REPETITIONS, onDismiss = { editing = null }) { updated ->
             onChange(draft.copy(exercises = draft.exercises.map { if (it.id == updated.id) updated else it }))
             editing = null
         }
@@ -206,7 +209,7 @@ fun TemplateDraftExitDialog(saving: Boolean, message: String?, onKeep: () -> Uni
 }
 
 @Composable
-private fun TemplateItemDialog(item: TemplateExercise, unit: WeightUnit, onDismiss: () -> Unit, onSave: (TemplateExercise) -> Unit) {
+private fun TemplateItemDialog(item: TemplateExercise, unit: WeightUnit,metric:RecordMetric, onDismiss: () -> Unit, onSave: (TemplateExercise) -> Unit) {
     var count by remember { mutableStateOf(item.targetSetCount.toString()) }
     var min by remember { mutableStateOf(item.targetRepMin.toString()) }
     var max by remember { mutableStateOf(item.targetRepMax.toString()) }
@@ -216,16 +219,16 @@ private fun TemplateItemDialog(item: TemplateExercise, unit: WeightUnit, onDismi
     AlertDialog(onDismissRequest = onDismiss, title = { Text("动作目标") }, text = {
         Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedTextField(count, { count = it }, label = { Text("目标组数") })
-            OutlinedTextField(min, { min = it }, label = { Text("最少次数") })
-            OutlinedTextField(max, { max = it }, label = { Text("最多次数") })
-            OutlinedTextField(weight, { weight = it }, label = { Text("默认重量（${unit.label}）") })
+            OutlinedTextField(min, { min = it }, label = { Text(if(metric==RecordMetric.SECONDS) "最少秒数" else "最少次数") })
+            OutlinedTextField(max, { max = it }, label = { Text(if(metric==RecordMetric.SECONDS) "最多秒数" else "最多次数") })
+            if(metric==RecordMetric.REPETITIONS) OutlinedTextField(weight, { weight = it }, label = { Text("默认重量（${unit.label}）") })
             OutlinedTextField(rest, { rest = it }, label = { Text("休息秒数") })
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }, confirmButton = { TextButton(onClick = {
         try {
             val updated = item.copy(targetSetCount = count.toInt(), targetRepMin = min.toInt(), targetRepMax = max.toInt(),
-                defaultWeightGrams = WeightUnits.parse(weight, unit), restSeconds = rest.toInt())
+                defaultWeightGrams = if(metric==RecordMetric.SECONDS) 0L else WeightUnits.parse(weight, unit), restSeconds = rest.toInt())
             TemplateDraft(name = "校验目标", exercises = listOf(updated)).validate()
             onSave(updated)
         } catch (e: Exception) { error = "请输入有效目标：组数 1～100、正数次数范围、非负重量和 0～3600 秒休息" }

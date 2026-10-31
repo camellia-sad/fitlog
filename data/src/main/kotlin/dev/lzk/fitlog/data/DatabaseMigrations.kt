@@ -4,6 +4,12 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseMigrations {
+    val FROM_4_TO_5=object:Migration(4,5) {
+        override fun migrate(db:SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE exercises ADD COLUMN recordMetric TEXT NOT NULL DEFAULT 'REPETITIONS'")
+            db.execSQL("ALTER TABLE session_exercises ADD COLUMN recordMetricSnapshot TEXT NOT NULL DEFAULT 'REPETITIONS'")
+        }
+    }
     val FROM_3_TO_4 = object : Migration(3, 4) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("""CREATE TABLE IF NOT EXISTS template_drafts (

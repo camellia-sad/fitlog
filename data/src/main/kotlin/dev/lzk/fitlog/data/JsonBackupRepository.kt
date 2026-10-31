@@ -36,7 +36,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             }
             data.put(table, rows)
         }
-        JSONObject().put("format", "FitLog").put("schemaVersion", 3).put("data", data).apply {
+        JSONObject().put("format", "FitLog").put("schemaVersion", 4).put("data", data).apply {
             preferences?.let {put("preferences",it.preferences.first().backupJson())}
             preparation?.let {put("preparedExercises",JSONArray(it.preparedExercises.first()))}
         }.toString()
@@ -64,7 +64,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
         }
         val root = JSONObject(json)
         val version = root.integer("schemaVersion")
-        require(root.getString("format") == "FitLog" && version in 1..3) { "不支持的备份版本" }
+        require(root.getString("format") == "FitLog" && version in 1..4) { "不支持的备份版本" }
         val restoredPreferences = if(version>=3) root.optJSONObject("preferences")?.backupPreferences() else null
         val prepared = if(version>=3) root.optJSONArray("preparedExercises")?.strings() else null
         require(prepared==null || prepared.size<=30 && prepared.distinct().size==prepared.size) {"待开始动作无效"}
@@ -85,7 +85,8 @@ class JsonBackupRepository(private val database: FitLogDatabase,
         val incoming = Bundle(
             data.rows("exercises") { ExerciseEntity(it.text("id"), it.text("nameZh"), it.text("nameEn"), it.text("equipmentType"),
                 it.optionalText("instructions"), it.optionalInt("estimatedSecondsPerSet"), it.optionalText("mediaAssetPath"),
-                it.flag("isFavorite"), it.flag("isCustom"), it.flag("isArchived")) },
+                it.flag("isFavorite"), it.flag("isCustom"), it.flag("isArchived"),
+                if(version>=4) it.text("recordMetric") else "REPETITIONS") },
             data.rows("exercise_muscles") { ExerciseMuscleEntity(it.text("exerciseId"), it.text("muscle"), it.text("role")) },
             data.rows("workout_templates") { TemplateEntity(it.text("id"), it.text("name"), it.text("splitType"), it.number("createdAt"), it.number("updatedAt")) },
             data.rows("template_exercises") { TemplateExerciseEntity(it.text("id"), it.text("templateId"), it.text("exerciseId"),
@@ -97,7 +98,8 @@ class JsonBackupRepository(private val database: FitLogDatabase,
                 it.number("pausedDurationMillis"), it.optionalLong("restEndsAtUtc")) },
             data.rows("session_exercises") { SessionExerciseEntity(it.text("id"), it.text("sessionId"), it.text("exerciseId"),
                 it.integer("sortOrder"), it.text("exerciseNameSnapshot"), it.integer("targetSetCountSnapshot"),
-                it.integer("targetRepMinSnapshot"), it.integer("targetRepMaxSnapshot"), it.optionalInt("restSecondsSnapshot")) },
+                it.integer("targetRepMinSnapshot"), it.integer("targetRepMaxSnapshot"), it.optionalInt("restSecondsSnapshot"),
+                if(version>=4) it.text("recordMetricSnapshot") else "REPETITIONS") },
             data.rows("set_records") { SetEntity(it.text("id"), it.text("sessionExerciseId"), it.integer("setIndex"), it.number("weightGrams"),
                 it.integer("reps"), it.text("status"), it.optionalLong("completedAtUtc"), it.text("setType")) },
             if (version >= 2) data.rows("training_plans") { TrainingPlanEntity(it.text("id"), it.text("startDate"), it.integer("cycleDays"), it.flag("repeats")) } else emptyList(),
@@ -140,6 +142,8 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             importedDrafts.forEach {row->
                 require(row.templateId==null || (existing.templates+templates).any {it.id==row.templateId}) {"草稿模板不存在"}
                 require(row.toDraft().exercises.all {it.exerciseId in exerciseIds}) {"草稿动作不存在"}
+                val metrics=(existing.exercises+newExercises).associate {it.id to it.recordMetric}
+                require(row.toDraft().exercises.all {metrics[it.exerciseId]!="SECONDS" || it.defaultWeightGrams==0L}) {"时长草稿动作不能包含重量"}
             }
             dao.importExercises(newExercises)
             dao.importMuscles(muscles)
@@ -188,6 +192,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             exercises.forEach {
                 require(it.nameZh.isNotBlank())
                 EquipmentType.valueOf(it.equipmentType)
+                RecordMetric.valueOf(it.recordMetric)
                 require(it.estimatedSecondsPerSet == null || it.estimatedSecondsPerSet > 0)
                 require(it.mediaAssetPath == null || (it.mediaAssetPath.startsWith("assets/") && ".." !in it.mediaAssetPath))
             }
@@ -214,6 +219,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             }
             sessionExercises.forEach {
                 require(it.sortOrder >= 0 && it.exerciseNameSnapshot.isNotBlank())
+                RecordMetric.valueOf(it.recordMetricSnapshot)
                 WorkoutRules.setCount(it.targetSetCountSnapshot)
                 WorkoutRules.repRange(it.targetRepMinSnapshot, it.targetRepMaxSnapshot)
                 it.restSecondsSnapshot?.let(WorkoutRules::rest)
@@ -232,6 +238,10 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             require(planDays.all { day -> plans.any { it.id == day.planId && day.dayIndex in 0 until it.cycleDays } &&
                 (day.templateId == null || templates.any { it.id == day.templateId }) })
             plans.forEach { plan -> require(planDays.filter { it.planId == plan.id }.map { it.dayIndex }.sorted() == (0 until plan.cycleDays).toList()) }
+            val metricByExercise=exercises.associate {it.id to it.recordMetric}
+            require(templateExercises.all {metricByExercise[it.exerciseId]!="SECONDS" || it.defaultWeightGrams==0L}) {"时长模板动作不能包含重量"}
+            val metricBySession=sessionExercises.associate {it.id to it.recordMetricSnapshot}
+            require(sets.all {metricBySession[it.sessionExerciseId]!="SECONDS" || it.weightGrams==0L}) {"时长训练不能包含重量"}
             val exerciseIds = exercises.map { it.id }.toSet()
             val templateIds = templates.map { it.id }.toSet()
             val sessionIds = sessions.map { it.id }.toSet()

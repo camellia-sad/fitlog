@@ -33,7 +33,7 @@ fun FriendsScreen(model:FriendsViewModel,social:SocialRepository?=null,
     val lifecycle=androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(model,profile?.id,lifecycle) {
         lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
-            while(isActive) {delay(15_000);if(model.profile.value!=null)model.refresh()}
+            while(isActive) {if(model.profile.value!=null)model.refresh();delay(15_000)}
         }
     }
     LaunchedEffect(selectedId,chatPeer,timeline){onSubpage(selectedId!=null || chatPeer!=null || timeline)}
@@ -64,9 +64,9 @@ fun FriendsScreen(model:FriendsViewModel,social:SocialRepository?=null,
                     LineIcon(Symbol.BACK,Modifier.size(24.dp).semanticsLabel("返回好友列表"))
                 }
                 OneLineText(if(selectedId!=null)"个人主页" else "好友",Modifier.weight(1f),style=MaterialTheme.typography.headlineMedium)
-                if(profile!=null) TextButton(onClick=model::refresh,enabled=!busy){Text("刷新")}
+
             }
-            if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
+
             message?.let{Text(it,color=MaterialTheme.colorScheme.primary)}
         }
         if(profile==null) item {

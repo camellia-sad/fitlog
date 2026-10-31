@@ -22,7 +22,8 @@ class ExerciseCatalog(private val context: Context, private val database: FitLog
             require(id.isNotBlank() && name.isNotBlank())
             exercises += ExerciseEntity(id, name, item.getString("nameEn"),
                 EquipmentType.valueOf(item.getString("equipmentType")).name,
-                item.optString("instructions").ifBlank { null }, item.optInt("estimatedSecondsPerSet", 45), null, false, false, false)
+                item.optString("instructions").ifBlank { null }, item.optInt("estimatedSecondsPerSet", 45), null, false, false, false,
+                dev.lzk.fitlog.domain.RecordMetric.valueOf(item.optString("recordMetric","REPETITIONS")).name)
             for (role in listOf("PRIMARY", "SECONDARY")) {
                 val list = item.optJSONArray(if (role == "PRIMARY") "primaryMuscles" else "secondaryMuscles") ?: JSONArray()
                 if (role == "PRIMARY") require(list.length() > 0)

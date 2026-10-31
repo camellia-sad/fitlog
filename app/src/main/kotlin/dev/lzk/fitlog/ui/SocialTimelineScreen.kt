@@ -200,7 +200,7 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
     HorizontalDivider()
     OneLineText(live.label+" · "+status.label,style=MaterialTheme.typography.titleMedium)
     Text(live.exercise)
-    Text("${live.weightGrams/1000.0} kg × ${live.reps} 次 · ${live.done}/${live.total} 组")
+    Text((if(live.recordMetric==RecordMetric.SECONDS) "${live.reps} 秒" else "${live.weightGrams/1000.0} kg × ${live.reps} 次")+" · ${live.done}/${live.total} 组")
     if(status==PresenceStatus.REST) {
         val remaining=live.restEndsAt?.epochSecond?.minus(now.epochSecond)?.coerceAtLeast(0) ?: 0
         Text("休息 %02d:%02d".format(remaining/60,remaining%60),color=MaterialTheme.colorScheme.primary)

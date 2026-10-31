@@ -108,7 +108,7 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             OneLineText(exercise.exerciseNameSnapshot, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold))
-                            Text("${exercise.targetRepMinSnapshot}–${exercise.targetRepMaxSnapshot} 次 / 组",
+                            Text("${exercise.targetRepMinSnapshot}–${exercise.targetRepMaxSnapshot} ${exercise.recordMetricSnapshot.unit} / 组",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                         }
                         PixelPuppy(Modifier.size(40.dp), when {
@@ -142,7 +142,7 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
             }
             items(exercise.sets, key = { it.id }) { record ->
                 SetRecordCard(
-                    record = record, unit = unit, canEdit = canEdit, step = state.preferences.weightStepGrams,
+                    record = record, unit = unit, recordMetric=exercise.recordMetricSnapshot,canEdit = canEdit, step = state.preferences.weightStepGrams,
                     onWeight = { editor = NumberEdit(EditKind.WEIGHT, record.id, WeightUnits.format(record.weightGrams, unit, editing = true)) },
                     onReps = { editor = NumberEdit(EditKind.REPS, record.id, record.reps.toString()) },
                     onWeightDelta = { model.adjustDraft(exercise.id, record.id, weightDeltaGrams = it) },
@@ -158,7 +158,7 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
                     Text("上次记录", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
                     val previous = state.lastPerformance
                     Text(
-                        previous?.sets?.joinToString("  ·  ") { "${WeightUnits.format(it.weightGrams, unit)} ${unit.label} × ${it.reps}" }
+                        previous?.sets?.joinToString("  ·  ") {it.displayValue(exercise.recordMetricSnapshot,unit)}
                             ?: "还没有这个动作的完成记录",
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -180,7 +180,7 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
     if (exercise == null) return
     editor?.let { edit ->
         val title = when (edit.kind) {
-            EditKind.WEIGHT -> "重量（${unit.label}）"; EditKind.REPS -> "次数"; EditKind.SET_COUNT -> "目标组数"
+            EditKind.WEIGHT -> "重量（${unit.label}）"; EditKind.REPS -> exercise.recordMetricSnapshot.inputLabel; EditKind.SET_COUNT -> "目标组数"
         }
         NumberInputDialog(title, edit.initial, edit.kind == EditKind.WEIGHT, onDismiss = { editor = null }) { text ->
             try {
@@ -191,7 +191,7 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
                         current?.let { model.updateDraft(exercise.id, it.id, weight, it.reps) }
                     }
                     EditKind.REPS -> {
-                        val reps = text.toIntOrNull() ?: throw WorkoutException(WorkoutError.INVALID_INPUT, "请输入整数次数")
+                        val reps = text.toIntOrNull() ?: throw WorkoutException(WorkoutError.INVALID_INPUT, "请输入整数${exercise.recordMetricSnapshot.unit}数")
                         WorkoutRules.draft(0, reps)
                         current?.let { model.updateDraft(exercise.id, it.id, it.weightGrams, reps) }
                     }
@@ -212,6 +212,7 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
 private fun SetRecordCard(
     record: SetRecord, unit: WeightUnit, canEdit: Boolean, step: Long, onWeight: () -> Unit, onReps: () -> Unit,
     onWeightDelta: (Long) -> Unit, onRepsDelta: (Int) -> Unit, onToggle: () -> Unit,
+    recordMetric:RecordMetric=RecordMetric.REPETITIONS,
 ) {
     val completed = record.status == SetStatus.COMPLETED
     val editable = canEdit && record.status == SetStatus.PLANNED
@@ -239,10 +240,11 @@ private fun SetRecordCard(
                     onValue = onWeight, onMinus = { onWeightDelta(-step) }, onPlus = { onWeightDelta(step) }, tag = "第${record.setIndex}组重量")
             }
             val reps: @Composable (Modifier) -> Unit = { modifier ->
-                NumberStepper("次数", record.reps.toString(), modifier, editable, editable && record.reps > 0,
-                    onValue = onReps, onMinus = { onRepsDelta(-1) }, onPlus = { onRepsDelta(1) }, tag = "第${record.setIndex}组次数")
+                NumberStepper(recordMetric.inputLabel, record.reps.toString(), modifier, editable, editable && record.reps > 0,
+                    onValue = onReps, onMinus = { onRepsDelta(-1) }, onPlus = { onRepsDelta(1) }, tag = if(recordMetric==RecordMetric.SECONDS) "第${record.setIndex}组秒数" else "第${record.setIndex}组次数")
             }
-            if (stacked) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if(recordMetric==RecordMetric.SECONDS) reps(Modifier.fillMaxWidth())
+            else if (stacked) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 weight(Modifier.fillMaxWidth()); reps(Modifier.fillMaxWidth())
             } else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 weight(Modifier.weight(1f)); reps(Modifier.weight(1f))

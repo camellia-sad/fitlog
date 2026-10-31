@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "exercises": [
     {
       "id": "barbell-bench-press",
@@ -572,6 +572,117 @@
       ],
       "secondaryMuscles": [],
       "instructions": "仰卧屈膝，收缩腹部使骨盆轻轻卷起，再缓慢回落，避免甩腿。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "incline-push-up",
+      "nameZh": "上斜俯卧撑",
+      "nameEn": "Incline Push-Up",
+      "equipmentType": "BODYWEIGHT",
+      "primaryMuscles": [
+        "CHEST"
+      ],
+      "secondaryMuscles": [
+        "TRICEPS",
+        "SHOULDERS"
+      ],
+      "instructions": "双手撑在稳固的高处，保持身体成一直线，屈肘靠近支撑面后推起。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "incline-barbell-bench-press",
+      "nameZh": "上斜杠铃卧推",
+      "nameEn": "Incline Barbell Bench Press",
+      "equipmentType": "BARBELL",
+      "primaryMuscles": [
+        "CHEST"
+      ],
+      "secondaryMuscles": [
+        "SHOULDERS",
+        "TRICEPS"
+      ],
+      "instructions": "上背稳定贴住上斜凳，控制杠铃下放至上胸附近，再平稳推起。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "plank",
+      "nameZh": "平板支撑",
+      "nameEn": "Plank",
+      "equipmentType": "BODYWEIGHT",
+      "primaryMuscles": [
+        "CORE"
+      ],
+      "secondaryMuscles": [
+        "SHOULDERS"
+      ],
+      "instructions": "以前臂和脚尖支撑，肘部置于肩下，保持躯干与骨盆稳定，正常呼吸。",
+      "estimatedSecondsPerSet": 45,
+      "recordMetric": "SECONDS"
+    },
+    {
+      "id": "reverse-grip-lat-pulldown",
+      "nameZh": "反手高位下拉",
+      "nameEn": "Reverse-Grip Lat Pulldown",
+      "equipmentType": "CABLE",
+      "primaryMuscles": [
+        "BACK"
+      ],
+      "secondaryMuscles": [
+        "BICEPS"
+      ],
+      "instructions": "反手握住横杆，稳定躯干，将肘部向下带动横杆靠近上胸，再控制还原。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "neutral-grip-pull-up",
+      "nameZh": "对握引体",
+      "nameEn": "Neutral-Grip Pull-Up",
+      "equipmentType": "BODYWEIGHT",
+      "primaryMuscles": [
+        "BACK"
+      ],
+      "secondaryMuscles": [
+        "BICEPS"
+      ],
+      "instructions": "双手掌心相对握住平行把手，控制身体上拉与下放，避免摆动借力。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "dumbbell-cuban-rotation",
+      "nameZh": "招财猫",
+      "nameEn": "Dumbbell Cuban Rotation",
+      "equipmentType": "DUMBBELL",
+      "primaryMuscles": [
+        "SHOULDERS"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "屈肘保持上臂位置稳定，控制前臂向上旋转与还原，不借力甩动。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "dumbbell-front-raise",
+      "nameZh": "哑铃前平举",
+      "nameEn": "Dumbbell Front Raise",
+      "equipmentType": "DUMBBELL",
+      "primaryMuscles": [
+        "SHOULDERS"
+      ],
+      "secondaryMuscles": [],
+      "instructions": "站稳并收紧躯干，手臂微屈，将哑铃向前抬至肩部附近，再缓慢下放。",
+      "estimatedSecondsPerSet": 45
+    },
+    {
+      "id": "cable-y-raise",
+      "nameZh": "绳索Y举",
+      "nameEn": "Cable Y-Raise",
+      "equipmentType": "CABLE",
+      "primaryMuscles": [
+        "SHOULDERS"
+      ],
+      "secondaryMuscles": [
+        "BACK"
+      ],
+      "instructions": "握住低位绳索把手，双臂沿斜上方向展开成 Y 形，控制还原并保持躯干稳定。",
       "estimatedSecondsPerSet": 45
     }
   ]

@@ -81,5 +81,5 @@ internal fun Workout.liveSnapshot(selected: String?): LiveTraining {
         ?: exercises.lastOrNull()
     val set = exercise?.sets?.firstOrNull { it.status == SetStatus.PLANNED } ?: exercise?.sets?.lastOrNull()
     return LiveTraining(session.id, session.trainingLabel, exercise?.exerciseNameSnapshot.orEmpty(),
-        set?.weightGrams ?: 0, set?.reps ?: 0, set?.setIndex ?: 0, completedSetCount, plannedSetCount, session.restEndsAtUtc)
+        set?.weightGrams ?: 0, set?.reps ?: 0, set?.setIndex ?: 0, completedSetCount, plannedSetCount, session.restEndsAtUtc,exercise?.recordMetricSnapshot ?: RecordMetric.REPETITIONS)
 }

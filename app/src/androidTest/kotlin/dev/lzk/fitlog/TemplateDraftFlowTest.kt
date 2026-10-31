@@ -128,7 +128,7 @@ class TemplateDraftFlowTest {
         pickerItem("杠铃卧推").assertExists()
         compose.onNodeWithContentDescription("清空模板动作搜索").performClick()
         assertEquals("", search.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
-        compose.onNodeWithText("42 个动作").assertExists()
+        compose.onNodeWithText("50 个动作").assertExists()
         search.performTextInput("bArBeLl BeNcH pReSs")
         pickerItem("杠铃卧推").assertExists()
         search.performTextClearance()

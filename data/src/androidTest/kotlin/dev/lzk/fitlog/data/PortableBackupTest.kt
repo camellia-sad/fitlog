@@ -37,7 +37,7 @@ class PortableBackupTest {
             RoomTrainingRepository(a).saveTemplateDraft(TemplateDraft(name="尚未保存"))
             val exporter=JsonBackupRepository(a,pa,pa);val importer=JsonBackupRepository(b,pb,pb)
             val json=exporter.exportJson()
-            assertEquals(3,JSONObject(json).getInt("schemaVersion"))
+            assertEquals(4,JSONObject(json).getInt("schemaVersion"))
             importer.validateJson(json)
             assertTrue(b.trainingDao().allDrafts().isEmpty());assertNotEquals(prefs,pb.preferences.first())
             importer.importJson(json)
@@ -115,6 +115,8 @@ class PortableBackupTest {
         try {
             ExerciseCatalog(context,db).initialize()
             val backup=PortableBackupRepository(JsonBackupRepository(db),social)
+            try {backup.importLocalJson("[".repeat(40)+"]".repeat(40));fail("deep JSON accepted")}
+            catch(e:IllegalArgumentException) {assertEquals("备份结构嵌套过深",e.message)}
             val other=JSONObject().put("format","FitLogChat").put("version",1).put("owner",id())
                 .put("messages",org.json.JSONArray()).put("pending",org.json.JSONArray()).toString()
             try {social.localChat.validate(owner,other);fail("wrong owner accepted")} catch(_:IllegalArgumentException) {}

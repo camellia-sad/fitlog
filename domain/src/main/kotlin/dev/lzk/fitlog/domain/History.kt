@@ -6,7 +6,7 @@ import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 
 data class TrainingDay(val date: LocalDate, val completedSets: Int, val sessions: Int)
-data class PerformancePoint(val sessionId: String, val date: LocalDate, val weightGrams: Long, val reps: Int)
+data class PerformancePoint(val sessionId: String, val date: LocalDate, val weightGrams: Long, val reps: Int,val recordMetric:RecordMetric=RecordMetric.REPETITIONS)
 data class TrainingStatistics(val days: Int, val sessions: Int, val completedSets: Int, val durationSeconds: Long, val volumeGrams: BigInteger)
 
 interface HistoryRepository {
@@ -25,7 +25,8 @@ object TrainingHistory {
     fun statistics(workouts: List<Workout>): TrainingStatistics {
         val finished = workouts.filter { it.session.status == SessionStatus.FINISHED && it.completedSetCount > 0 }
         val completed = finished.flatMap { it.exercises }.flatMap { it.sets }.filter { it.status == SetStatus.COMPLETED }
-        val volume = completed.fold(BigInteger.ZERO) { value, set ->
+        val volume = finished.flatMap {it.exercises}.filter {it.recordMetricSnapshot==RecordMetric.REPETITIONS}
+            .flatMap {it.sets}.filter {it.status==SetStatus.COMPLETED}.fold(BigInteger.ZERO) { value, set ->
             value + BigInteger.valueOf(set.weightGrams) * BigInteger.valueOf(set.reps.toLong())
         }
         return TrainingStatistics(
@@ -46,9 +47,10 @@ object TrainingHistory {
     fun performance(workouts: List<Workout>, exerciseId: String): List<PerformancePoint> = workouts
         .filter { it.session.status == SessionStatus.FINISHED }
         .sortedBy { it.session.startedAtUtc }.flatMap { workout ->
-            workout.exercises.filter { it.exerciseId == exerciseId }.flatMap { it.sets }
-                .filter { it.status == SetStatus.COMPLETED }.map {
-                    PerformancePoint(workout.session.id, workout.session.localWorkoutDate, it.weightGrams, it.reps)
+            workout.exercises.filter { it.exerciseId == exerciseId }.flatMap {exercise->
+                exercise.sets.filter { it.status == SetStatus.COMPLETED }.map {
+                    PerformancePoint(workout.session.id, workout.session.localWorkoutDate, it.weightGrams, it.reps,exercise.recordMetricSnapshot)
                 }
+            }
         }
 }

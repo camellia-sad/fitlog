@@ -9,6 +9,9 @@ enum class Muscle { CHEST, BACK, SHOULDERS, QUADRICEPS, HAMSTRINGS, GLUTES, CALV
 enum class SessionStatus { ACTIVE, PAUSED, FINISHED, DISCARDED }
 enum class SetStatus { PLANNED, COMPLETED, SKIPPED }
 enum class SetType { WORKING }
+enum class RecordMetric(val unit:String,val inputLabel:String,val defaultMin:Int,val defaultMax:Int) {
+    REPETITIONS("次","次数",8,12),SECONDS("秒","保持时长（秒）",30,60)
+}
 
 data class Exercise(
     val id: String,
@@ -23,6 +26,7 @@ data class Exercise(
     val isFavorite: Boolean = false,
     val isCustom: Boolean = false,
     val isArchived: Boolean = false,
+    val recordMetric:RecordMetric = RecordMetric.REPETITIONS,
 )
 
 data class WorkoutSession(
@@ -64,6 +68,7 @@ data class SessionExercise(
     val targetRepMaxSnapshot: Int,
     val sets: List<SetRecord>,
     val restSecondsSnapshot: Int? = null,
+    val recordMetricSnapshot:RecordMetric = RecordMetric.REPETITIONS,
 )
 
 data class Workout(val session: WorkoutSession, val exercises: List<SessionExercise>) {

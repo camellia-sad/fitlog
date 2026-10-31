@@ -30,6 +30,7 @@ enum class PresenceStatus(val label:String) {
 data class LiveTraining(
     val sessionId:String="",val label:String="",val exercise:String="",val weightGrams:Long=0,val reps:Int=0,
     val setIndex:Int=0,val done:Int=0,val total:Int=0,val restEndsAt:Instant?=null,
+    val recordMetric:RecordMetric=RecordMetric.REPETITIONS,
 )
 data class SocialPerson(val profile:SocialProfile,val sharing:SharingPreferences,val status:PresenceStatus,val live:LiveTraining?,val updatedAt:Instant?)
 data class SharedWorkout(val id:String,val localId:String,val startedAt:Instant,val label:String,

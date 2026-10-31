@@ -191,15 +191,16 @@ private fun TrainingColorLegend() {
 
 @Composable
 private fun PerformanceChart(points: List<PerformancePoint>, unit: WeightUnit) {
-    var reps by remember { mutableStateOf(false) }
+    val timed=points.any {it.recordMetric==RecordMetric.SECONDS}
+    var reps by remember(timed) { mutableStateOf(timed) }
     val peaks = remember(points, reps) {
         points.groupBy { it.sessionId }.values.map { sets -> if (reps) sets.maxBy { it.reps } else sets.maxBy { it.weightGrams } }
     }
     SoftCard {
-        ChoiceChips(listOf(false, true), { it == reps }, { if (it) "次数" else "重量" }) { reps = it }
+        if(!timed) ChoiceChips(listOf(false, true), { it == reps }, { if (it) "次数" else "重量" }) { reps = it }
         if (peaks.isEmpty()) Text("还没有这个动作的已结束训练记录。", color = MaterialTheme.colorScheme.onSurfaceVariant)
         else {
-            Text(if (reps) "每次训练的最高次数" else "每次训练的最高重量（${unit.label}）", style = MaterialTheme.typography.titleSmall)
+            Text(if(timed) "每次训练的最长保持时间（秒）" else if (reps) "每次训练的最高次数" else "每次训练的最高重量（${unit.label}）", style = MaterialTheme.typography.titleSmall)
             val line = MaterialTheme.colorScheme.primary
             val values = peaks.map { if (reps) it.reps.toDouble() else it.weightGrams.toDouble() }
             Canvas(Modifier.fillMaxWidth().height(150.dp).semanticsLabel("${peaks.size} 次训练的真实历史趋势")) {
@@ -216,7 +217,7 @@ private fun PerformanceChart(points: List<PerformancePoint>, unit: WeightUnit) {
             }
             Text("${peaks.first().date} → ${peaks.last().date}", style = MaterialTheme.typography.labelSmall)
             points.takeLast(15).reversed().forEach { point ->
-                Text("${point.date} · ${WeightUnits.format(point.weightGrams, unit)} ${unit.label} × ${point.reps}", style = MaterialTheme.typography.bodySmall)
+                Text("${point.date} · "+if(point.recordMetric==RecordMetric.SECONDS) "${point.reps} 秒" else "${WeightUnits.format(point.weightGrams, unit)} ${unit.label} × ${point.reps}", style = MaterialTheme.typography.bodySmall)
             }
             if (points.size > 15) Text("此处展示最近 15 组，完整组记录见日期详情。", style = MaterialTheme.typography.labelSmall)
         }
@@ -232,7 +233,7 @@ fun WorkoutDetails(workout: Workout, unit: WeightUnit) {
         workout.exercises.forEach { exercise ->
             Text(exercise.exerciseNameSnapshot, style = MaterialTheme.typography.titleSmall)
             exercise.sets.forEach { record ->
-                Text("${record.setIndex}.  ${WeightUnits.format(record.weightGrams, unit)} ${unit.label} × ${record.reps} · ${record.status.label()}",
+                Text("${record.setIndex}.  ${record.displayValue(exercise.recordMetricSnapshot,unit)} · ${record.status.label()}",
                     style = MaterialTheme.typography.bodySmall)
             }
         }
