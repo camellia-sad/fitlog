@@ -61,6 +61,50 @@ class PolishFlowTest {
         compose.waitUntil(15_000){fake.commentRows.size==1}
         assertEquals("other",fake.commentRows.single().id)
     }
+    @Test fun avatarSurvivesOutgoingPageLifecycleStop() {
+        val image=Bitmap.createBitmap(32,32,Bitmap.Config.ARGB_8888)
+        image.eraseColor(android.graphics.Color.GREEN)
+        fake.imageBytes=ByteArrayOutputStream().also{image.compress(Bitmap.CompressFormat.PNG,100,it)}.toByteArray()
+        image.recycle()
+        val owner=object:androidx.lifecycle.LifecycleOwner {
+            val registry=androidx.lifecycle.LifecycleRegistry(this)
+            override val lifecycle:androidx.lifecycle.Lifecycle get()=registry
+        }
+        compose.runOnUiThread{owner.registry.currentState=androidx.lifecycle.Lifecycle.State.STARTED}
+        compose.setContent {FitLogTheme {
+            CompositionLocalProvider(androidx.lifecycle.compose.LocalLifecycleOwner provides owner) {
+                SocialAvatar(fake,fake.me.copy(nickname="陈先生",avatarPath="avatar")){}
+            }
+        }}
+        compose.waitUntil(15_000){compose.onAllNodesWithContentDescription("图片").fetchSemanticsNodes().isNotEmpty()}
+        // Navigation can stop the old destination while its exit transition is still visible.
+        compose.runOnUiThread{owner.registry.currentState=androidx.lifecycle.Lifecycle.State.CREATED}
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("图片").assertExists()
+        compose.onNodeWithText("陈").assertDoesNotExist()
+        compose.runOnUiThread{owner.registry.currentState=androidx.lifecycle.Lifecycle.State.STARTED}
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("图片").assertExists()
+        compose.runOnIdle{assertEquals(1,fake.imageReads)}
+    }
+    @Test fun customAvatarLoadingDoesNotFlashNicknameButFailureHasFallback() {
+        val requested=java.util.concurrent.atomic.AtomicBoolean(false)
+        val gate=kotlinx.coroutines.CompletableDeferred<Unit>()
+        val source=object:SocialRepository by fake,FriendsRepository by fake {
+            override suspend fun image(path:String):ByteArray {
+                requested.set(true);gate.await()
+                return fake.image(path)
+            }
+        }
+        compose.setContent {FitLogTheme {SocialAvatar(source,fake.me.copy(nickname="陈先生",avatarPath="delayed-avatar")){}}}
+        compose.waitUntil(15_000){requested.get()}
+        compose.onNodeWithText("陈").assertDoesNotExist()
+        compose.onNodeWithContentDescription("图片").assertDoesNotExist()
+        // Invalid bytes produce the actual error fallback, rather than a loading fallback.
+        gate.complete(Unit)
+        compose.waitUntil(15_000){compose.onAllNodesWithText("陈").fetchSemanticsNodes().isNotEmpty()}
+    }
+
     @Test fun avatarIsReusedAcrossPageChangesWithoutEllipsis() {
         val image=Bitmap.createBitmap(32,32,Bitmap.Config.ARGB_8888)
         image.eraseColor(android.graphics.Color.GREEN)

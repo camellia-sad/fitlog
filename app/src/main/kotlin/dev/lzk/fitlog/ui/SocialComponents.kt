@@ -54,11 +54,11 @@ internal object AvatarImages {
     val account=currentProfile?.id.orEmpty()
     val cacheKey=System.identityHashCode(repository).toString()+":"+account+":"+path
     var bitmap by remember(cacheKey) { mutableStateOf(if(avatar) AvatarImages.get(cacheKey) else null) }
-    var failed by remember(path) { mutableStateOf(false) }
+    var failed by remember(cacheKey) { mutableStateOf(false) }
     LaunchedEffect(repository,path,lifecycle,cacheKey) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             try {
-                bitmap=bitmap ?: withContext(Dispatchers.IO) {
+                bitmap=bitmap ?: (if(avatar) AvatarImages.get(cacheKey) else null) ?: withContext(Dispatchers.IO) {
                     val bytes=repository.image(path)
                     // Decode at thumbnail size; source is bounded to 2 MB and 1600 px by upload.
                     val bounds=BitmapFactory.Options().apply {inJustDecodeBounds=true}
@@ -77,8 +77,12 @@ internal object AvatarImages {
         }
     }
     Box(modifier.then(if(!avatar && previewEnabled)Modifier.combinedClickable(onClickLabel="查看大图",onClick={preview=true},onLongClick=onLongClick) else Modifier),contentAlignment=Alignment.Center) {
-        bitmap?.let {Image(it.asImageBitmap(),contentDescription="图片",modifier=Modifier.fillMaxSize(),contentScale=if(avatar)ContentScale.Crop else ContentScale.Fit)}
-            ?: if(avatar || !failed) fallback() else Text("图片暂不可用",style=MaterialTheme.typography.labelSmall)
+        // A stopped navigation destination can remain visible during its exit animation.
+        // Its loader has released bitmap, so draw the account-scoped thumbnail directly.
+        val displayed=bitmap ?: if(avatar) AvatarImages.get(cacheKey) else null
+        if(displayed!=null) Image(displayed.asImageBitmap(),contentDescription="图片",modifier=Modifier.fillMaxSize(),contentScale=if(avatar)ContentScale.Crop else ContentScale.Fit)
+        else if(avatar) {if(failed) fallback()}
+        else if(!failed) fallback() else Text("图片暂不可用",style=MaterialTheme.typography.labelSmall)
     }
     if(preview) SocialPhotoViewer(repository,gallery.ifEmpty{listOf(path)},path){preview=false}
 }

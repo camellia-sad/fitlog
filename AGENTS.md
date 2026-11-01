@@ -35,9 +35,9 @@
 
 - Gradle Wrapper 为 9.1.0，AGP 9.0.1，Kotlin 2.3.20，Room 2.8.5；JDK 21 编译为 JVM 17 字节码，compileSdk/targetSdk 为 36。
 - 配置 JDK 和 Android SDK 后，构建使用 `./gradlew :app:assembleDebug`；领域测试使用 `./gradlew :domain:test`；设备测试使用 `./gradlew :data:connectedDebugAndroidTest :app:connectedDebugAndroidTest`；静态检查使用 `./gradlew :app:lintDebug`。
-- 开发分支应用版本为 0.6.3-dev、versionCode 13（稳定基线 0.5.3）；Room schema 为 5，保留 `data/schemas/` 中的历史及 1→2→3→4→5 迁移。备份 JSON 格式版本为 4，兼容导入版本 1、2、3，包含动作、模板、训练、计划、偏好、待开始动作和模板草稿；本地主 JSON 内嵌独立 chat 数据区与本人动态副本，图片仅保留引用。云端私有 ZIP 内分文件保存记录与图片，保留最近三份，最大 50 MB，恢复不重新发表动态。
+- 开发分支应用版本为 0.6.4-dev、versionCode 14（稳定基线 0.5.3）；Room schema 为 5，保留 `data/schemas/` 中的历史及 1→2→3→4→5 迁移。备份 JSON 格式版本为 4，兼容导入版本 1、2、3，包含动作、模板、训练、计划、偏好、待开始动作和模板草稿；本地主 JSON 内嵌独立 chat 数据区与本人动态副本，图片仅保留引用。云端私有 ZIP 内分文件保存记录与图片，保留最近三份，最大 50 MB，恢复不重新发表动态。
 - 聊天及动态图片完整适配并支持大图缩放、平移及多图切换；训练总结和历史感想可主动预览并分享到动态，仅带入完成组，发表不改变训练共享开关。
-- 评论仅作者本人可删除；头像小图缓存按账号隔离、限制容量并在应用进入后台时释放。个人与好友详情提供 FitLog ID 复制，主页资料卡隐藏 ID；聊天统一处理输入法与系统留白。
+- 评论仅作者本人可删除；头像小图缓存按账号隔离、限制容量并在应用进入后台时释放；切页过渡直接复用缓存头像，自定义头像加载中不显示昵称首字，仅加载失败后回退。个人与好友详情提供 FitLog ID 复制，主页资料卡隐藏 ID；聊天统一处理输入法与系统留白。
 - 社交采用 Supabase 邮箱验证码、受限 RPC 与私有图片存储；聊天历史、待发送队列及本人动态副本使用独立 Room 数据库 schema 2，保留 1→2 迁移，训练库独立升级至 schema 5。训练共享默认关闭，绑定本机记录需明确确认；心跳与前台轮询同步状态，尚未接入系统后台消息推送。
 - 本机工具配置与预览放在 Git 忽略的 `.local-tools/`；云端连接从 `.local-tools/social.properties` 读取 `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`，配置值不提交。云端迁移位于 `supabase/migrations/`，权限断言位于 `supabase/tests/`。
 
