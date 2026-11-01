@@ -12,7 +12,7 @@ FitLog 是一款 Android 力量训练记录助手，采用轻像素风格。训�
 
 ## 使用方法
 
-1. 在 Android 8.0 或更高版本的设备上安装 [FitLog APK](https://jrqmjpnitwfuqlbpvrzu.supabase.co/storage/v1/object/public/fitlog-updates/FitLog-15.apk)。
+1. 在 Android 8.0 或更高版本的设备上安装 FitLog APK，也可按下文从源码构建。
 2. 在「动作」中浏览动作、创建模板和计划；在「主页」选择自由训练或模板并开始记录。
 3. 在「好友」中查看好友和动态，在「我的」中登录账号、管理个人资料及进入设置。
 4. 在「我的 → 设置」中导出本地 JSON，或登录后使用云端备份和恢复。聊天记录保存在本机，换设备前需主动备份；本地 JSON 不包含图片文件。
