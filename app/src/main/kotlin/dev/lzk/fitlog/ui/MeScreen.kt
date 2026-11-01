@@ -93,7 +93,7 @@ fun MeScreen(model:FriendsViewModel,social:SocialRepository?=null,syncHistory:su
         }
     }
     if(logout)AlertDialog(onDismissRequest={logout=false},title={Text("退出登录？")},
-        text={Text("本机训练记录会保留；待发送社交消息和缓存将清除。")},
+        text={Text("本机训练、聊天记录和待发送消息会保留，按账号隔离。")},
         confirmButton={TextButton(onClick={logout=false;editing=false;model.signOut()},enabled=!busy){Text("确认")}},
         dismissButton={TextButton(onClick={logout=false}){Text("取消")}})
 }

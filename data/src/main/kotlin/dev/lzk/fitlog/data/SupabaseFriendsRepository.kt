@@ -88,6 +88,9 @@ open class SupabaseFriendsRepository(context: Context, private val baseUrl: Stri
         catch (_: IOException) { }
         Unit
     }
+    protected suspend fun forgetDeletedSession(owner:String) = lock.withLock {
+        if(profile.value?.id==owner) {store.clear();session=null;_profile.value=null}
+    }
     protected fun requireProfileId() = requireNotNull(profile.value?.id) { "请先登录" }
     protected suspend fun authorized(path: String, method: String = "GET", body: JSONObject? = null, prefer: String? = null,
         expectedOwner:String=requireProfileId()): String {

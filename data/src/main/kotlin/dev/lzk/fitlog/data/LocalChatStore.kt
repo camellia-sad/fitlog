@@ -39,6 +39,23 @@ internal class LocalChatStore(context:Context,private val db:SocialCacheDatabase
             unread=old?.unread ?: (message.sender!=owner))))
         if(message.withdrawn) {hideQuotes(owner,message.id);old?.let {pruneImages(owner,JSONObject(it.json).chatMessage().mediaPaths())}}
     }
+    suspend fun clearChats(owner:String):Set<String> {
+        val paths=db.dao().all(owner).filter {!it.hidden}.flatMap {JSONObject(it.json).chatMessage().mediaPaths()}.toMutableSet()
+        db.dao().allPending(owner).forEach {row->
+            val draft=JSONObject(row.json)
+            draft.optional("media_path")?.let {paths+=it}
+            draft.optJSONArray("forwarded")?.objects()?.forEach {it.optional("media_path")?.let {path->paths+=path}}
+        }
+        db.withTransaction {db.dao().hideOwner(owner);db.dao().clearOutboxOwner(owner)}
+        pruneImages(owner,paths)
+        return paths
+    }
+    suspend fun eraseAccount(owner:String) {
+        db.withTransaction {db.dao().clearOwner(owner);db.dao().clearOutboxOwner(owner);db.dao().clearPostsOwner(owner)}
+        val directory=file(owner,"account-cleanup").parentFile!!
+        check(!directory.exists() || directory.deleteRecursively()) {"本机社交图片未能全部清除"}
+    }
+
     suspend fun hideQuotes(owner:String,id:String)=hideQuotes(owner,setOf(id))
     suspend fun hideQuotes(owner:String,ids:Set<String>) {
         if(ids.isEmpty()) return

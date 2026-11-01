@@ -70,6 +70,7 @@ class FriendsViewModel(private val repository: FriendsRepository) : ViewModel() 
     suspend fun repositorySharing() = repository.sharing()
     suspend fun updateSharing(value:SharingPreferences) = repository.saveSharing(value)
     suspend fun unblock(id:String) = repository.act(id,"unblock")
+    fun clearChatPreviews() {friends.value=friends.value.map {it.copy(lastMessage=null,lastMessageAt=null,unread=0)}}
     fun signOut()=execute { repository.signOut(); friends.value=emptyList(); found.value=null; codeSent.value=false }
     class Factory(private val repository:FriendsRepository):ViewModelProvider.Factory {
         override fun <T:ViewModel> create(modelClass:Class<T>):T {

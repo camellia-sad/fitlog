@@ -120,6 +120,19 @@ class HistoryViewModel(container: AppContainer) : FeatureModel(container) {
 }
 
 class SettingsViewModel(container: AppContainer) : FeatureModel(container) {
+    val profile=container.friends.profile
+    fun clearTraining() = transfer {
+        container.training.clearTrainingHistory()
+        message.value="已清空本机训练记录，模板、计划和动作已保留"
+    }
+    fun clearChats(onDone:()->Unit={}) = transfer {
+        container.social.clearAllChats();onDone()
+        message.value="已清空当前账号的本机聊天记录与对应图片"
+    }
+    fun deleteAccount(onDone:()->Unit={}) = transfer {
+        container.social.deleteAccount();onDone()
+        message.value="账号已注销，离线训练数据已保留；可使用原邮箱重新注册"
+    }
     val preferences = container.preferences.preferences
         .catch { message.value = it.message }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferences())
     val busy = MutableStateFlow(false)

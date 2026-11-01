@@ -57,6 +57,9 @@ interface WorkoutDao {
     @Query("SELECT * FROM workout_sessions WHERE id = :id")
     suspend fun session(id: String): SessionEntity?
 
+    @Query("DELETE FROM workout_sessions")
+    suspend fun clearSessions()
+
     @Query("SELECT MAX(startedAtUtc) FROM workout_sessions WHERE localWorkoutDate = :date")
     suspend fun lastStart(date: String): Long?
 

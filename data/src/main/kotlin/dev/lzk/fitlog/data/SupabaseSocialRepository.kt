@@ -149,6 +149,37 @@ class SupabaseSocialRepository(
         relay("withdraw",peerId,id,owner=owner)
         localChat.receive(owner,message.copy(body="",mediaPath=null,forwarded=emptyList(),replyPreview=null,withdrawn=true))
     }
+    suspend fun clearAllChats() = localGate.withLock {
+        val owner=requireProfileId()
+        val paths=withContext(Dispatchers.IO) {localChat.clearChats(owner)}
+        withContext(Dispatchers.IO) {
+            for(path in paths) {
+                val digest=MessageDigest.getInstance("SHA-256").digest("$owner|$path".toByteArray()).joinToString("") {"%02x".format(it)}
+                File(mediaDir,digest).delete()
+            }
+        }
+    }
+    suspend fun deleteAccount() = localGate.withLock {
+        val owner=requireProfileId()
+        var done=false
+        var batches=0
+        while(!done && batches++<200) {
+            val response=JSONObject(authorized("/functions/v1/account-delete","POST",JSONObject().put("confirmation","DELETE"),expectedOwner=owner))
+            done=response.getBoolean("done")
+            if(!done) kotlinx.coroutines.delay(200)
+        }
+        check(done) {"云端内容较多，注销尚未完成，请再次点击继续注销"}
+        withContext(kotlinx.coroutines.NonCancellable+Dispatchers.IO) {
+            try {
+                localChat.eraseAccount(owner)
+                val editor=settings.edit().remove("contacts_$owner")
+                if(boundTrainingOwner()==owner) editor.remove("training_owner")
+                check(editor.commit()) {"无法清除账号本机设置"}
+            } finally {forgetDeletedSession(owner)}
+            mediaDir.listFiles().orEmpty().forEach {it.delete()}
+        }
+    }
+
     override suspend fun clearChat(peerId:String) = localGate.withLock {
         val owner=requireProfileId()
         val rows=cache.dao().all(owner).filter {it.peer==peerId}

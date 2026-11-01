@@ -165,7 +165,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                 MeScreen(friendsModel,container.social,syncHistory={container.sharing.syncHistory()},
                     onSettings={nav.navigate("settings")}) {socialSubpage=it}
             }
-            composable("settings") { SettingsScreen(settings,onBackups={nav.navigate("backups")},onBack={nav.popBackStack()}) }
+            composable("settings") { SettingsScreen(settings,onBackups={nav.navigate("backups")},onBack={nav.popBackStack()},onChatCleared=friendsModel::clearChatPreviews) }
         }
     }
     if (pendingTemplateExit != null && templateEditor != null) {

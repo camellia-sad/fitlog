@@ -115,7 +115,7 @@ fun OnboardingScreen(preferences: UserPreferences, message: String? = null, onSa
 }
 
 @Composable
-fun SettingsScreen(model: SettingsViewModel,onBack:(()->Unit)?=null,onBackups:(()->Unit)?=null) {
+fun SettingsScreen(model: SettingsViewModel,onBack:(()->Unit)?=null,onBackups:(()->Unit)?=null,onChatCleared:()->Unit={}) {
     val preferences by model.preferences.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
     val message by model.message.collectAsStateWithLifecycle()
@@ -162,7 +162,11 @@ fun SettingsScreen(model: SettingsViewModel,onBack:(()->Unit)?=null,onBackups:((
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
         HorizontalDivider()
-        PersonalDataDeleteButton()
+        val profile by model.profile.collectAsStateWithLifecycle()
+        DataManagementButtons(profile!=null,busy,model::clearTraining,
+            {model.clearChats{onChatCleared()}},
+            {model.deleteAccount{AvatarImages.clear();onChatCleared()}})
+        PersonalDataDeleteButton(enabled=!busy)
         Text("FitLog · 训练离线可用", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(16.dp))
     }

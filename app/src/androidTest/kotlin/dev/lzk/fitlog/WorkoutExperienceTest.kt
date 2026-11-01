@@ -239,10 +239,10 @@ class WorkoutExperienceTest {
     @Test fun deletingAllDataRequiresConfirmationAndCancelDoesNothing() {
         var calls = 0
         compose.setContent { FitLogTheme { PersonalDataDeleteButton { calls++; false } } }
-        compose.onNodeWithText("删除个人全部信息").performClick()
+        compose.onNodeWithText("清除全部本机数据").performClick()
         compose.onNodeWithText("取消").performClick()
         assertEquals(0,calls)
-        compose.onNodeWithText("删除个人全部信息").performClick()
+        compose.onNodeWithText("清除全部本机数据").performClick()
         compose.onNodeWithText("永久删除").performClick()
         assertEquals(1,calls)
         compose.onNodeWithText("系统未能清除数据，请稍后重试。").assertExists()

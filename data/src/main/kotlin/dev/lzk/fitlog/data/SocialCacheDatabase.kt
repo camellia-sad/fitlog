@@ -42,6 +42,8 @@ internal interface SocialCacheDao {
     @Query("DELETE FROM message_outbox WHERE owner=:owner AND peer=:peer") suspend fun clearPending(owner:String,peer:String)
     @Query("DELETE FROM message_outbox WHERE owner=:owner") suspend fun clearOutboxOwner(owner:String)
     @Query("DELETE FROM cached_messages WHERE owner=:owner") suspend fun clearOwner(owner:String)
+    @Query("UPDATE cached_messages SET hidden=1,json='{}',unread=0 WHERE owner=:owner") suspend fun hideOwner(owner:String)
+    @Query("DELETE FROM local_posts WHERE owner=:owner") suspend fun clearPostsOwner(owner:String)
     @Query("SELECT * FROM local_posts WHERE owner=:owner ORDER BY id") suspend fun posts(owner:String):List<LocalPostEntity>
     @Insert(onConflict=OnConflictStrategy.REPLACE) suspend fun putPosts(rows:List<LocalPostEntity>)
     @Query("UPDATE local_posts SET hidden=1,json='{}' WHERE owner=:owner AND id=:id") suspend fun hidePost(owner:String,id:String)

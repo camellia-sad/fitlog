@@ -13,6 +13,8 @@ class RoomTrainingRepository(private val database: FitLogDatabase, private val c
     private val dao = database.trainingDao()
     private val workouts = database.workoutDao()
 
+    suspend fun clearTrainingHistory() = database.withTransaction { workouts.clearSessions() }
+
     override fun observeTemplateDrafts() = dao.observeTemplateDrafts().map { rows -> rows.map { it.toDraft() } }
 
     override suspend fun saveTemplateDraft(draft: TemplateDraft) = database.withTransaction {
