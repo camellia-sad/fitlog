@@ -87,12 +87,12 @@ do $$ begin
  if exists(select 1 from public.social_messages where id=current_setting('fitlog_test.hidden')::uuid)
  then raise exception 'TEST_FAILED: hidden legacy content retained';end if;
 end $$;
--- TTL cleanup only affects new relay messages; old history is not expired automatically.
+-- Cleanup must never remove undelivered messages, even if a legacy deadline is present.
 insert into public.social_messages(id,sender,recipient,body,delivery_expires_at)
  values(gen_random_uuid(),current_setting('fitlog_test.a')::uuid,current_setting('fitlog_test.b')::uuid,'expired',now()-interval '1 second');
 select public.chat_relay_cleanup();
 do $$ begin
- if exists(select 1 from public.social_messages where body='expired') then raise exception 'TEST_FAILED: expired content retained';end if;
+ if not exists(select 1 from public.social_messages where body='expired') then raise exception 'TEST_FAILED: undelivered content removed';end if;
 end $$;
 rollback;
 select 'Local delivery and backup permission assertions passed; fixtures rolled back' as result;
