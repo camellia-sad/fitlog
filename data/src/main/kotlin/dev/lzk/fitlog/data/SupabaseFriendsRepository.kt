@@ -16,7 +16,9 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 
 open class SupabaseFriendsRepository(context: Context, private val baseUrl: String, private val publicKey: String,
-    namespace: String = "fitlog") : FriendsRepository {
+    namespace: String = "fitlog",
+    private val openConnection: (URI) -> HttpsURLConnection = { it.toURL().openConnection() as HttpsURLConnection }) : FriendsRepository {
+    private val diagnostics = NetworkDiagnostics(context, namespace)
     override val configured = runCatching {
         val uri = URI(baseUrl)
         uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null &&
@@ -152,8 +154,11 @@ open class SupabaseFriendsRepository(context: Context, private val baseUrl: Stri
 
     private suspend fun requestBytes(path:String,method:String,payload:ByteArray?,token:String?,prefer:String?,mime:String,maxBytes:Int=4_000_000):ByteArray = withContext(Dispatchers.IO) {
         check(configured) { "尚未配置云端连接" }
-        val connection = URI(baseUrl.trimEnd('/') + path).toURL().openConnection() as HttpsURLConnection
+        val url = baseUrl.trimEnd('/') + path
+        val trace = diagnostics.begin(url, method, 15_000, 15_000, payload?.size ?: 0)
+        var pending: HttpsURLConnection? = null
         try {
+            val connection = openConnection(URI(url)); pending = connection
             connection.connectTimeout=15_000; connection.readTimeout=15_000
             connection.instanceFollowRedirects=false; connection.requestMethod=method
             connection.setRequestProperty("apikey", publicKey)
@@ -163,9 +168,17 @@ open class SupabaseFriendsRepository(context: Context, private val baseUrl: Stri
             if(payload!=null) {
                 connection.doOutput=true
                 connection.setRequestProperty("Content-Type",mime)
+            }
+            trace.phase(NetworkDiagnostics.Phase.CONNECT)
+            connection.connect(); trace.connected(connection)
+            if(payload != null) {
+                trace.phase(NetworkDiagnostics.Phase.SEND)
                 connection.outputStream.use { it.write(payload) }
             }
+            trace.phase(NetworkDiagnostics.Phase.RESPONSE)
             val status=connection.responseCode
+            trace.response(connection, status)
+            trace.phase(NetworkDiagnostics.Phase.READ)
             val bytes=(if(status in 200..299) connection.inputStream else connection.errorStream)?.use { input ->
                 val output=ByteArrayOutputStream()
                 val buffer=ByteArray(8192)
@@ -173,7 +186,7 @@ open class SupabaseFriendsRepository(context: Context, private val baseUrl: Stri
                     val count=input.read(buffer)
                     if(count<0) break
                     require(output.size()+count<=maxBytes) {"云端响应过大"}
-                    output.write(buffer,0,count)
+                    output.write(buffer,0,count); trace.receivedBytes += count
                 }
                 output.toByteArray()
             } ?: byteArrayOf()
@@ -187,8 +200,10 @@ open class SupabaseFriendsRepository(context: Context, private val baseUrl: Stri
                 }
                 throw CloudException(status,message)
             }
+            trace.success()
             bytes
-        } finally { connection.disconnect() }
+        } catch(error: Exception) { trace.failure(error); throw error }
+        finally { pending?.disconnect() }
     }
     private class CloudException(val status: Int,message:String): IOException(message)
 }

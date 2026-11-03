@@ -13,6 +13,8 @@ class AppContainer(context: Context, databaseName: String = "fitlog.db") : AutoC
     private val settingsStore = UserPreferencesStore(context.applicationContext, scope, "$databaseName.preferences_pb")
     val preferences: PreferencesRepository = settingsStore
     val preparation: PreparationRepository = settingsStore
+    val networkDiagnostics = NetworkDiagnostics(context.applicationContext, databaseName)
+    init { scope.launch { runCatching { networkDiagnostics.prune() } } }
     val backups = JsonBackupRepository(database, settingsStore, settingsStore)
     private val socialDelegate = lazy {
         SupabaseSocialRepository(context.applicationContext, BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_PUBLISHABLE_KEY, databaseName)

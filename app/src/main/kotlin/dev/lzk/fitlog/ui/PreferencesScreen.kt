@@ -166,6 +166,7 @@ fun SettingsScreen(model: SettingsViewModel,onBack:(()->Unit)?=null,onBackups:((
         DataManagementButtons(profile!=null,busy,model::clearTraining,
             {model.clearChats{onChatCleared()}},
             {model.deleteAccount{AvatarImages.clear();onChatCleared()}})
+        NetworkDiagnosticsControls(busy, model::exportNetworkLogs, model::clearNetworkLogs)
         PersonalDataDeleteButton(enabled=!busy)
         Text("FitLog · 训练离线可用", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(16.dp))

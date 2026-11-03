@@ -138,6 +138,18 @@ class SettingsViewModel(container: AppContainer) : FeatureModel(container) {
     val busy = MutableStateFlow(false)
     fun save(value: UserPreferences) = execute { container.preferences.save(value.copy(onboardingCompleted = true)); message.value = "设置已保存" }
 
+    fun exportNetworkLogs(context: Context, uri: Uri) = transfer {
+        withContext(Dispatchers.IO) {
+            requireNotNull(context.contentResolver.openOutputStream(uri, "wt")) { "无法打开导出位置" }
+                .bufferedWriter().use { it.write(container.networkDiagnostics.exportJson()) }
+        }
+        message.value = "网络调试日志已导出"
+    }
+    fun clearNetworkLogs() = transfer {
+        withContext(Dispatchers.IO) { container.networkDiagnostics.clear() }
+        message.value = "本机网络调试日志已清空"
+    }
+
     fun export(context: Context, uri: Uri) = transfer {
         val text = container.portableBackups.exportLocalJson()
         withContext(Dispatchers.IO) {
