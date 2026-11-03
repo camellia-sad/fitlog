@@ -6,6 +6,12 @@ interface WorkoutRepository {
     fun observeExercises(query: String = "", equipment: EquipmentType? = null, muscle: Muscle? = null, archived: Boolean = false): Flow<List<Exercise>>
     fun observeActiveWorkout(): Flow<Workout?>
     fun observeWorkout(sessionId: String): Flow<Workout?>
+    fun observeDailyWorkout(date: java.time.LocalDate): Flow<Workout?>
+    suspend fun reserveDailyWorkout(templateId: String? = null, exerciseIds: List<String> = emptyList()): Workout
+    suspend fun startDailyWorkout(templateId: String? = null, exerciseIds: List<String> = emptyList()): Workout
+    suspend fun addDailyExercise(exerciseId: String)
+    suspend fun addDailySet(sessionExerciseId: String)
+    suspend fun removeExercise(sessionExerciseId: String)
     suspend fun startWorkout(templateId: String? = null, exerciseIds: List<String> = emptyList()): Workout
     suspend fun addExercise(sessionId: String, exerciseId: String, setCount: Int, repMin: Int, repMax: Int): String
     suspend fun updateSetDraft(sessionExerciseId: String, setId: String, weightGrams: Long, reps: Int)

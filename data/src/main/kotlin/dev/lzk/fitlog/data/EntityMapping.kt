@@ -23,6 +23,7 @@ internal fun SessionEntity.toDomain() = WorkoutSession(
     id, Instant.ofEpochMilli(startedAtUtc), LocalDate.parse(localWorkoutDate), SessionStatus.valueOf(status),
     endedAtUtc?.let(Instant::ofEpochMilli), feedback, templateId, templateNameSnapshot,
     pausedAtUtc?.let(Instant::ofEpochMilli), pausedDurationMillis, restEndsAtUtc?.let(Instant::ofEpochMilli),
+    dailyPlanDate = dailyPlanDate?.let(LocalDate::parse),
 )
 
 internal fun SetEntity.toDomain() = SetRecord(
@@ -33,7 +34,7 @@ internal fun SetEntity.toDomain() = SetRecord(
 internal fun SessionExerciseRow.toDomain() = SessionExercise(
     exercise.id, exercise.sessionId, exercise.exerciseId, exercise.sortOrder,
     exercise.exerciseNameSnapshot, exercise.targetSetCountSnapshot,
-    exercise.targetRepMinSnapshot, exercise.targetRepMaxSnapshot, sets.sortedBy { it.setIndex }.map { it.toDomain() }, exercise.restSecondsSnapshot, RecordMetric.valueOf(exercise.recordMetricSnapshot),
+    exercise.targetRepMinSnapshot, exercise.targetRepMaxSnapshot, sets.sortedBy { it.setIndex }.map { it.toDomain() }, exercise.restSecondsSnapshot, RecordMetric.valueOf(exercise.recordMetricSnapshot), exercise.removedFromPlan,
 )
 
 internal fun WorkoutRow.toDomain() = Workout(session.toDomain().copy(isExtra = isExtra), exercises.sortedBy { it.exercise.sortOrder }.map { it.toDomain() })

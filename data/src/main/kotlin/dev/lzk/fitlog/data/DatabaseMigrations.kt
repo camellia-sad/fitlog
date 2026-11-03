@@ -4,6 +4,13 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseMigrations {
+    val FROM_6_TO_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE workout_sessions ADD COLUMN dailyPlanDate TEXT")
+            db.execSQL("CREATE UNIQUE INDEX index_workout_sessions_dailyPlanDate ON workout_sessions(dailyPlanDate)")
+            db.execSQL("ALTER TABLE session_exercises ADD COLUMN removedFromPlan INTEGER NOT NULL DEFAULT 0")
+        }
+    }
     val FROM_5_TO_6 = object : Migration(5, 6) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE exercises ADD COLUMN defaultWeightGrams INTEGER")

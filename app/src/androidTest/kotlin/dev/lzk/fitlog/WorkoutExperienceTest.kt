@@ -143,12 +143,13 @@ class WorkoutExperienceTest {
         }
         show()
         compose.onNodeWithText("继续训练").performScrollTo().performClick()
-        waitText("添加动作")
+        waitText("展开")
         compose.onNodeWithTag("workout-exercises").performTouchInput { swipeLeft() }
+        compose.onNodeWithText("结束训练").assertDoesNotExist()
+        compose.onNodeWithTag("workout-exercises").performClick()
         compose.onNodeWithText("添加动作").assertIsDisplayed()
-        val add = compose.onNodeWithText("添加动作").fetchSemanticsNode().boundsInRoot
-        val strip = compose.onNodeWithTag("workout-exercises").fetchSemanticsNode().boundsInRoot
-        assertTrue(add.left < strip.left)
+        compose.onNodeWithText("收起").performClick()
+        compose.onNodeWithTag("workout-exercises").assertIsDisplayed()
     }
 
     @Test fun planEditorDefaultsToWeekAndSavesFourteenDayCycle() {

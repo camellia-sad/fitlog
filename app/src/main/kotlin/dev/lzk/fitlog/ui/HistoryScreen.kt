@@ -89,8 +89,13 @@ fun HistoryScreen(model: HistoryViewModel, unit: WeightUnit, exercises: List<Exe
                 SoftCard(Modifier.clickable { detailId = workout.session.id }) {
                     OneLineText("${workout.session.trainingLabel} · ${workout.historyStatus()}",
                         style = MaterialTheme.typography.titleMedium)
-                    Text(if (workout.completedSetCount == 0) "未完成 · ${workout.elapsedDuration(Instant.now()).display()}" else
+                    Text(if(workout.session.status == SessionStatus.READY) "计划尚未开始" else if (workout.completedSetCount == 0) "未完成 · ${workout.elapsedDuration(Instant.now()).display()}" else
                         "${workout.completedExerciseCount} 个动作 · ${workout.completedSetCount}/${workout.plannedSetCount} 组 · ${workout.elapsedDuration(Instant.now()).display()}")
+                    if(workout.session.dailyPlanDate != null) {
+                        val pending = workout.exercises.filter { !it.removedFromPlan && it.sets.any { set -> set.status != SetStatus.COMPLETED } }
+                        if(pending.isNotEmpty()) Text("未完成：" + pending.joinToString("、") { it.exerciseNameSnapshot },
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(workout.session.startedAtUtc.atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm")),
                             style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -192,7 +197,8 @@ fun WorkoutDetails(workout: Workout, unit: WeightUnit) {
         Text("${workout.completedExerciseCount} 个动作 · ${workout.completedSetCount} 组 · ${workout.elapsedDuration(Instant.now()).display()}",
             color = MaterialTheme.colorScheme.primary)
         workout.exercises.forEach { exercise ->
-            Text(exercise.exerciseNameSnapshot, style = MaterialTheme.typography.titleSmall)
+            Text(exercise.exerciseNameSnapshot + if(exercise.removedFromPlan) " · 已移出计划，保留完成记录" else "", style = MaterialTheme.typography.titleSmall)
+            if(!exercise.removedFromPlan && exercise.sets.any { it.status != SetStatus.COMPLETED }) Text("未完成目标：" + exercise.sets.count { it.status != SetStatus.COMPLETED } + " 组", color = MaterialTheme.colorScheme.primary)
             exercise.sets.forEach { record ->
                 Text("${record.setIndex}.  ${record.displayValue(exercise.recordMetricSnapshot,unit)} · ${record.status.label()}",
                     style = MaterialTheme.typography.bodySmall)
@@ -202,6 +208,6 @@ fun WorkoutDetails(workout: Workout, unit: WeightUnit) {
     }
 }
 fun SessionStatus.label(): String = when (this) {
-    SessionStatus.ACTIVE -> "进行中"; SessionStatus.PAUSED -> "已暂停"; SessionStatus.FINISHED -> "已结束"; SessionStatus.DISCARDED -> "已放弃"
+    SessionStatus.READY -> "未开始"; SessionStatus.ACTIVE -> "进行中"; SessionStatus.PAUSED -> "已暂停"; SessionStatus.FINISHED -> "已结束"; SessionStatus.DISCARDED -> "已放弃"
 }
 private fun SetStatus.label(): String = when (this) { SetStatus.PLANNED -> "草稿"; SetStatus.COMPLETED -> "已完成"; SetStatus.SKIPPED -> "已跳过" }

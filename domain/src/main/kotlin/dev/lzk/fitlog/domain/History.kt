@@ -15,15 +15,19 @@ interface HistoryRepository {
 }
 
 fun Workout.historyStatus(): String = when (session.status) {
+    SessionStatus.READY -> "未开始"
     SessionStatus.FINISHED -> if (allSetsCompleted) "已完成" else "未完成"
     SessionStatus.ACTIVE -> "进行中 · 未完成"
     SessionStatus.PAUSED -> "已暂停 · 未完成"
     SessionStatus.DISCARDED -> "已放弃"
 }
 
+fun Workout.isRecordedTraining() = session.status == SessionStatus.FINISHED ||
+    (session.dailyPlanDate != null && session.status in listOf(SessionStatus.ACTIVE, SessionStatus.PAUSED))
+
 object TrainingHistory {
     fun statistics(workouts: List<Workout>): TrainingStatistics {
-        val finished = workouts.filter { it.session.status == SessionStatus.FINISHED && it.completedSetCount > 0 }
+        val finished = workouts.filter { it.isRecordedTraining() && it.completedSetCount > 0 }
         val completed = finished.flatMap { it.exercises }.flatMap { it.sets }.filter { it.status == SetStatus.COMPLETED }
         val volume = finished.flatMap {it.exercises}.filter {it.recordMetricSnapshot==RecordMetric.REPETITIONS}
             .flatMap {it.sets}.filter {it.status==SetStatus.COMPLETED}.fold(BigInteger.ZERO) { value, set ->
@@ -39,13 +43,13 @@ object TrainingHistory {
     }
 
     fun days(workouts: List<Workout>): List<TrainingDay> = workouts
-        .filter { it.session.status == SessionStatus.FINISHED && it.completedSetCount > 0 }
+        .filter { it.isRecordedTraining() && it.completedSetCount > 0 }
         .groupBy { it.session.localWorkoutDate }.map { (date, sessions) ->
             TrainingDay(date, sessions.sumOf { it.completedSetCount }, sessions.size)
         }.sortedBy { it.date }
 
     fun performance(workouts: List<Workout>, exerciseId: String): List<PerformancePoint> = workouts
-        .filter { it.session.status == SessionStatus.FINISHED }
+        .filter { it.isRecordedTraining() }
         .sortedBy { it.session.startedAtUtc }.flatMap { workout ->
             workout.exercises.filter { it.exerciseId == exerciseId }.flatMap {exercise->
                 exercise.sets.filter { it.status == SetStatus.COMPLETED }.map {

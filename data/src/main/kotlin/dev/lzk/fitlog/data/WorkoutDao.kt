@@ -8,9 +8,10 @@ import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
-const val WORKOUT_SELECT = """SELECT s.*, EXISTS(SELECT 1 FROM workout_sessions p
-    WHERE p.localWorkoutDate = s.localWorkoutDate AND (p.startedAtUtc < s.startedAtUtc
-    OR (p.startedAtUtc = s.startedAtUtc AND p.id < s.id))) AS isExtra FROM workout_sessions s """
+const val WORKOUT_SELECT = """SELECT s.*, CASE WHEN s.dailyPlanDate IS NOT NULL THEN 0 ELSE
+    EXISTS(SELECT 1 FROM workout_sessions p WHERE p.localWorkoutDate = s.localWorkoutDate
+    AND (p.dailyPlanDate IS NOT NULL OR p.startedAtUtc < s.startedAtUtc
+    OR (p.startedAtUtc = s.startedAtUtc AND p.id < s.id))) END AS isExtra FROM workout_sessions s """
 
 @Dao
 interface WorkoutDao {
@@ -71,6 +72,17 @@ interface WorkoutDao {
 
     @Query("SELECT * FROM workout_sessions WHERE id = :id")
     suspend fun session(id: String): SessionEntity?
+
+    @Transaction @Query(WORKOUT_SELECT + "WHERE dailyPlanDate = :date")
+    fun observeDailyWorkout(date: String): Flow<WorkoutRow?>
+    @Query("SELECT * FROM workout_sessions WHERE dailyPlanDate = :date")
+    suspend fun dailySession(date: String): SessionEntity?
+    @Query("SELECT * FROM workout_sessions WHERE localWorkoutDate = :date AND status != 'DISCARDED' ORDER BY startedAtUtc, id LIMIT 1")
+    suspend fun firstOnDate(date: String): SessionEntity?
+    @Query("DELETE FROM session_exercises WHERE id = :id")
+    suspend fun deleteExercise(id: String)
+    @Query("DELETE FROM set_records WHERE sessionExerciseId = :id AND status != 'COMPLETED'")
+    suspend fun deleteUnfinishedSets(id: String)
 
     @Query("DELETE FROM workout_sessions")
     suspend fun clearSessions()

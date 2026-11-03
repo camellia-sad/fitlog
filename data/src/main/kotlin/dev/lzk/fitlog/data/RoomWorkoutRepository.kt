@@ -13,6 +13,13 @@ class RoomWorkoutRepository(
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) : WorkoutRepository {
     private val dao = database.workoutDao()
+    private val daily = RoomDailyWorkouts(database, clock, this)
+    override fun observeDailyWorkout(date: LocalDate) = dao.observeDailyWorkout(date.toString()).map { it?.toDomain() }
+    override suspend fun reserveDailyWorkout(templateId: String?, exerciseIds: List<String>) = daily.reserve(templateId, exerciseIds)
+    override suspend fun startDailyWorkout(templateId: String?, exerciseIds: List<String>) = daily.start(templateId, exerciseIds)
+    override suspend fun addDailyExercise(exerciseId: String) = daily.addAction(exerciseId)
+    override suspend fun addDailySet(sessionExerciseId: String) = daily.addSet(sessionExerciseId)
+    override suspend fun removeExercise(sessionExerciseId: String) = daily.remove(sessionExerciseId)
 
     override fun observeExercises(query: String, equipment: EquipmentType?, muscle: Muscle?, archived: Boolean) =
         dao.observeExercises(query.trim(), equipment?.name, muscle?.name, archived).map { rows -> rows.map { it.toDomain() } }
@@ -123,7 +130,8 @@ class RoomWorkoutRepository(
                     SetEntity(newId(), sessionExerciseId, index, reference?.weightGrams ?: 0L, reference?.reps ?: exercise.targetRepMinSnapshot)
                 })
             }
-            dao.updateSessionExercise(exercise.copy(targetSetCountSnapshot = count))
+            dao.updateSessionExercise(exercise.copy(targetSetCountSnapshot = count,
+                removedFromPlan = if(count > sets.size) false else exercise.removedFromPlan))
             if (finishWhenAllDone && workout(exercise.sessionId).allSetsCompleted) finishWorkout(exercise.sessionId, null)
             SetCountResult.Updated
         }
@@ -202,7 +210,7 @@ class RoomWorkoutRepository(
         val end = maxOf(clock.millis(), session.startedAtUtc)
         val pause = session.pausedAtUtc?.let { (end - it).coerceAtLeast(0) } ?: 0
         dao.updateSession(session.copy(
-            status = "FINISHED", endedAtUtc = end, feedback = feedback?.trim()?.ifBlank { null },
+            status = "FINISHED", endedAtUtc = end, feedback = feedback?.trim()?.ifBlank { null } ?: session.feedback,
             unfinishedSlot = null, restEndsAtUtc = null, pausedAtUtc = null,
             pausedDurationMillis = Math.addExact(session.pausedDurationMillis, pause),
         ))

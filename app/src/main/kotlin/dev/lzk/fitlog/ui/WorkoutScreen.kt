@@ -39,6 +39,7 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
     val exercise = state.selectedExercise
     val unit = state.preferences.weightUnit
     val canEdit = workout?.session?.status != SessionStatus.PAUSED
+    var showingActions by remember { mutableStateOf(false) }
     var editor by remember { mutableStateOf<NumberEdit?>(null) }
     var showingEffort by remember { mutableStateOf(false) }
     LaunchedEffect(model) {
@@ -53,6 +54,10 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
     val now by produceState(Instant.now(), workout?.session?.id) {
         while (true) { value = Instant.now(); delay(1_000) }
     }
+    if(showingActions && workout != null) TodayActionsDialog(workout, onClose = { showingActions = false },
+        onSelect = { model.selectExercise(it); showingActions = false }, onAdd = { showingActions = false; onAdd() },
+        onAddSet = { if(workout.session.dailyPlanDate != null) model.addDailySet(it) else model.adjustTargetSetCount(it, 1) },
+        onRemove = model::removeExercise, editable = canEdit)
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { LineIcon(Symbol.BACK, Modifier.size(24.dp).semanticsLabel("返回今日")) }
@@ -62,6 +67,12 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
             }
             if (workout != null) TextButton(onClick = { model.setPaused(canEdit) }) { Text(if (canEdit) "暂停" else "恢复") }
             TextButton(onClick = onFinish, enabled = workout != null) { Text("结束") }
+        }
+        if(workout != null) {
+        OutlinedButton(onClick = { showingActions = true }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).testTag("workout-exercises")) {
+            OneLineText("${if(workout.session.isExtra) "加练动作" else "今日动作"} · ${workout.completedSetCount}/${workout.plannedSetCount} 组", Modifier.weight(1f))
+            Text("展开")
+        }
         }
         if (workout == null || exercise == null) {
             Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -74,15 +85,6 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
                 Button(onClick = onAdd, enabled = workout != null && canEdit, modifier = Modifier.heightIn(min = 54.dp)) { Text("选择动作") }
             }
             return
-        }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AssistChip(onClick = onAdd, enabled = canEdit, label = { Text("添加动作") }, leadingIcon = { LineIcon(Symbol.PLUS, Modifier.size(16.dp)) })
-            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()).testTag("workout-exercises"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            workout.exercises.forEach { item ->
-                FilterChip(selected = item.id == exercise.id, onClick = { model.selectExercise(item.id) },
-                    label = { Text(item.exerciseNameSnapshot, maxLines = 1, softWrap = false) }, shape = RoundedCornerShape(12.dp))
-            }
-            }
         }
         val rest = workout.restRemainingSeconds(now)
         if (rest > 0) Surface(

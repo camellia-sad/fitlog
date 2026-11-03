@@ -37,7 +37,13 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
     val plan by templates.plan.collectAsStateWithLifecycle()
     var selectedTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectionChanged by rememberSaveable { mutableStateOf(false) }
-    val todayPlanId = plan?.templateOn(LocalDate.now())
+    val todayPlanId = plan?.templateOn(state.todayDate)
+    var selectionDate by rememberSaveable { mutableStateOf(state.todayDate.toString()) }
+    LaunchedEffect(state.todayDate) {
+        if(selectionDate != state.todayDate.toString()) {
+            selectionDate = state.todayDate.toString(); selectionChanged = false; selectedTemplateId = todayPlanId
+        }
+    }
     LaunchedEffect(todayPlanId) { if (!selectionChanged) selectedTemplateId = todayPlanId }
     val settingsMessage by settings.message.collectAsStateWithLifecycle()
     val nav = rememberNavController()
@@ -133,13 +139,16 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
         NavHost(nav, startDestination = "home", modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             composable("home") {
                 HomeScreen(state, onStart = { onWorkoutStarted(); model.startWorkout(selectedTemplateId); goWorkout() },
-                    onContinue = { onWorkoutStarted(); model.setPaused(false); goWorkout() },
+                    onContinue = { onWorkoutStarted(); if(state.workout != null) model.setPaused(false) else model.continueToday(); goWorkout() },
                     onLibrary = { nav.navigate("library") }, onHistory = { nav.navigate("history") }, weekly = weekly,
                     templates = templateState.templates, plan = plan,
                     selectedTemplateId = selectedTemplateId,
                     onSelectTemplate = { selectedTemplateId = it; selectionChanged = true },
                     prepared = state.preparedExerciseIds.mapNotNull { id -> templateState.exercises.find { it.id == id } },
-                    onRemovePrepared = model::removePreparedExercise, updates=container.updates)
+                    onRemovePrepared = model::removePreparedExercise, updates=container.updates,
+                    onReserve = { model.reserveToday(selectedTemplateId) },
+                    onExtra = { onWorkoutStarted(); model.startExtraWorkout(); goWorkout() },
+                    onAddDailySet = model::addDailySet, onRemoveAction = model::removeExercise)
             }
             composable("backups") {BackupScreen(container,onBack={nav.popBackStack()},onLogin={nav.navigate("me")})}
             composable("library") {
@@ -188,7 +197,8 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
         AlertDialog(onDismissRequest = { finishing = false }, title = { Text("结束这次训练？") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("本次完成 ${workout.completedExerciseCount} 个动作、${workout.completedSetCount} 组。未完成草稿会保留，不计入完成数量。")
+                    Text("本次完成 ${workout.completedExerciseCount} 个动作、${workout.completedSetCount} 组。" +
+                        if(workout.session.dailyPlanDate != null) "结束只停止计时，今日计划与全部进度保留，稍后可继续。" else "未完成草稿会保留，不计入完成数量。")
                     OutlinedTextField(feedback, { feedback = it.take(2000) }, label = { Text("今天感觉如何（选填）") }, maxLines = 3)
                 }
             },

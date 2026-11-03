@@ -37,7 +37,7 @@ class PortableBackupTest {
             RoomTrainingRepository(a).saveTemplateDraft(TemplateDraft(name="尚未保存"))
             val exporter=JsonBackupRepository(a,pa,pa);val importer=JsonBackupRepository(b,pb,pb)
             val json=exporter.exportJson()
-            assertEquals(5,JSONObject(json).getInt("schemaVersion"))
+            assertEquals(6,JSONObject(json).getInt("schemaVersion"))
             importer.validateJson(json)
             assertTrue(b.trainingDao().allDrafts().isEmpty());assertNotEquals(prefs,pb.preferences.first())
             importer.importJson(json)

@@ -38,7 +38,7 @@ interface TrainingDao {
     @Transaction @Query(WORKOUT_SELECT + "WHERE localWorkoutDate BETWEEN :from AND :to ORDER BY startedAtUtc DESC, id DESC")
     fun observeHistory(from: String, to: String): Flow<List<WorkoutRow>>
     @Transaction @Query(WORKOUT_SELECT + """
-        WHERE status = 'FINISHED'
+        WHERE (status = 'FINISHED' OR (dailyPlanDate IS NOT NULL AND status IN ('ACTIVE','PAUSED')))
         AND EXISTS (SELECT 1 FROM session_exercises e WHERE e.sessionId = s.id AND e.exerciseId = :exerciseId)
         ORDER BY startedAtUtc DESC, id DESC
     """)

@@ -25,8 +25,11 @@ import java.util.Locale
 fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Unit, onLibrary: () -> Unit,
     weekly: List<Workout> = emptyList(), templates: List<WorkoutTemplate> = emptyList(),
     onHistory: () -> Unit = {}, selectedTemplateId: String? = null, onSelectTemplate: (String?) -> Unit = {},
-    prepared: List<Exercise> = emptyList(), onRemovePrepared: (String) -> Unit = {}, plan: TrainingPlan? = null, updates:dev.lzk.fitlog.updates.AppUpdates? = null) {
+    prepared: List<Exercise> = emptyList(), onRemovePrepared: (String) -> Unit = {}, plan: TrainingPlan? = null, updates:dev.lzk.fitlog.updates.AppUpdates? = null,
+    onReserve: () -> Unit = {}, onExtra: () -> Unit = {}, onAddDailySet: (String) -> Unit = {}, onRemoveAction: (String) -> Unit = {}) {
     val workout = state.workout
+    val todayWorkout = state.todayWorkout
+    var viewingToday by remember { mutableStateOf(false) }
     var pickingTemplate by remember { mutableStateOf(false) }
     val selectedTemplate = templates.find { it.id == selectedTemplateId }
     val now by produceState(Instant.now(), workout?.session?.id) { while (true) { value = Instant.now(); delay(1_000) } }
@@ -67,13 +70,13 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
                             LineIcon(Symbol.DUMBBELL, Modifier.padding(14.dp).size(28.dp))
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            OneLineText(if (workout == null) "开始今天的训练" else workout.session.trainingLabel,
+                            OneLineText(workout?.session?.trainingLabel ?: todayWorkout?.session?.trainingLabel ?: "开始今天的训练",
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold))
-                            OneLineText(if (workout == null) "选择自由训练或自己的模板" else "${if (workout.session.status == SessionStatus.PAUSED) "已暂停" else "训练中"} · ${workout.elapsedDuration(now).timerText()}",
+                            OneLineText(if (workout == null) (todayWorkout?.let { it.historyStatus() + " · " + it.completedSetCount + "/" + it.plannedSetCount + " 组" } ?: "选择自由训练或自己的模板") else "${if (workout.session.status == SessionStatus.PAUSED) "已暂停" else "训练中"} · ${workout.elapsedDuration(now).timerText()}",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                         }
                     }
-                    if (workout == null) {
+                    if (workout == null && todayWorkout == null) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             FilterChip(selected = selectedTemplateId == null, onClick = { onSelectTemplate(null) }, label = { Text("自由训练") })
                             OutlinedButton(onClick = { pickingTemplate = true }) { OneLineText(selectedTemplate?.name ?: "模板训练") }
@@ -93,16 +96,20 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
                             OutlinedButton(onClick = onLibrary, modifier = Modifier.fillMaxWidth()) { Text("添加本次动作") }
                         }
                     }
-                    Button(onClick = if (workout == null) onStart else onContinue,
-                        enabled = !state.loading && (selectedTemplateId == null || selectedTemplate != null || workout != null), modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
+                    if(todayWorkout == null && workout == null) OutlinedButton(onClick = onReserve, modifier = Modifier.fillMaxWidth()) { Text("设为今日计划") }
+                    if(todayWorkout != null) OutlinedButton(onClick = { viewingToday = true }, modifier = Modifier.fillMaxWidth().testTag("home-today-actions")) { Text("今日动作 · ${todayWorkout.completedSetCount}/${todayWorkout.plannedSetCount} 组") }
+                    Button(onClick = if (workout != null) onContinue else if(todayWorkout?.allSetsCompleted == true) ({ viewingToday = true }) else if(todayWorkout != null) onContinue else onStart,
+                        enabled = !state.loading && (selectedTemplateId == null || selectedTemplate != null || workout != null || todayWorkout != null), modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
                         shape = RoundedCornerShape(14.dp)) {
                         LineIcon(if (workout == null) Symbol.PLUS else Symbol.ARROW, Modifier.size(22.dp), MaterialTheme.colorScheme.onPrimary)
                         Spacer(Modifier.width(10.dp))
-                        Text(if (workout == null) "开始训练" else "继续训练", style = MaterialTheme.typography.titleMedium)
+                        Text(if(workout != null) "继续训练" else if(todayWorkout?.allSetsCompleted == true) "查看今日计划" else if(todayWorkout != null && todayWorkout.session.status != SessionStatus.READY) "继续今日计划" else "开始训练", style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }
         }
+
+        if(todayWorkout != null && workout == null) OutlinedButton(onClick = onExtra, modifier = Modifier.fillMaxWidth().testTag("start-extra-workout")) { Text("开始加练") }
 
         val dates = TrainingHistory.days(weekly).associateBy { it.date }
         if (dates.isNotEmpty()) SoftCard {
@@ -161,6 +168,9 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
         updates?.let {UpdateEntry(it)}
         Spacer(Modifier.height(4.dp))
     }
+    if(viewingToday && todayWorkout != null) TodayActionsDialog(todayWorkout, onClose = { viewingToday = false },
+        onSelect = {}, onAdd = { viewingToday = false; onLibrary() }, onAddSet = onAddDailySet,
+        onRemove = onRemoveAction, editable = true)
     if (pickingTemplate) AlertDialog(onDismissRequest = { pickingTemplate = false }, title = { Text("选择训练模板") },
         text = { Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
             if (templates.isEmpty()) Text("还没有模板，可到动作页创建自己的训练安排。")

@@ -57,18 +57,21 @@ class WorkoutFlowTest {
         completeNext(2, 2)
         compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("完成当前第3组").fetchSemanticsNodes().isNotEmpty() }
 
+        compose.onNodeWithTag("workout-exercises").performClick()
         compose.onNodeWithText("添加动作").performClick()
         addExercise("高位下拉")
         completeNext(1, 3)
         completeNext(2, 4)
 
+        compose.onNodeWithTag("workout-exercises").performClick()
         compose.onNodeWithText("添加动作").performClick()
         addExercise("杠铃深蹲")
         completeNext(1, 5)
         completeNext(2, 6)
 
-        compose.onNodeWithText("杠铃卧推").performClick()
-        compose.waitUntil(10_000) { compose.onAllNodesWithText("杠铃卧推").fetchSemanticsNodes().size > 1 }
+        compose.onNodeWithTag("workout-exercises").performClick()
+        compose.onNodeWithTag("select-action-barbell-bench-press").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("输入第1组重量").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("workout-sets").performScrollToNode(hasContentDescription("输入第1组重量"))
         assertEquals(37_500L, runBlocking { container.workouts.observeActiveWorkout().first()!!.exercises.first().sets.first().weightGrams })
         compose.onNodeWithContentDescription("输入第1组重量").assertTextEquals("37.5")
@@ -82,7 +85,7 @@ class WorkoutFlowTest {
         assertEquals(6, saved.completedSetCount)
         assertEquals(37_500L, saved.exercises.first().sets.first().weightGrams)
         compose.onNodeWithText("完成", substring = false).performClick()
-        compose.onNodeWithText("开始训练").assertExists()
+        compose.onNodeWithText("继续今日计划").assertExists()
     }
 
     private fun completeNext(index: Int, expectedCount: Int) {

@@ -36,7 +36,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             }
             data.put(table, rows)
         }
-        JSONObject().put("format", "FitLog").put("schemaVersion", 5).put("data", data).apply {
+        JSONObject().put("format", "FitLog").put("schemaVersion", 6).put("data", data).apply {
             preferences?.let {put("preferences",it.preferences.first().backupJson())}
             preparation?.let {put("preparedExercises",JSONArray(it.preparedExercises.first()))}
         }.toString()
@@ -64,7 +64,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
         }
         val root = JSONObject(json)
         val version = root.integer("schemaVersion")
-        require(root.getString("format") == "FitLog" && version in 1..5) { "不支持的备份版本" }
+        require(root.getString("format") == "FitLog" && version in 1..6) { "不支持的备份版本" }
         val restoredPreferences = if(version>=3) root.optJSONObject("preferences")?.backupPreferences() else null
         val prepared = if(version>=3) root.optJSONArray("preparedExercises")?.strings() else null
         require(prepared==null || prepared.size<=30 && prepared.distinct().size==prepared.size) {"待开始动作无效"}
@@ -98,11 +98,13 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             data.rows("workout_sessions") { SessionEntity(it.text("id"), it.number("startedAtUtc"), it.text("localWorkoutDate"),
                 it.text("status"), it.optionalLong("endedAtUtc"), it.optionalText("feedback"), it.optionalInt("unfinishedSlot"),
                 it.optionalText("templateId"), it.optionalText("templateNameSnapshot"), it.optionalLong("pausedAtUtc"),
-                it.number("pausedDurationMillis"), it.optionalLong("restEndsAtUtc")) },
+                it.number("pausedDurationMillis"), it.optionalLong("restEndsAtUtc"),
+                if(version>=6) it.optionalText("dailyPlanDate") else null) },
             data.rows("session_exercises") { SessionExerciseEntity(it.text("id"), it.text("sessionId"), it.text("exerciseId"),
                 it.integer("sortOrder"), it.text("exerciseNameSnapshot"), it.integer("targetSetCountSnapshot"),
                 it.integer("targetRepMinSnapshot"), it.integer("targetRepMaxSnapshot"), it.optionalInt("restSecondsSnapshot"),
-                if(version>=4) it.text("recordMetricSnapshot") else "REPETITIONS") },
+                if(version>=4) it.text("recordMetricSnapshot") else "REPETITIONS",
+                if(version>=6) it.flag("removedFromPlan") else false) },
             data.rows("set_records") { SetEntity(it.text("id"), it.text("sessionExerciseId"), it.integer("setIndex"), it.number("weightGrams"),
                 it.integer("reps"), it.text("status"), it.optionalLong("completedAtUtc"), it.text("setType")) },
             if (version >= 2) data.rows("training_plans") { TrainingPlanEntity(it.text("id"), it.text("startDate"), it.integer("cycleDays"), it.flag("repeats")) } else emptyList(),
@@ -214,13 +216,16 @@ class JsonBackupRepository(private val database: FitLogDatabase,
                 WorkoutRules.repRange(it.targetRepMin, it.targetRepMax)
                 WorkoutRules.draft(it.defaultWeightGrams, 0); WorkoutRules.rest(it.restSeconds)
             }
+            require(sessions.mapNotNull { it.dailyPlanDate }.distinct().size == sessions.count { it.dailyPlanDate != null }) {"同一天存在多个今日计划"}
             sessions.forEach {
                 val status = SessionStatus.valueOf(it.status)
                 LocalDate.parse(it.localWorkoutDate)
                 require(it.startedAtUtc >= 0 && it.pausedDurationMillis >= 0)
                 val unfinished = status in listOf(SessionStatus.ACTIVE, SessionStatus.PAUSED)
                 require((it.unfinishedSlot == 1) == unfinished && (it.unfinishedSlot == null || it.unfinishedSlot == 1))
-                require(if (unfinished) it.endedAtUtc == null else it.endedAtUtc != null && it.endedAtUtc >= it.startedAtUtc)
+                require(if (unfinished || status == SessionStatus.READY) it.endedAtUtc == null else it.endedAtUtc != null && it.endedAtUtc >= it.startedAtUtc)
+                require(it.dailyPlanDate == null || it.dailyPlanDate == it.localWorkoutDate)
+                require(status != SessionStatus.READY || (it.dailyPlanDate != null && it.pausedDurationMillis == 0L && it.restEndsAtUtc == null))
                 require((status == SessionStatus.PAUSED) == (it.pausedAtUtc != null))
                 require(it.pausedAtUtc == null || it.pausedAtUtc >= it.startedAtUtc)
                 require(it.restEndsAtUtc == null || unfinished && it.restEndsAtUtc >= it.startedAtUtc)
@@ -266,6 +271,12 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             require(sets.distinctBy { it.sessionExerciseId to it.setIndex }.size == sets.size)
             val byTemplate = templateExercises.groupBy { it.templateId }
             require(templates.all { byTemplate[it.id].orEmpty().size in 1..30 })
+            require(sessions.mapNotNull { it.dailyPlanDate }.distinct().size == sessions.count { it.dailyPlanDate != null }) {"今日计划日期冲突"}
+            val ready = sessions.filter { it.status == "READY" }.map { it.id }.toSet()
+            val readyExercises = sessionExercises.filter { it.sessionId in ready }.map { it.id }.toSet()
+            require(sets.none { it.sessionExerciseId in readyExercises && it.status == "COMPLETED" }) {"未开始计划不能包含完成组"}
+            val removed = sessionExercises.filter { it.removedFromPlan }.map { it.id }.toSet()
+            require(sets.none { it.sessionExerciseId in removed && it.status != "COMPLETED" }) {"已移除动作不能包含未完成目标"}
             val byExercise = sets.groupBy { it.sessionExerciseId }
             sessionExercises.forEach { exercise ->
                 val indices = byExercise[exercise.id].orEmpty().map { it.setIndex }.sorted()
