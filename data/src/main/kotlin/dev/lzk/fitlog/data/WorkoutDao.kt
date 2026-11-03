@@ -84,6 +84,9 @@ interface WorkoutDao {
     @Query("DELETE FROM set_records WHERE sessionExerciseId = :id AND status != 'COMPLETED'")
     suspend fun deleteUnfinishedSets(id: String)
 
+    @Query("DELETE FROM workout_sessions WHERE localWorkoutDate = :date")
+    suspend fun clearSessionsOnDate(date: String): Int
+
     @Query("DELETE FROM workout_sessions")
     suspend fun clearSessions()
 

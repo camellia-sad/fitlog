@@ -107,6 +107,16 @@ class TemplateViewModel(container: AppContainer) : FeatureModel(container) {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HistoryViewModel(container: AppContainer) : FeatureModel(container) {
+    val clearingDate = MutableStateFlow(false)
+    val clearNotice = MutableStateFlow<String?>(null)
+    fun clearDate(date: LocalDate) = execute {
+        if(clearingDate.value) return@execute
+        clearingDate.value = true; message.value = null; clearNotice.value = null
+        try {
+            val count = container.training.clearTrainingDate(date)
+            clearNotice.value = "已清除 $date 的 $count 条本机训练记录"
+        } finally { clearingDate.value = false }
+    }
     val year = MutableStateFlow(LocalDate.now().year)
     val selectedDate = MutableStateFlow(LocalDate.now())
     val selectedExerciseId = MutableStateFlow<String?>(null)
@@ -115,8 +125,8 @@ class HistoryViewModel(container: AppContainer) : FeatureModel(container) {
     val performance = selectedExerciseId.flatMapLatest { id ->
         if (id == null) flowOf(emptyList()) else container.training.observeExerciseHistory(id)
     }.catch { message.value = it.message }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    fun selectDate(date: LocalDate) { selectedDate.value = date; year.value = date.year }
-    fun setYear(value: Int) { year.value = value; selectedDate.value = selectedDate.value.withYear(value) }
+    fun selectDate(date: LocalDate) { selectedDate.value = date; year.value = date.year; clearNotice.value = null }
+    fun setYear(value: Int) { year.value = value; selectedDate.value = selectedDate.value.withYear(value); clearNotice.value = null }
 }
 
 class SettingsViewModel(container: AppContainer) : FeatureModel(container) {

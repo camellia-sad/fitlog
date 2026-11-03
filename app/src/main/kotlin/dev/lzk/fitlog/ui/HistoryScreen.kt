@@ -36,8 +36,11 @@ fun HistoryScreen(model: HistoryViewModel, unit: WeightUnit, exercises: List<Exe
     val selectedExercise by model.selectedExerciseId.collectAsStateWithLifecycle()
     val performance by model.performance.collectAsStateWithLifecycle()
     val message by model.message.collectAsStateWithLifecycle()
+    val clearing by model.clearingDate.collectAsStateWithLifecycle()
+    val clearNotice by model.clearNotice.collectAsStateWithLifecycle()
     val workouts = remember(all, year) { all.filter { it.session.localWorkoutDate.year == year } }
     val statistics = remember(workouts) { TrainingHistory.statistics(workouts) }
+    val selectedDay = remember(workouts, date) { workouts.filter { it.session.localWorkoutDate == date } }
     val days = remember(workouts) { TrainingHistory.days(workouts).associateBy { it.date } }
     var pickingDate by remember { mutableStateOf(false) }
     var pickingExercise by remember { mutableStateOf(false) }
@@ -77,8 +80,15 @@ fun HistoryScreen(model: HistoryViewModel, unit: WeightUnit, exercises: List<Exe
                         style = MaterialTheme.typography.bodySmall)
                 }
             }
-            item { Text(date.toString(), style = MaterialTheme.typography.titleLarge) }
-            val selectedDay = workouts.filter { it.session.localWorkoutDate == date }
+            item(key = "selected-day") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    OneLineText(date.toString(), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                    ClearTrainingDayButton(date, selectedDay.size,
+                        selectedDay.any { it.session.status in listOf(SessionStatus.ACTIVE, SessionStatus.PAUSED) },
+                        clearing) { target -> detailId = null; model.clearDate(target) }
+                }
+                clearNotice?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+            }
             if (selectedDay.isEmpty()) item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("这一天还没有训练记录。", Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
