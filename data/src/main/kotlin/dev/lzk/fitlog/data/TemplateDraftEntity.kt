@@ -19,7 +19,7 @@ internal fun TemplateDraft.toDraftEntity(): TemplateDraftEntity {
         items.put(JSONObject().put("id", item.id).put("exerciseId", item.exerciseId).put("sortOrder", item.sortOrder)
             .put("targetSetCount", item.targetSetCount).put("targetRepMin", item.targetRepMin)
             .put("targetRepMax", item.targetRepMax).put("defaultWeightGrams", item.defaultWeightGrams)
-            .put("restSeconds", item.restSeconds))
+            .put("restSeconds", item.restSeconds).put("useExerciseWeight", item.useExerciseWeight))
     }
     val value = JSONObject().put("name", name).put("splitType", splitType.name).put("exercises", items)
     return TemplateDraftEntity(templateDraftKey(id), id, value.toString())
@@ -33,6 +33,7 @@ internal fun TemplateDraftEntity.toDraft(): TemplateDraft {
             val item = items.getJSONObject(index)
             TemplateExercise(item.getString("id"), item.getString("exerciseId"), item.getInt("sortOrder"),
                 item.getInt("targetSetCount"), item.getInt("targetRepMin"), item.getInt("targetRepMax"),
-                item.getLong("defaultWeightGrams"), item.getInt("restSeconds"))
+                item.getLong("defaultWeightGrams"), item.getInt("restSeconds"),
+                item.optBoolean("useExerciseWeight", item.getLong("defaultWeightGrams") == 0L))
         })
 }

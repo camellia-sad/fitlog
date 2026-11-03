@@ -22,7 +22,7 @@ import dev.lzk.fitlog.training.WorkoutViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun ExerciseLibraryScreen(state: WorkoutUiState, model: WorkoutViewModel, onAdd: (Exercise) -> Unit, onTemplates: () -> Unit = {}) {
+fun ExerciseLibraryScreen(state: WorkoutUiState, model: WorkoutViewModel, onAdd: (Exercise) -> Unit, onTemplates: () -> Unit = {}, onHistory: (String) -> Unit = {}) {
     val canAdd = state.workout?.session?.status != SessionStatus.PAUSED
     var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(model.currentSearchQuery)) }
     var detail by remember { mutableStateOf<Exercise?>(null) }
@@ -82,7 +82,8 @@ fun ExerciseLibraryScreen(state: WorkoutUiState, model: WorkoutViewModel, onAdd:
             }
         }
     }
-    detail?.let { exercise ->
+    detail?.let { selected ->
+        val exercise = state.exercises.find { it.id == selected.id } ?: selected
         ModalBottomSheet(onDismissRequest = { detail = null }) {
             Column(Modifier.heightIn(max = 620.dp).verticalScroll(rememberScrollState()).padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -91,6 +92,9 @@ fun ExerciseLibraryScreen(state: WorkoutUiState, model: WorkoutViewModel, onAdd:
                 Text(exercise.equipmentType.label())
                 if(ExerciseAnimations.has(exercise.id)) ExerciseGif(exercise.id,exercise.nameZh,Modifier.fillMaxWidth().height(220.dp))
                 exercise.instructions?.let { Text(it) }
+                if(exercise.recordMetric == RecordMetric.REPETITIONS)
+                    ExerciseWeightControl(exercise, state.preferences.weightUnit) { model.setDefaultWeight(exercise.id, it) }
+                OutlinedButton(onClick = { detail = null; onHistory(exercise.id) }, modifier = Modifier.fillMaxWidth()) { Text("查看动作历史") }
                 Row {
                     TextButton(onClick = { model.favorite(exercise); detail = null }) { Text(if (exercise.isFavorite) "取消收藏" else "收藏动作") }
                     TextButton(onClick = { detail = null; archiving = exercise }) { Text(if (exercise.isArchived) "恢复动作" else "归档动作") }

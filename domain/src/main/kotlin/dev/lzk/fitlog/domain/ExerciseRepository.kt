@@ -12,6 +12,7 @@ data class CustomExerciseDraft(
 }
 
 interface ExerciseRepository {
+    suspend fun setDefaultWeight(id: String, weightGrams: Long?)
     suspend fun setFavorite(id: String, favorite: Boolean)
     suspend fun createCustomExercise(draft: CustomExerciseDraft): String
     suspend fun setArchived(id: String, archived: Boolean)

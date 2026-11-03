@@ -12,7 +12,12 @@ internal fun ExerciseRow.toDomain() = Exercise(
     instructions = exercise.instructions, estimatedSecondsPerSet = exercise.estimatedSecondsPerSet,
     mediaAssetPath = exercise.mediaAssetPath, isFavorite = exercise.isFavorite,
     isCustom = exercise.isCustom, isArchived = exercise.isArchived, recordMetric=RecordMetric.valueOf(exercise.recordMetric),
+    defaultWeightGrams = if (exercise.recordMetric == "SECONDS") null else exercise.effectiveWeight(bestWeightGrams),
+    bestWeightGrams = bestWeightGrams, hasManualWeight = exercise.defaultWeightGrams != null && (bestWeightGrams ?: 0L) <= exercise.defaultWeightRecordGrams,
 )
+
+internal fun ExerciseEntity.effectiveWeight(best: Long?): Long? =
+    if(defaultWeightGrams != null && (best ?: 0L) <= defaultWeightRecordGrams) defaultWeightGrams else best
 
 internal fun SessionEntity.toDomain() = WorkoutSession(
     id, Instant.ofEpochMilli(startedAtUtc), LocalDate.parse(localWorkoutDate), SessionStatus.valueOf(status),

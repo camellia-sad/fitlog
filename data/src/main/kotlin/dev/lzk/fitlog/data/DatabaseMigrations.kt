@@ -4,6 +4,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseMigrations {
+    val FROM_5_TO_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE exercises ADD COLUMN defaultWeightGrams INTEGER")
+            db.execSQL("ALTER TABLE exercises ADD COLUMN defaultWeightRecordGrams INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE template_exercises ADD COLUMN useExerciseWeight INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("UPDATE template_exercises SET useExerciseWeight = 1 WHERE defaultWeightGrams = 0")
+        }
+    }
     val FROM_4_TO_5=object:Migration(4,5) {
         override fun migrate(db:SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE exercises ADD COLUMN recordMetric TEXT NOT NULL DEFAULT 'REPETITIONS'")

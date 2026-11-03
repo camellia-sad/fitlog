@@ -127,6 +127,8 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
         val metric=repository.observeExercises().first().find {it.id==id}?.recordMetric ?: RecordMetric.REPETITIONS
         return add(sessionId,id,count,metric.defaultMin,metric.defaultMax)
     }
+    fun setDefaultWeight(exerciseId: String, weight: Long?) = mutate { container.training.setDefaultWeight(exerciseId, weight) }
+
     fun updateDraft(sessionExerciseId: String, setId: String, weightGrams: Long, reps: Int) = mutate {
         update(sessionExerciseId, setId, weightGrams, reps)
     }

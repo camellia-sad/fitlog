@@ -106,6 +106,7 @@ class TrainingFeaturesFlowTest {
         compose.onAllNodesWithText("下移").onFirst().performScrollTo().performClick()
         compose.onAllNodesWithText("调整").onFirst().performScrollTo().performClick()
         compose.onNodeWithText("目标组数").performTextReplacement("2")
+        compose.onNodeWithTag("follow-exercise-weight").performClick()
         compose.onNodeWithText("默认重量（kg）").performTextReplacement("42.5")
         compose.onNodeWithText("确认目标").performClick()
         compose.onNodeWithText("保存模板").performClick()

@@ -42,7 +42,9 @@ class ExerciseCatalog(private val context: Context, private val database: FitLog
             exercises.forEach { item ->
                 val old = existing[item.id]
                 if (old == null || !old.isCustom) {
-                    if (old != null) training.updateExercise(item.copy(isFavorite = old.isFavorite, isArchived = old.isArchived))
+                    if (old != null) training.updateExercise(item.copy(isFavorite = old.isFavorite, isArchived = old.isArchived,
+                        defaultWeightGrams = if(item.recordMetric == "SECONDS") null else old.defaultWeightGrams,
+                        defaultWeightRecordGrams = old.defaultWeightRecordGrams))
                     training.deleteMuscles(item.id)
                     dao.insertMuscles(muscles.filter { it.exerciseId == item.id })
                 }

@@ -19,6 +19,7 @@ data class TemplateExerciseEntity(
     @PrimaryKey val id: String, val templateId: String, val exerciseId: String, val sortOrder: Int,
     val targetSetCount: Int, val targetRepMin: Int, val targetRepMax: Int,
     val defaultWeightGrams: Long, val restSeconds: Int,
+    @ColumnInfo(defaultValue = "0") val useExerciseWeight: Boolean = defaultWeightGrams == 0L,
 )
 
 data class TemplateRow(

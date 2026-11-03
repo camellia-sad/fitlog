@@ -16,6 +16,10 @@ android {
     }
 }
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
+// Migration fixtures must include the schema emitted by the current compilation.
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("AndroidTestAssets") }.configureEach {
+    dependsOn("ksp" + name.removePrefix("merge").removeSuffix("AndroidTestAssets") + "Kotlin")
+}
 dependencies {
     implementation(project(":domain"))
     api(libs.room.runtime)

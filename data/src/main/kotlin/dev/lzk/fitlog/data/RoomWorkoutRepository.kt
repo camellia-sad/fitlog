@@ -44,8 +44,9 @@ class RoomWorkoutRepository(
             val id = newId()
             dao.insertSessionExercise(SessionExerciseEntity(id, session.id, source.id, index, source.nameZh,
                 item.targetSetCount, item.targetRepMin, item.targetRepMax, item.restSeconds,source.recordMetric))
+            val weight = if(source.recordMetric == "SECONDS") 0L else if(item.useExerciseWeight) defaultWeight(source) else item.defaultWeightGrams
             dao.insertSets((1..item.targetSetCount).map { setIndex ->
-                SetEntity(newId(), id, setIndex, item.defaultWeightGrams, item.targetRepMin)
+                SetEntity(newId(), id, setIndex, weight, item.targetRepMin)
             })
         }
         exerciseIds.forEach {
@@ -70,9 +71,10 @@ class RoomWorkoutRepository(
                 id, sessionId, exerciseId, dao.nextExerciseOrder(sessionId), source.nameZh, setCount, repMin, repMax,
                 recordMetricSnapshot=source.recordMetric,
             ))
+            val weight = defaultWeight(source)
             dao.insertSets((1..setCount).map { index ->
                 val reference = previous.getOrNull(index - 1) ?: previous.lastOrNull()
-                SetEntity(newId(), id, index, reference?.weightGrams ?: 0L, reference?.reps ?: repMin)
+                SetEntity(newId(), id, index, weight, reference?.reps ?: repMin)
             })
             id
         }
@@ -223,6 +225,9 @@ class RoomWorkoutRepository(
             ExercisePerformance(session.id, exerciseId, session.toDomain().startedAtUtc,
                 previous.sets.filter { it.status == "COMPLETED" }.sortedBy { it.setIndex }.map { it.toDomain() })
         }
+
+    private suspend fun defaultWeight(exercise: ExerciseEntity): Long =
+        if(exercise.recordMetric == "SECONDS") 0L else exercise.effectiveWeight(dao.bestWeight(exercise.id)) ?: 0L
 
     private suspend fun workout(id: String) = dao.workout(id)?.toDomain() ?: missing("会话不存在")
 

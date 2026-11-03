@@ -16,13 +16,28 @@ const val WORKOUT_SELECT = """SELECT s.*, EXISTS(SELECT 1 FROM workout_sessions 
 interface WorkoutDao {
     @Transaction
     @Query("""
-        SELECT * FROM exercises e WHERE isArchived = :archived
+        SELECT e.*, (SELECT MAX(sr.weightGrams) FROM set_records sr
+            JOIN session_exercises se ON se.id = sr.sessionExerciseId
+            JOIN workout_sessions ws ON ws.id = se.sessionId
+            WHERE se.exerciseId = e.id AND se.recordMetricSnapshot = 'REPETITIONS'
+            AND sr.status = 'COMPLETED' AND ws.status != 'DISCARDED') AS bestWeightGrams
+        FROM exercises e WHERE isArchived = :archived
         AND (instr(lower(nameZh), lower(:query)) > 0 OR instr(lower(nameEn), lower(:query)) > 0)
         AND (:equipment IS NULL OR equipmentType = :equipment)
         AND (:muscle IS NULL OR EXISTS (SELECT 1 FROM exercise_muscles m WHERE m.exerciseId = e.id AND m.muscle = :muscle))
         ORDER BY nameZh, id
     """)
     fun observeExercises(query: String, equipment: String?, muscle: String?, archived: Boolean): Flow<List<ExerciseRow>>
+
+    @Query("""SELECT MAX(sr.weightGrams) FROM set_records sr
+        JOIN session_exercises se ON se.id = sr.sessionExerciseId
+        JOIN workout_sessions ws ON ws.id = se.sessionId
+        WHERE se.exerciseId = :id AND se.recordMetricSnapshot = 'REPETITIONS'
+        AND sr.status = 'COMPLETED' AND ws.status != 'DISCARDED'""")
+    suspend fun bestWeight(id: String): Long?
+
+    @Query("UPDATE exercises SET defaultWeightGrams = :weight, defaultWeightRecordGrams = :record WHERE id = :id")
+    suspend fun defaultWeight(id: String, weight: Long?, record: Long): Int
 
     @Query("SELECT * FROM exercises WHERE id = :id")
     suspend fun exercise(id: String): ExerciseEntity?

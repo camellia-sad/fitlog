@@ -27,6 +27,9 @@ data class Exercise(
     val isCustom: Boolean = false,
     val isArchived: Boolean = false,
     val recordMetric:RecordMetric = RecordMetric.REPETITIONS,
+    val defaultWeightGrams: Long? = null,
+    val bestWeightGrams: Long? = null,
+    val hasManualWeight: Boolean = false,
 )
 
 data class WorkoutSession(

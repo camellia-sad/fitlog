@@ -55,6 +55,7 @@ class TemplateDraftFlowTest {
         addBench()
         compose.onNodeWithText("调整").performScrollTo().performClick()
         compose.onNodeWithText("目标组数").performTextReplacement("2")
+        compose.onNodeWithTag("follow-exercise-weight").performClick()
         compose.onNodeWithText("默认重量（kg）").performTextReplacement("42.5")
         compose.onNodeWithText("确认目标").performClick()
         compose.onNodeWithText("取消", substring = false).performClick()

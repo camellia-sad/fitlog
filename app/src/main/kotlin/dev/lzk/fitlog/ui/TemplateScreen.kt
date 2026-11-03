@@ -128,7 +128,7 @@ private fun TemplateEditor(draft: TemplateDraft, exercises: List<Exercise>, unit
                 SoftCard {
                     Text(exercises.find { it.id == item.exerciseId }?.nameZh ?: "已归档动作", style = MaterialTheme.typography.titleMedium)
                     Text("${item.targetSetCount} 组 × ${item.targetRepMin}–${item.targetRepMax} ${metric.unit}"+
-                        (if(metric==RecordMetric.SECONDS) "" else " · ${WeightUnits.format(item.defaultWeightGrams, unit)} ${unit.label}")+" · 休息 ${item.restSeconds} 秒",
+                        (if(metric==RecordMetric.SECONDS) "" else if(item.useExerciseWeight) " · 跟随动作重量" else " · ${WeightUnits.format(item.defaultWeightGrams, unit)} ${unit.label}")+" · 休息 ${item.restSeconds} 秒",
                         style = MaterialTheme.typography.bodySmall)
                     FlowRow {
                         TextButton(onClick = { editing = item }, enabled = !saving) { Text("调整") }
@@ -214,6 +214,7 @@ private fun TemplateItemDialog(item: TemplateExercise, unit: WeightUnit,metric:R
     var min by remember { mutableStateOf(item.targetRepMin.toString()) }
     var max by remember { mutableStateOf(item.targetRepMax.toString()) }
     var weight by remember { mutableStateOf(WeightUnits.format(item.defaultWeightGrams, unit, editing = true)) }
+    var followWeight by remember { mutableStateOf(item.useExerciseWeight) }
     var rest by remember { mutableStateOf(item.restSeconds.toString()) }
     var error by remember { mutableStateOf<String?>(null) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text("动作目标") }, text = {
@@ -221,14 +222,22 @@ private fun TemplateItemDialog(item: TemplateExercise, unit: WeightUnit,metric:R
             OutlinedTextField(count, { count = it }, label = { Text("目标组数") })
             OutlinedTextField(min, { min = it }, label = { Text(if(metric==RecordMetric.SECONDS) "最少秒数" else "最少次数") })
             OutlinedTextField(max, { max = it }, label = { Text(if(metric==RecordMetric.SECONDS) "最多秒数" else "最多次数") })
-            if(metric==RecordMetric.REPETITIONS) OutlinedTextField(weight, { weight = it }, label = { Text("默认重量（${unit.label}）") })
+            if(metric==RecordMetric.REPETITIONS) {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Checkbox(followWeight, { followWeight = it }, modifier = Modifier.testTag("follow-exercise-weight"))
+                    Text("跟随动作默认重量")
+                }
+                if(!followWeight) OutlinedTextField(weight, { weight = it }, label = { Text("默认重量（${unit.label}）") }, singleLine = true)
+                Text(if(followWeight) "开始训练时使用动作的最新默认重量。" else "本模板优先使用此重量，包括 0。", style = MaterialTheme.typography.bodySmall)
+            }
             OutlinedTextField(rest, { rest = it }, label = { Text("休息秒数") })
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }, confirmButton = { TextButton(onClick = {
         try {
             val updated = item.copy(targetSetCount = count.toInt(), targetRepMin = min.toInt(), targetRepMax = max.toInt(),
-                defaultWeightGrams = if(metric==RecordMetric.SECONDS) 0L else WeightUnits.parse(weight, unit), restSeconds = rest.toInt())
+                defaultWeightGrams = if(metric==RecordMetric.SECONDS || followWeight) 0L else WeightUnits.parse(weight, unit),
+                restSeconds = rest.toInt(), useExerciseWeight = metric==RecordMetric.REPETITIONS && followWeight)
             TemplateDraft(name = "校验目标", exercises = listOf(updated)).validate()
             onSave(updated)
         } catch (e: Exception) { error = "请输入有效目标：组数 1～100、正数次数范围、非负重量和 0～3600 秒休息" }

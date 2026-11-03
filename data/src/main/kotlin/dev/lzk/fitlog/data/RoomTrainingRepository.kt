@@ -57,7 +57,7 @@ class RoomTrainingRepository(private val database: FitLogDatabase, private val c
         dao.deleteTemplateExercises(id)
         dao.insertTemplateExercises(draft.exercises.mapIndexed { index, item ->
             TemplateExerciseEntity(if (existing?.exercises?.any { it.id == item.id } == true) item.id else UUID.randomUUID().toString(), id, item.exerciseId, index, item.targetSetCount,
-                item.targetRepMin, item.targetRepMax, item.defaultWeightGrams, item.restSeconds)
+                item.targetRepMin, item.targetRepMax, item.defaultWeightGrams, item.restSeconds, item.useExerciseWeight)
         })
         dao.deleteTemplateDraft(templateDraftKey(draft.id))
         id
@@ -73,6 +73,14 @@ class RoomTrainingRepository(private val database: FitLogDatabase, private val c
 
     override fun observeExerciseHistory(exerciseId: String) =
         dao.observeExerciseHistory(exerciseId).map { rows -> rows.map { it.toDomain() } }
+
+    override suspend fun setDefaultWeight(id: String, weightGrams: Long?) = database.withTransaction {
+        val source = workouts.exercise(id) ?: throw WorkoutException(WorkoutError.NOT_FOUND, "动作不存在")
+        WorkoutRules.input(source.recordMetric != "SECONDS", "时长动作不记录重量")
+        weightGrams?.let { WorkoutRules.draft(it, 0) }
+        workouts.defaultWeight(id, weightGrams, if(weightGrams == null) 0L else workouts.bestWeight(id) ?: 0L)
+        Unit
+    }
 
     override suspend fun setFavorite(id: String, favorite: Boolean) {
         if (dao.favorite(id, favorite) == 0) throw WorkoutException(WorkoutError.NOT_FOUND, "动作不存在")
@@ -96,6 +104,6 @@ internal fun TemplateRow.toDomain() = WorkoutTemplate(
     template.id, template.name, SplitType.valueOf(template.splitType),
     Instant.ofEpochMilli(template.createdAt), Instant.ofEpochMilli(template.updatedAt),
     exercises.sortedBy { it.sortOrder }.map {
-        TemplateExercise(it.id, it.exerciseId, it.sortOrder, it.targetSetCount, it.targetRepMin, it.targetRepMax, it.defaultWeightGrams, it.restSeconds)
+        TemplateExercise(it.id, it.exerciseId, it.sortOrder, it.targetSetCount, it.targetRepMin, it.targetRepMax, it.defaultWeightGrams, it.restSeconds, it.useExerciseWeight)
     },
 )

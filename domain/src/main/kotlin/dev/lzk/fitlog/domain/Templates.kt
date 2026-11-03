@@ -12,6 +12,7 @@ data class TemplateExercise(
     val targetRepMax: Int = 12,
     val defaultWeightGrams: Long = 0,
     val restSeconds: Int = 90,
+    val useExerciseWeight: Boolean = defaultWeightGrams == 0L,
 )
 
 data class WorkoutTemplate(

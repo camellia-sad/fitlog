@@ -21,6 +21,8 @@ data class ExerciseEntity(
     val isCustom: Boolean,
     val isArchived: Boolean,
     @ColumnInfo(defaultValue = "'REPETITIONS'") val recordMetric:String = "REPETITIONS",
+    val defaultWeightGrams: Long? = null,
+    @ColumnInfo(defaultValue = "0") val defaultWeightRecordGrams: Long = 0,
 )
 
 @Entity(
@@ -92,6 +94,7 @@ data class SetEntity(
 
 data class ExerciseRow(
     @Embedded val exercise: ExerciseEntity,
+    val bestWeightGrams: Long? = null,
     @Relation(parentColumn = "id", entityColumn = "exerciseId") val muscles: List<ExerciseMuscleEntity>,
 )
 

@@ -36,7 +36,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             }
             data.put(table, rows)
         }
-        JSONObject().put("format", "FitLog").put("schemaVersion", 4).put("data", data).apply {
+        JSONObject().put("format", "FitLog").put("schemaVersion", 5).put("data", data).apply {
             preferences?.let {put("preferences",it.preferences.first().backupJson())}
             preparation?.let {put("preparedExercises",JSONArray(it.preparedExercises.first()))}
         }.toString()
@@ -64,7 +64,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
         }
         val root = JSONObject(json)
         val version = root.integer("schemaVersion")
-        require(root.getString("format") == "FitLog" && version in 1..4) { "不支持的备份版本" }
+        require(root.getString("format") == "FitLog" && version in 1..5) { "不支持的备份版本" }
         val restoredPreferences = if(version>=3) root.optJSONObject("preferences")?.backupPreferences() else null
         val prepared = if(version>=3) root.optJSONArray("preparedExercises")?.strings() else null
         require(prepared==null || prepared.size<=30 && prepared.distinct().size==prepared.size) {"待开始动作无效"}
@@ -86,12 +86,15 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             data.rows("exercises") { ExerciseEntity(it.text("id"), it.text("nameZh"), it.text("nameEn"), it.text("equipmentType"),
                 it.optionalText("instructions"), it.optionalInt("estimatedSecondsPerSet"), it.optionalText("mediaAssetPath"),
                 it.flag("isFavorite"), it.flag("isCustom"), it.flag("isArchived"),
-                if(version>=4) it.text("recordMetric") else "REPETITIONS") },
+                if(version>=4) it.text("recordMetric") else "REPETITIONS",
+                if(version>=5) it.optionalLong("defaultWeightGrams") else null,
+                if(version>=5) it.number("defaultWeightRecordGrams") else 0L) },
             data.rows("exercise_muscles") { ExerciseMuscleEntity(it.text("exerciseId"), it.text("muscle"), it.text("role")) },
             data.rows("workout_templates") { TemplateEntity(it.text("id"), it.text("name"), it.text("splitType"), it.number("createdAt"), it.number("updatedAt")) },
             data.rows("template_exercises") { TemplateExerciseEntity(it.text("id"), it.text("templateId"), it.text("exerciseId"),
                 it.integer("sortOrder"), it.integer("targetSetCount"), it.integer("targetRepMin"), it.integer("targetRepMax"),
-                it.number("defaultWeightGrams"), it.integer("restSeconds")) },
+                it.number("defaultWeightGrams"), it.integer("restSeconds"),
+                if(version>=5) it.flag("useExerciseWeight") else it.number("defaultWeightGrams") == 0L) },
             data.rows("workout_sessions") { SessionEntity(it.text("id"), it.number("startedAtUtc"), it.text("localWorkoutDate"),
                 it.text("status"), it.optionalLong("endedAtUtc"), it.optionalText("feedback"), it.optionalInt("unfinishedSlot"),
                 it.optionalText("templateId"), it.optionalText("templateNameSnapshot"), it.optionalLong("pausedAtUtc"),
@@ -115,7 +118,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
                 if (old == null) true else {
                     require(old.isCustom == local.isCustom) { "同 ID 动作类型冲突" }
                     if (old.isCustom) {
-                        require(old.copy(isFavorite = local.isFavorite, isArchived = local.isArchived) == local) { "同 ID 自定义动作冲突" }
+                        require(old.copy(isFavorite = local.isFavorite, isArchived = local.isArchived, defaultWeightGrams = local.defaultWeightGrams, defaultWeightRecordGrams = local.defaultWeightRecordGrams) == local) { "同 ID 自定义动作冲突" }
                         require(existing.muscles.filter { it.exerciseId == old.id }.toSet() ==
                             incoming.muscles.filter { it.exerciseId == old.id }.toSet()) { "同 ID 动作肌群冲突" }
                     }
@@ -148,7 +151,9 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             dao.importExercises(newExercises)
             dao.importMuscles(muscles)
             incoming.exercises.forEach { item ->
-                localExercises[item.id]?.let { old -> dao.updateExercise(old.copy(isFavorite = item.isFavorite, isArchived = item.isArchived)) }
+                localExercises[item.id]?.let { old -> dao.updateExercise(old.copy(isFavorite = item.isFavorite, isArchived = item.isArchived,
+                    defaultWeightGrams = if(version>=5) item.defaultWeightGrams else old.defaultWeightGrams,
+                    defaultWeightRecordGrams = if(version>=5) item.defaultWeightRecordGrams else old.defaultWeightRecordGrams)) }
             }
             dao.importTemplates(templates)
             dao.insertTemplateExercises(templateExercises)
@@ -193,6 +198,9 @@ class JsonBackupRepository(private val database: FitLogDatabase,
                 require(it.nameZh.isNotBlank())
                 EquipmentType.valueOf(it.equipmentType)
                 RecordMetric.valueOf(it.recordMetric)
+                require(it.defaultWeightRecordGrams >= 0)
+                it.defaultWeightGrams?.let { weight -> WorkoutRules.draft(weight, 0) }
+                require(it.recordMetric != "SECONDS" || it.defaultWeightGrams == null) {"时长动作不能有默认重量"}
                 require(it.estimatedSecondsPerSet == null || it.estimatedSecondsPerSet > 0)
                 require(it.mediaAssetPath == null || (it.mediaAssetPath.startsWith("assets/") && ".." !in it.mediaAssetPath))
             }

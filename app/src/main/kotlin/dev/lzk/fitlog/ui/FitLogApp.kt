@@ -143,7 +143,8 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             }
             composable("backups") {BackupScreen(container,onBack={nav.popBackStack()},onLogin={nav.navigate("me")})}
             composable("library") {
-                ExerciseLibraryScreen(state, model, onTemplates = { nav.navigate("templates") }, onAdd = { exercise -> model.startAndAddExercise(exercise.id)
+                ExerciseLibraryScreen(state, model, onTemplates = { nav.navigate("templates") },
+                    onHistory = { history.selectedExerciseId.value = it; nav.navigate("exercise-history/" + android.net.Uri.encode(it)) }, onAdd = { exercise -> model.startAndAddExercise(exercise.id)
                     if (state.workout == null) {
                         selectedTemplateId = null; selectionChanged = true
                         nav.popBackStack("home", false)
@@ -157,6 +158,13 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             composable("history") {
                 LaunchedEffect(Unit) { history.selectDate(LocalDate.now()) }
                 HistoryScreen(history, state.preferences.weightUnit, templateState.exercises, onBack = { nav.popBackStack() },onShare={sharingWorkout=it})
+            }
+            composable("exercise-history/{exerciseId}") { entry ->
+                val exerciseId = entry.arguments?.getString("exerciseId")
+                LaunchedEffect(exerciseId) { history.selectedExerciseId.value = exerciseId }
+                val records by history.performance.collectAsStateWithLifecycle()
+                ExerciseHistoryScreen(exerciseId?.let { id -> templateState.exercises.find { it.id == id } },
+                    records, state.preferences.weightUnit, onBack = { nav.popBackStack() })
             }
             composable("friends") {
                 FriendsScreen(friendsModel,container.social,onLogin={nav.navigate("me")}) {socialSubpage=it}
