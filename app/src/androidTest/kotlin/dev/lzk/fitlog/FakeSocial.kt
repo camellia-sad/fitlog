@@ -14,6 +14,8 @@ internal class FakeSocial:FriendsRepository,SocialRepository {
     var queue=listOf<MessageDraft>()
     var posts=listOf<SocialPost>()
     var commentRows=listOf<SocialComment>()
+    var replyRows=mapOf<String,List<SocialComment>>()
+    var lastComment:Pair<String,String?>?=null
     var imageBytes=ByteArray(0)
     var imageReads=0
     var preference=SharingPreferences()
@@ -51,8 +53,11 @@ internal class FakeSocial:FriendsRepository,SocialRepository {
     override suspend fun deletePost(id:String){posts=posts.filterNot{it.id==id}}
     override suspend fun like(id:String,liked:Boolean){}
     override suspend fun comments(postId:String,before:SocialCursor?)=commentRows
-    override suspend fun comment(postId:String,text:String,id:String){}
-    override suspend fun deleteComment(postId:String,id:String){commentRows=commentRows.filterNot{it.id==id}}
+    override suspend fun replies(postId:String,parentId:String,after:SocialCursor?)=replyRows[parentId].orEmpty()
+    override suspend fun comment(postId:String,text:String,id:String,replyTo:String?){lastComment=text to replyTo}
+    override suspend fun deleteComment(postId:String,id:String){
+        commentRows=commentRows.filterNot{it.id==id};replyRows=replyRows.mapValues{(_,rows)->rows.filterNot{it.id==id}}
+    }
     override suspend fun person(id:String)=SocialPerson(if(id==me.id)me else peer,SharingPreferences(),PresenceStatus.ONLINE,null,null)
     override suspend fun sharedHistory(id:String,before:SocialCursor?)=emptyList<SharedWorkout>()
     override suspend fun blocked()=emptyList<SocialProfile>()

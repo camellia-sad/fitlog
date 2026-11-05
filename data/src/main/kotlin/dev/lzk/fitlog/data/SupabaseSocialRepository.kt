@@ -267,13 +267,14 @@ class SupabaseSocialRepository(
     }
     override suspend fun like(id:String,liked:Boolean) {rpc("social_feed",JSONObject().put("p_action",if(liked)"like" else "unlike").put("p_id",id))}
     override suspend fun comments(postId:String,before:SocialCursor?):List<SocialComment> =
-        JSONArray(rpc("social_feed",JSONObject().put("p_action","comments").put("p_id",postId).cursor(before))).objects().map {
-            SocialComment(it.getString("id"),it.getString("owner_id"),it.optString("nickname"),it.getString("body"),
-                requireNotNull(it.getString("created_at").toSocialInstant()))
-        }
-    override suspend fun comment(postId:String,text:String,id:String) {
+        JSONArray(rpc("social_feed",JSONObject().put("p_action","comments").put("p_id",postId).cursor(before))).objects().map {it.comment()}
+    override suspend fun replies(postId:String,parentId:String,after:SocialCursor?):List<SocialComment> =
+        JSONArray(rpc("social_feed",JSONObject().put("p_action","replies").put("p_id",postId).put("p_parent_id",parentId).cursor(after)))
+            .objects().map {it.comment()}
+    override suspend fun comment(postId:String,text:String,id:String,replyTo:String?) {
         require(text.trim().length in 1..1000) {"评论为 1～1000 字"}
-        rpc("social_feed",JSONObject().put("p_action","comment").put("p_id",postId).put("p_body",text.trim()).put("p_comment_id",id))
+        rpc("social_feed",JSONObject().put("p_action","comment").put("p_id",postId).put("p_body",text.trim()).put("p_comment_id",id)
+            .apply {replyTo?.let {put("p_parent_id",it)}})
     }
     override suspend fun deleteComment(postId:String,id:String) {
         rpc("social_feed",JSONObject().put("p_action","delete_comment").put("p_id",postId).put("p_comment_id",id))

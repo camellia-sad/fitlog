@@ -26,3 +26,6 @@ internal fun LiveTraining.toJson()=JSONObject().put("session_id",sessionId).put(
 internal fun JSONObject.liveTraining()=LiveTraining(optString("session_id"),optString("label"),optString("exercise"),
     optLong("weight_grams"),optInt("reps"),optInt("set_index"),optInt("done"),optInt("total"),optString("rest_ends_at").toSocialInstant(),
     runCatching {RecordMetric.valueOf(optString("record_metric"))}.getOrDefault(RecordMetric.REPETITIONS))
+internal fun JSONObject.comment()=SocialComment(getString("id"),getString("owner_id"),optString("nickname"),optString("body"),
+    requireNotNull(getString("created_at").toSocialInstant()),optional("parent_id"),optional("reply_to_nickname"),
+    optInt("reply_count"),optBoolean("deleted"))

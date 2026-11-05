@@ -61,6 +61,30 @@ class PolishFlowTest {
         compose.waitUntil(15_000){fake.commentRows.size==1}
         assertEquals("other",fake.commentRows.single().id)
     }
+    @Test fun repliesExpandUnderCommentAndReplyKeepsThread() {
+        fake.posts=listOf(SocialPost("post",fake.me.id,"我",null,"今日动态",emptyList(),Instant.now(),0,false,3))
+        fake.commentRows=listOf(SocialComment("root",fake.peer.id,"训练搭子","顶层评论",Instant.now(),replyCount=2))
+        fake.replyRows=mapOf("root" to listOf(
+            SocialComment("r1",fake.me.id,"我","第一条回复",Instant.now(),parentId="root"),
+            SocialComment("r2",fake.peer.id,"训练搭子","继续回复",Instant.now(),parentId="root",replyToNickname="我")))
+        compose.setContent {FitLogTheme {SocialTimelineScreen(fake,fake.me,onBack={},onPerson={})}}
+        waitText("评论 3")
+        compose.onNodeWithText("评论 3").performClick()
+        waitText("展开 2 条回复")
+        compose.onNodeWithText("第一条回复").assertDoesNotExist()
+        compose.onNodeWithText("展开 2 条回复").performClick()
+        waitText("第一条回复")
+        compose.onNodeWithText("回复 @我：继续回复").assertExists()
+        // Reply buttons follow list order: root, r1, r2.
+        compose.onAllNodesWithText("回复").onLast().performClick()
+        waitText("回复 @训练搭子")
+        compose.onNodeWithText("写回复").performTextInput("收到")
+        compose.onNodeWithText("发送").performClick()
+        compose.waitUntil(15_000){fake.lastComment!=null}
+        assertEquals("收到" to "r2",fake.lastComment)
+        compose.onNodeWithText("收起回复").performClick()
+        compose.onNodeWithText("第一条回复").assertDoesNotExist()
+    }
     @Test fun avatarSurvivesOutgoingPageLifecycleStop() {
         val image=Bitmap.createBitmap(32,32,Bitmap.Config.ARGB_8888)
         image.eraseColor(android.graphics.Color.GREEN)

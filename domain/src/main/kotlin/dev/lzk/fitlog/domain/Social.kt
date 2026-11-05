@@ -17,7 +17,9 @@ data class SocialPost(
     val id:String,val ownerId:String,val nickname:String,val avatarPath:String?,val body:String,
     val mediaPaths:List<String>,val createdAt:Instant,val likeCount:Int,val liked:Boolean,val commentCount:Int,
 ) { val cursor get()=SocialCursor(createdAt,id) }
-data class SocialComment(val id:String,val ownerId:String,val nickname:String,val body:String,val createdAt:Instant) {
+/** Replies share their top-level comment as [parentId]; [replyToNickname] names the reply being answered. */
+data class SocialComment(val id:String,val ownerId:String,val nickname:String,val body:String,val createdAt:Instant,
+    val parentId:String?=null,val replyToNickname:String?=null,val replyCount:Int=0,val deleted:Boolean=false) {
     val cursor get()=SocialCursor(createdAt,id)
 }
 data class PostDraft(val id:String=UUID.randomUUID().toString(),val body:String="",val mediaPaths:List<String> = emptyList())
@@ -51,7 +53,10 @@ interface SocialRepository {
     suspend fun deletePost(id:String)
     suspend fun like(id:String,liked:Boolean)
     suspend fun comments(postId:String,before:SocialCursor?=null):List<SocialComment>
-    suspend fun comment(postId:String,text:String,id:String)
+    /** Oldest first; [after] continues from the last reply already shown. */
+    suspend fun replies(postId:String,parentId:String,after:SocialCursor?=null):List<SocialComment>
+    /** [replyTo] may be a top-level comment or a reply; the server attaches it to the top-level thread. */
+    suspend fun comment(postId:String,text:String,id:String,replyTo:String?=null)
     suspend fun deleteComment(postId:String,id:String)
     suspend fun person(id:String):SocialPerson
     suspend fun sharedHistory(id:String,before:SocialCursor?=null):List<SharedWorkout>
