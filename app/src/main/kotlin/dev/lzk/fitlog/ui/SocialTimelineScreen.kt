@@ -7,7 +7,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -168,9 +170,10 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
         Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(body,{body=it.take(4000)},label={Text("今天有什么新进步？")},maxLines=6)
             Text("${images.size} / 9 张图片")
+            PostImagePreviews(repository,images,!busy){path->images=images-path}
             Row {
                 TextButton(onClick=picker,enabled=!busy && images.size<9){Text("添加图片")}
-                TextButton(onClick={images=emptyList()},enabled=!busy){Text("移除图片")}
+                if(images.isNotEmpty()) TextButton(onClick={images=emptyList()},enabled=!busy){Text("全部移除")}
             }
             error?.let {Text(it,color=MaterialTheme.colorScheme.error)}
         }
@@ -191,6 +194,26 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
             text={Text("停止后续共享与新消息。")},
             confirmButton={TextButton(onClick={confirm=null;if(action=="block")onBlock() else onRemove()}){Text("确认")}},
             dismissButton={TextButton(onClick={confirm=null}){Text("取消")}})
+    }
+}
+
+/** Uploaded images are kept locally, so the preview shows exactly what will be published. */
+@Composable private fun PostImagePreviews(repository:SocialRepository,images:List<String>,enabled:Boolean,onRemove:(String)->Unit) {
+    images.chunked(3).forEachIndexed {rowIndex,row->
+        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+            row.forEachIndexed {index,path->
+                Box(Modifier.weight(1f).height(96.dp)) {
+                    SocialImage(repository,path,Modifier.fillMaxSize(),gallery=images)
+                    Surface(onClick={onRemove(path)},enabled=enabled,shape=CircleShape,
+                        color=MaterialTheme.colorScheme.surface.copy(alpha=0.85f),
+                        modifier=Modifier.align(Alignment.TopEnd).padding(2.dp).size(28.dp)
+                            .semanticsLabel("移除第 ${rowIndex*3+index+1} 张图片")) {
+                        Box(contentAlignment=Alignment.Center){Text("×",style=MaterialTheme.typography.titleMedium)}
+                    }
+                }
+            }
+            repeat(3-row.size){Spacer(Modifier.weight(1f))}
+        }
     }
 }
 
