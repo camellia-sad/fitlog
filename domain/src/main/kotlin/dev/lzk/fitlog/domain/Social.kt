@@ -15,13 +15,15 @@ data class ChatMessage(
 data class MessageDraft(val id:String=UUID.randomUUID().toString(),val body:String="",val mediaPath:String?=null,val replyId:String?=null)
 data class SocialPost(
     val id:String,val ownerId:String,val nickname:String,val avatarPath:String?,val body:String,
-    val mediaPaths:List<String>,val createdAt:Instant,val likeCount:Int,val liked:Boolean,val commentCount:Int,
+    val mediaPaths:List<String>,val createdAt:Instant,val likeCount:Int,val liked:Boolean,val commentCount:Int,val fitlogId:String="",
 ) { val cursor get()=SocialCursor(createdAt,id) }
 /** Replies share their top-level comment as [parentId]; [replyToNickname] names the reply being answered. */
 data class SocialComment(val id:String,val ownerId:String,val nickname:String,val body:String,val createdAt:Instant,
-    val parentId:String?=null,val replyToNickname:String?=null,val replyCount:Int=0,val deleted:Boolean=false) {
+    val parentId:String?=null,val replyToNickname:String?=null,val replyCount:Int=0,val deleted:Boolean=false,val avatarPath:String?=null,val fitlogId:String="") {
     val cursor get()=SocialCursor(createdAt,id)
 }
+data class ReplyNotice(val comment:SocialComment,val postId:String,val postPreview:String)
+data class CommentContext(val post:SocialPost,val root:SocialComment,val target:SocialComment)
 data class PostDraft(val id:String=UUID.randomUUID().toString(),val body:String="",val mediaPaths:List<String> = emptyList())
 enum class PresenceStatus(val label:String) {
     OFFLINE("离线"),ONLINE("在线"),TRAINING("锻炼中"),REST("组间休息"),PAUSED("训练已暂停");
@@ -58,6 +60,11 @@ interface SocialRepository {
     /** [replyTo] may be a top-level comment or a reply; the server attaches it to the top-level thread. */
     suspend fun comment(postId:String,text:String,id:String,replyTo:String?=null)
     suspend fun deleteComment(postId:String,id:String)
+    suspend fun replyNotices(before:SocialCursor?=null):List<ReplyNotice> = emptyList()
+    suspend fun unreadReplies():Int = 0
+    suspend fun readReply(id:String) {}
+    suspend fun readAllReplies() {}
+    suspend fun commentContext(id:String):CommentContext = error("回复定位暂不可用")
     suspend fun person(id:String):SocialPerson
     suspend fun sharedHistory(id:String,before:SocialCursor?=null):List<SharedWorkout>
     suspend fun blocked():List<SocialProfile>

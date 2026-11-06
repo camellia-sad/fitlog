@@ -15,6 +15,9 @@ internal class FakeSocial:FriendsRepository,SocialRepository {
     var posts=listOf<SocialPost>()
     var commentRows=listOf<SocialComment>()
     var replyRows=mapOf<String,List<SocialComment>>()
+    var notices=listOf<ReplyNotice>()
+    var contexts=mapOf<String,CommentContext>()
+    var likedValue:Boolean?=null
     var lastComment:Pair<String,String?>?=null
     var imageBytes=ByteArray(0)
     var imageReads=0
@@ -51,13 +54,18 @@ internal class FakeSocial:FriendsRepository,SocialRepository {
     override suspend fun feed(ownerId:String?,before:SocialCursor?)=posts
     override suspend fun publish(draft:PostDraft){posts=listOf(SocialPost(draft.id,me.id,me.nickname,null,draft.body,draft.mediaPaths,Instant.now(),0,false,0))+posts}
     override suspend fun deletePost(id:String){posts=posts.filterNot{it.id==id}}
-    override suspend fun like(id:String,liked:Boolean){}
+    override suspend fun like(id:String,liked:Boolean){likedValue=liked}
     override suspend fun comments(postId:String,before:SocialCursor?)=commentRows
     override suspend fun replies(postId:String,parentId:String,after:SocialCursor?)=replyRows[parentId].orEmpty()
     override suspend fun comment(postId:String,text:String,id:String,replyTo:String?){lastComment=text to replyTo}
     override suspend fun deleteComment(postId:String,id:String){
         commentRows=commentRows.filterNot{it.id==id};replyRows=replyRows.mapValues{(_,rows)->rows.filterNot{it.id==id}}
     }
+    override suspend fun replyNotices(before:SocialCursor?)=notices
+    override suspend fun unreadReplies()=notices.size
+    override suspend fun readReply(id:String){notices=notices.filterNot{it.comment.id==id}}
+    override suspend fun readAllReplies(){notices=emptyList()}
+    override suspend fun commentContext(id:String)=contexts[id] ?: error("原动态或回复已删除或不可访问")
     override suspend fun person(id:String)=SocialPerson(if(id==me.id)me else peer,SharingPreferences(),PresenceStatus.ONLINE,null,null)
     override suspend fun sharedHistory(id:String,before:SocialCursor?)=emptyList<SharedWorkout>()
     override suspend fun blocked()=emptyList<SocialProfile>()

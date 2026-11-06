@@ -144,7 +144,7 @@ internal fun safeEndpoint(url: String): JSONObject {
     val segments = uri?.path.orEmpty().trim('/').split('/')
     val auth = setOf("otp","verify","token","logout","user")
     val rpc = setOf("list_fitlog_friends","find_fitlog_user","friend_action","social_chat","social_chat_relay",
-        "social_feed","social_training","social_person","social_blocks")
+        "social_feed","social_activity","social_training","social_person","social_blocks")
     val tables = setOf("social_profiles","friend_notes","social_privacy")
     val buckets = setOf("fitlog-media","fitlog-backups","fitlog-updates")
     val route = when {

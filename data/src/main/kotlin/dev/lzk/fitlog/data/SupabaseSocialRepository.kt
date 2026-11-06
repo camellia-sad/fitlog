@@ -245,7 +245,7 @@ class SupabaseSocialRepository(
 
     override suspend fun feed(ownerId:String?,before:SocialCursor?):List<SocialPost> {
         val owner=requireProfileId()
-        val posts=JSONArray(rpc("social_feed",JSONObject().put("p_action","list").put("p_peer",ownerId).cursor(before),owner)).objects().map {it.post()}
+        val posts=JSONArray(rpc("social_activity",JSONObject().put("p_action","feed").put("p_peer",ownerId).cursor(before),owner)).objects().map {it.post()}
         val old=cache.dao().posts(owner).associateBy {it.id}
         cache.dao().putPosts(posts.filter {it.ownerId==owner && old[it.id]?.hidden!=true}.map {p->
             LocalPostEntity(owner,p.id,JSONObject().put("id",p.id).put("body",p.body).put("created_at",p.createdAt.toString())
@@ -267,9 +267,9 @@ class SupabaseSocialRepository(
     }
     override suspend fun like(id:String,liked:Boolean) {rpc("social_feed",JSONObject().put("p_action",if(liked)"like" else "unlike").put("p_id",id))}
     override suspend fun comments(postId:String,before:SocialCursor?):List<SocialComment> =
-        JSONArray(rpc("social_feed",JSONObject().put("p_action","comments").put("p_id",postId).cursor(before))).objects().map {it.comment()}
+        JSONArray(rpc("social_activity",JSONObject().put("p_action","comments").put("p_id",postId).cursor(before))).objects().map {it.comment()}
     override suspend fun replies(postId:String,parentId:String,after:SocialCursor?):List<SocialComment> =
-        JSONArray(rpc("social_feed",JSONObject().put("p_action","replies").put("p_id",postId).put("p_parent_id",parentId).cursor(after)))
+        JSONArray(rpc("social_activity",JSONObject().put("p_action","replies").put("p_id",postId).put("p_root",parentId).cursor(after)))
             .objects().map {it.comment()}
     override suspend fun comment(postId:String,text:String,id:String,replyTo:String?) {
         require(text.trim().length in 1..1000) {"评论为 1～1000 字"}
@@ -278,6 +278,17 @@ class SupabaseSocialRepository(
     }
     override suspend fun deleteComment(postId:String,id:String) {
         rpc("social_feed",JSONObject().put("p_action","delete_comment").put("p_id",postId).put("p_comment_id",id))
+    }
+    override suspend fun replyNotices(before:SocialCursor?):List<ReplyNotice> =
+        JSONArray(rpc("social_activity",JSONObject().put("p_action","inbox").cursor(before))).objects().map {
+            ReplyNotice(it.comment(),it.getString("post_id"),it.optString("post_preview"))
+        }
+    override suspend fun unreadReplies():Int = rpc("social_activity",JSONObject().put("p_action","count")).toInt()
+    override suspend fun readReply(id:String) {rpc("social_activity",JSONObject().put("p_action","read").put("p_id",id))}
+    override suspend fun readAllReplies() {rpc("social_activity",JSONObject().put("p_action","read_all"))}
+    override suspend fun commentContext(id:String):CommentContext {
+        val j=JSONObject(rpc("social_activity",JSONObject().put("p_action","context").put("p_id",id)))
+        return CommentContext(j.getJSONObject("post").post(),j.getJSONObject("root").comment(),j.getJSONObject("target").comment())
     }
     override suspend fun person(id:String):SocialPerson {
         val j=JSONObject(rpc("social_person",JSONObject().put("p_peer",id)))

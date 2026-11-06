@@ -52,11 +52,13 @@ class PolishFlowTest {
             SocialComment("other",fake.peer.id,"训练搭子","好友评论",Instant.now()),
             SocialComment("mine",fake.me.id,"我","本人评论",Instant.now()))
         compose.setContent {FitLogTheme {SocialTimelineScreen(fake,fake.me,onBack={},onPerson={})}}
-        waitText("评论 2")
-        compose.onNodeWithText("评论 2").performClick()
+        waitText("今日动态")
+        compose.onNodeWithContentDescription("查看评论").performClick()
         waitText("好友评论")
         // One delete belongs to the post underneath; only one belongs to a comment.
         compose.onAllNodesWithText("删除").assertCountEquals(2)
+        compose.onAllNodesWithText("删除").onLast().performClick()
+        waitText("删除这条评论？")
         compose.onAllNodesWithText("删除").onLast().performClick()
         compose.waitUntil(15_000){fake.commentRows.size==1}
         assertEquals("other",fake.commentRows.single().id)
@@ -68,20 +70,21 @@ class PolishFlowTest {
             SocialComment("r1",fake.me.id,"我","第一条回复",Instant.now(),parentId="root"),
             SocialComment("r2",fake.peer.id,"训练搭子","继续回复",Instant.now(),parentId="root",replyToNickname="我")))
         compose.setContent {FitLogTheme {SocialTimelineScreen(fake,fake.me,onBack={},onPerson={})}}
-        waitText("评论 3")
-        compose.onNodeWithText("评论 3").performClick()
+        waitText("今日动态")
+        compose.onNodeWithContentDescription("查看评论").performClick()
         waitText("展开 2 条回复")
         compose.onNodeWithText("第一条回复").assertDoesNotExist()
         compose.onNodeWithText("展开 2 条回复").performClick()
         waitText("第一条回复")
-        compose.onNodeWithText("回复 @我：继续回复").assertExists()
+        compose.onNodeWithText("@我 继续回复").assertExists()
         // Reply buttons follow list order: root, r1, r2.
         compose.onAllNodesWithText("回复").onLast().performClick()
-        waitText("回复 @训练搭子")
-        compose.onNodeWithText("写回复").performTextInput("收到")
+        waitText("正在回复 @训练搭子")
+        compose.onNode(hasSetTextAction()).performTextInput("收到")
         compose.onNodeWithText("发送").performClick()
         compose.waitUntil(15_000){fake.lastComment!=null}
         assertEquals("收到" to "r2",fake.lastComment)
+        compose.onNodeWithTag("activity-comments").performScrollToNode(hasText("收起回复"))
         compose.onNodeWithText("收起回复").performClick()
         compose.onNodeWithText("第一条回复").assertDoesNotExist()
     }

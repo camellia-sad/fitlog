@@ -17,7 +17,7 @@ internal fun JSONObject.chatMessage()=ChatMessage(getString("id"),getString("sen
     },optBoolean("withdrawn"))
 internal fun JSONObject.post()=SocialPost(getString("id"),getString("owner_id"),optString("nickname"),
     optional("avatar_path"),optString("body"),(optJSONArray("media_paths")?:JSONArray()).strings(),
-    requireNotNull(getString("created_at").toSocialInstant()),optInt("like_count"),optBoolean("liked"),optInt("comment_count"))
+    requireNotNull(getString("created_at").toSocialInstant()),optInt("like_count"),optBoolean("liked"),optInt("comment_count"),optString("fitlog_id"))
 internal fun JSONObject.socialProfile()=SocialProfile(getString("id"),getString("fitlog_id"),getString("nickname"),
     optString("bio"),optional("avatar_path"))
 internal fun LiveTraining.toJson()=JSONObject().put("session_id",sessionId).put("label",label).put("exercise",exercise)
@@ -28,4 +28,4 @@ internal fun JSONObject.liveTraining()=LiveTraining(optString("session_id"),optS
     runCatching {RecordMetric.valueOf(optString("record_metric"))}.getOrDefault(RecordMetric.REPETITIONS))
 internal fun JSONObject.comment()=SocialComment(getString("id"),getString("owner_id"),optString("nickname"),optString("body"),
     requireNotNull(getString("created_at").toSocialInstant()),optional("parent_id"),optional("reply_to_nickname"),
-    optInt("reply_count"),optBoolean("deleted"))
+    optInt("reply_count"),optBoolean("deleted"),optional("avatar_path"),optString("fitlog_id"))
