@@ -113,14 +113,31 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
         return
     }
     if (!state.preferences.onboardingCompleted) {
-        Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-            OnboardingScreen(state.preferences, settingsMessage) { settings.save(it) }
+        Box(Modifier.fillMaxSize()) {
+            FitBackdrop(BackdropKind.HORIZON)
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
+                Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+                    OnboardingScreen(state.preferences, settingsMessage) { settings.save(it) }
+                }
+            }
         }
         return
     }
+    LaunchedEffect(route) { ThemeClock.holdForWorkout = route == "workout" }
+    val addExercise: (Exercise) -> Unit = { exercise ->
+        model.startAndAddExercise(exercise.id)
+        if (state.workout == null) {
+            selectedTemplateId = null; selectionChanged = true
+            nav.popBackStack("home", false)
+        } else goWorkout()
+    }
     CompositionLocalProvider(LocalHapticsEnabled provides state.preferences.hapticsEnabled) {
+    Box(Modifier.fillMaxSize()) {
+    FitBackdrop(when (route) { "home" -> BackdropKind.SKY; "workout" -> BackdropKind.PLAIN; else -> BackdropKind.HORIZON })
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background, contentWindowInsets = WindowInsets.safeDrawing,
+        // Transparent so the backdrop shows; contentColor must then be explicit, or text falls back to black.
+        containerColor = androidx.compose.ui.graphics.Color.Transparent, contentColor = MaterialTheme.colorScheme.onBackground,
+        contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbars) },
         bottomBar = {
             if (route in listOf("home", "library", "friends", "me") && !(route in listOf("friends","me") && socialSubpage)) FitNavigationBar(route) { destination ->
@@ -145,11 +162,14 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             composable("backups") {BackupScreen(container,onBack={nav.popBackStack()},onLogin={nav.navigate("me")})}
             composable("library") {
                 ExerciseLibraryScreen(state, model, onTemplates = { nav.navigate("templates") },
-                    onHistory = { history.selectedExerciseId.value = it; nav.navigate("exercise-history/" + android.net.Uri.encode(it)) }, onAdd = { exercise -> model.startAndAddExercise(exercise.id)
-                    if (state.workout == null) {
-                        selectedTemplateId = null; selectionChanged = true
-                        nav.popBackStack("home", false)
-                    } else goWorkout() })
+                    onOpen = { nav.navigate("exercise/" + android.net.Uri.encode(it.id)) }, onAdd = addExercise)
+            }
+            composable("exercise/{exerciseId}") { entry ->
+                val id = entry.arguments?.getString("exerciseId")
+                ExerciseDetailScreen(state.exercises.find { it.id == id } ?: templateState.exercises.find { it.id == id }, state, model,
+                    onBack = { nav.popBackStack() },
+                    onHistory = { history.selectedExerciseId.value = it; nav.navigate("exercise-history/" + android.net.Uri.encode(it)) },
+                    onAdd = addExercise)
             }
             composable("workout") {
                 LaunchedEffect(state.selectedExercise?.id) { container.social.selectTrainingExercise(state.selectedExercise?.id) }
@@ -177,6 +197,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             }
             composable("settings") { SettingsScreen(settings,onBackups={nav.navigate("backups")},onBack={nav.popBackStack()},onChatCleared=friendsModel::clearChatPreviews) }
         }
+    }
     }
     if (pendingTemplateExit != null && templateEditor != null) {
         TemplateDraftExitDialog(templateSaving, templateMessage, templates::keepDraft, templates::discardDraft) {

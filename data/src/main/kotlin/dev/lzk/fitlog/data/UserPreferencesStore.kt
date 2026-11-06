@@ -43,7 +43,7 @@ class UserPreferencesStore(context: Context, scope: CoroutineScope, filename: St
             restEnabled = values[Keys.restEnabled] ?: true,
             restSeconds = (values[Keys.rest] ?: 90).coerceIn(0, 3600),
             onboardingCompleted = values[Keys.onboarded] ?: false,
-            theme = values[Keys.theme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM,
+            theme = values[Keys.theme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.TIME,
             hapticsEnabled = values[Keys.haptics] ?: true,
         )
     }

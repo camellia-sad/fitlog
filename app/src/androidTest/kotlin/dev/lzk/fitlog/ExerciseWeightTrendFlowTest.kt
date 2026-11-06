@@ -91,6 +91,9 @@ class ExerciseWeightTrendFlowTest {
         compose.onNodeWithTag("edit-exercise-weight").assertDoesNotExist()
         compose.onNodeWithText("查看动作历史").performScrollTo().performClick()
         waitText("还没有这个动作的已结束训练记录。")
+        // Exercise history returns to the exercise's own page, which in turn returns to the library.
+        compose.onNodeWithContentDescription("返回动作库").performClick()
+        waitText("查看动作历史")
         compose.onNodeWithContentDescription("返回动作库").performClick()
         waitText("动作库")
     }

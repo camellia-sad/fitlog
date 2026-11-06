@@ -11,8 +11,17 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.core.view.WindowCompat
+import java.time.LocalTime
+import kotlinx.coroutines.delay
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -47,12 +56,26 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val preferences by container.preferences.preferences.collectAsStateWithLifecycle(initialValue = UserPreferences())
+            val systemDark = isSystemInDarkTheme()
             val dark = when (preferences.theme) {
-                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.TIME, ThemeMode.SYSTEM -> systemDark
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
             }
-            FitLogTheme(dark) {
+            val clock by produceState(LocalTime.now()) { while (true) { value = LocalTime.now(); delay(30_000) } }
+            val livePeriod = DayPeriod.at(clock)
+            var period by remember { mutableStateOf(livePeriod) }
+            // A new period waits until the workout page is closed, so colours never change mid-set.
+            LaunchedEffect(livePeriod, ThemeClock.holdForWorkout) { if (!ThemeClock.holdForWorkout) period = livePeriod }
+            val timeTheme = preferences.theme == ThemeMode.TIME
+            val barsDark = isFitThemeDark(dark, period, timeTheme)
+            SideEffect {
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !barsDark
+                    isAppearanceLightNavigationBars = !barsDark
+                }
+            }
+            FitLogTheme(dark, period, timeTheme) {
                 FitLogApp(container, notificationOpens.intValue) {
                     if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
                         permission.launch(Manifest.permission.POST_NOTIFICATIONS)

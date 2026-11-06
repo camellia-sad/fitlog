@@ -9,7 +9,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import kotlin.math.floor
 
-enum class Symbol { HOME, DUMBBELL, BACK, PLUS, CHECK, SEARCH, ARROW, MINUS, CLOCK, LIST, SETTINGS, FRIENDS, PERSON, PLAY, SPARK, DOWN, CLOSE, PAUSE }
+enum class Symbol { HOME, DUMBBELL, BACK, PLUS, CHECK, SEARCH, ARROW, MINUS, CLOCK, LIST, SETTINGS, FRIENDS, PERSON, PLAY, SPARK, DOWN, CLOSE, PAUSE,
+    STAR, STAR_FILLED, ARCHIVE, UNARCHIVE, EDIT }
 
 /** Solid 12×12 pixel glyphs drawn to match the puppy's outline weight. `#` marks a filled cell. */
 private val Glyphs: Map<Symbol, List<String>> = mapOf(
@@ -30,6 +31,13 @@ private val Glyphs: Map<Symbol, List<String>> = mapOf(
     Symbol.LIST to listOf("##.#######", "..........", "##.#######", "..........", "##.#######", "..........", "##.#######"),
     Symbol.PAUSE to listOf("###..###", "###..###", "###..###", "###..###", "###..###", "###..###", "###..###"),
     Symbol.CLOSE to listOf("##....##", ".##..##.", "..####..", "...##...", "..####..", ".##..##.", "##....##"),
+    // Favourite: outline star, and the same star filled once saved.
+    Symbol.STAR to listOf(".....##.....", "....#..#....", "####....####", "#..........#", ".#........#.", "..#......#..", "..#......#..", ".#...##...#.", ".#..#..#..#.", ".###....###."),
+    Symbol.STAR_FILLED to listOf(".....##.....", "....####....", "############", "############", ".##########.", "..########..", "..########..", ".####..####.", ".###....###.", ".##......##."),
+    // Archive: a box with a lid and a handle slot; unarchive adds an up arrow above the slot.
+    Symbol.ARCHIVE to listOf("############", "#..........#", "############", ".#........#.", ".#..####..#.", ".#........#.", ".#........#.", ".##########."),
+    Symbol.UNARCHIVE to listOf(".....##.....", "....####....", "...######...", ".....##.....", "############", ".#........#.", ".#..####..#.", ".#........#.", ".##########."),
+    Symbol.EDIT to listOf("........##..", ".......####.", "......####..", ".....####...", "....####....", "...####.....", "..####......", ".####.......", ".###........", "####........"),
     Symbol.SETTINGS to listOf("....##....", ".##.##.##.", ".########.", "..##..##..", "####..####", "####..####", "..##..##..", ".########.", ".##.##.##.", "....##...."),
 )
 

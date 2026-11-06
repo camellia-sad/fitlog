@@ -24,12 +24,10 @@ import dev.lzk.fitlog.training.WorkoutViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun ExerciseLibraryScreen(state: WorkoutUiState, model: WorkoutViewModel, onAdd: (Exercise) -> Unit, onTemplates: () -> Unit = {}, onHistory: (String) -> Unit = {}) {
+fun ExerciseLibraryScreen(state: WorkoutUiState, model: WorkoutViewModel, onAdd: (Exercise) -> Unit, onTemplates: () -> Unit = {}, onOpen: (Exercise) -> Unit = {}) {
     val canAdd = state.workout?.session?.status != SessionStatus.PAUSED
     var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(model.currentSearchQuery)) }
-    var detail by remember { mutableStateOf<Exercise?>(null) }
     var custom by remember { mutableStateOf(false) }
-    var archiving by remember { mutableStateOf<Exercise?>(null) }
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             OneLineText("动作库", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
@@ -76,47 +74,12 @@ fun ExerciseLibraryScreen(state: WorkoutUiState, model: WorkoutViewModel, onAdd:
             style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 20.dp)) {
             items(state.exercises, key = { it.id }) { exercise ->
-                ExerciseRow(exercise, state.preferences.weightUnit, canAdd, onOpen = { detail = exercise }, onAdd = { onAdd(exercise) })
+                ExerciseRow(exercise, state.preferences.weightUnit, canAdd, onOpen = { onOpen(exercise) }, onAdd = { onAdd(exercise) })
             }
             if (state.exercises.isEmpty() && !state.loading) item {
                 Text("没有符合条件的动作，可调整筛选或创建自定义动作。", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-    }
-    detail?.let { selected ->
-        val exercise = state.exercises.find { it.id == selected.id } ?: selected
-        ModalBottomSheet(onDismissRequest = { detail = null }) {
-            Column(Modifier.heightIn(max = 620.dp).verticalScroll(rememberScrollState()).padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text(exercise.nameZh, style = MaterialTheme.typography.headlineSmall)
-                Text(exercise.nameEn + " · " + exercise.equipmentType.label(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (exercise.primaryMuscles.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    exercise.primaryMuscles.forEach { MuscleChip(it.label(), it.group) }
-                }
-                if(ExerciseAnimations.has(exercise.id)) ExerciseStage(exercise.id, exercise.nameZh, exercise.primaryMuscles.firstOrNull()?.group,
-                    Modifier.fillMaxWidth().height(220.dp), corner = 18.dp)
-                exercise.instructions?.let { Text(it) }
-                if(exercise.recordMetric == RecordMetric.REPETITIONS)
-                    ExerciseWeightControl(exercise, state.preferences.weightUnit) { model.setDefaultWeight(exercise.id, it) }
-                OutlinedButton(onClick = { detail = null; onHistory(exercise.id) }, modifier = Modifier.fillMaxWidth()) { Text("查看动作历史") }
-                Row {
-                    TextButton(onClick = { model.favorite(exercise); detail = null }) { Text(if (exercise.isFavorite) "取消收藏" else "收藏动作") }
-                    TextButton(onClick = { detail = null; archiving = exercise }) { Text(if (exercise.isArchived) "恢复动作" else "归档动作") }
-                }
-                if (!exercise.isArchived) PixelButton(enabled = canAdd, onClick = { detail = null; onAdd(exercise) },
-                    modifier = Modifier.fillMaxWidth()) {
-                    LineIcon(Symbol.PLUS, Modifier.size(14.dp), LocalContentColor.current)
-                    Text(if (state.workout == null) "加入待开始训练" else "添加到本次训练")
-                }
-                Spacer(Modifier.height(16.dp))
-            }
-        }
-    }
-    archiving?.let { exercise ->
-        AlertDialog(onDismissRequest = { archiving = null }, title = { Text(if (exercise.isArchived) "恢复动作？" else "归档动作？") },
-            text = { Text("已有训练记录与名称快照会保留。归档动作可在“已归档”筛选中恢复。") },
-            confirmButton = { TextButton(onClick = { model.archive(exercise); archiving = null }) { Text("确认") } },
-            dismissButton = { TextButton(onClick = { archiving = null }) { Text("取消") } })
     }
     if (custom) CustomExerciseDialog(onDismiss = { custom = false }) { model.createCustom(it); custom = false }
 }
@@ -132,16 +95,18 @@ private fun ExerciseRow(exercise: Exercise, unit: WeightUnit, canAdd: Boolean, o
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(exercise.nameZh, style = MaterialTheme.typography.titleMedium, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-                    if (exercise.isFavorite) Row(verticalAlignment = Alignment.CenterVertically) {
-                        LineIcon(Symbol.SPARK, Modifier.size(12.dp), fitColors.orange)
-                        Text("已收藏", style = MaterialTheme.typography.labelSmall, color = fitColors.orangeDeep)
-                    }
+                    if (exercise.isFavorite) LineIcon(Symbol.STAR_FILLED, Modifier.size(13.dp).semanticsLabel("已收藏"), fitColors.orange)
                 }
                 Text("${exercise.equipmentType.label()} · ${exercise.primaryMuscles.joinToString("、") { it.label() }}",
                     color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 1)
                 val best = exercise.bestWeightGrams
+                // The number is the point: small label and unit, large pixel digits.
                 if (exercise.recordMetric == RecordMetric.REPETITIONS && best != null && best > 0)
-                    Text("最佳 ${WeightUnits.format(best, unit)} ${unit.label}", style = pixelNumber(13.sp, FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("最佳", Modifier.padding(bottom = 3.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(WeightUnits.format(best, unit), style = pixelNumber(19.sp), color = MaterialTheme.colorScheme.primary)
+                        Text(unit.label, Modifier.padding(bottom = 3.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
             }
             if (!exercise.isArchived) PixelButton(onClick = onAdd, enabled = canAdd, minHeight = 40.dp,
                 modifier = Modifier.width(48.dp).semanticsLabel("添加${exercise.nameZh}")) {

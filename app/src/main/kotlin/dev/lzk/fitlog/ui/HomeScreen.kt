@@ -47,10 +47,11 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
             .flatMap { it.primaryMuscles }.map { it.group }.distinct().take(4)
     }
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 20.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(top = 4.dp, bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+        // Tall enough that the first card starts in the sky's bridge zone and the sky stays visible above it.
+        Row(Modifier.fillMaxWidth().heightIn(min = 136.dp).padding(bottom = 8.dp), verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 PixelWordmark(height = if (largeFont) 26.dp else 30.dp)
                 OneLineText(LocalDate.now().format(DateTimeFormatter.ofPattern("M月d日 · E", Locale.SIMPLIFIED_CHINESE)),

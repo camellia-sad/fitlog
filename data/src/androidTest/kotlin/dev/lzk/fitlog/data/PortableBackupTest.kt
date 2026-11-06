@@ -49,6 +49,16 @@ class PortableBackupTest {
             assertEquals(prefs,pb.preferences.first())
         } finally {scope.cancel();a.close();b.close();names.forEach {context.deleteDatabase(it)}}
     }
+    @Test fun timeThemeBackupStaysReadableForOlderVersions() {
+        val prefs=UserPreferences(theme=ThemeMode.TIME,onboardingCompleted=true,hapticsEnabled=false)
+        val json=prefs.backupJson()
+        // Older versions only read "theme", which must stay a value they know.
+        assertEquals("SYSTEM",json.getString("theme"))
+        assertEquals(prefs,json.backupPreferences())
+        // A backup written before themeMode/hapticsEnabled existed still imports with their defaults.
+        json.remove("themeMode");json.remove("hapticsEnabled")
+        assertEquals(prefs.copy(theme=ThemeMode.SYSTEM,hapticsEnabled=true),json.backupPreferences())
+    }
     @Test fun archiveRestoresChatAndImagesWithoutCloudAndDeletedMessagesStayDeleted()=runBlocking {
         val owner=id();val peer=id();val namespace="portable-"+id();val second="portable-"+id()
         session(namespace,owner);session(second,owner)

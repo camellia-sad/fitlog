@@ -6,7 +6,8 @@ import kotlinx.coroutines.flow.Flow
 
 enum class WeightUnit(val label: String) { KG("kg"), LB("lb") }
 enum class SplitType { FULL_BODY, UPPER_LOWER, PUSH_PULL_LEGS, FREE }
-enum class ThemeMode { SYSTEM, LIGHT, DARK }
+/** TIME follows the clock: four day-period palettes, with night as the dark palette. */
+enum class ThemeMode { TIME, SYSTEM, LIGHT, DARK }
 
 data class UserPreferences(
     val equipment: Set<EquipmentType> = emptySet(),
@@ -18,7 +19,7 @@ data class UserPreferences(
     val restEnabled: Boolean = true,
     val restSeconds: Int = 90,
     val onboardingCompleted: Boolean = false,
-    val theme: ThemeMode = ThemeMode.SYSTEM,
+    val theme: ThemeMode = ThemeMode.TIME,
     val hapticsEnabled: Boolean = true,
 ) {
     fun validate() {

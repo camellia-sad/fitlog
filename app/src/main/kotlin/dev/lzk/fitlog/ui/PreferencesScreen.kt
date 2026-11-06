@@ -151,6 +151,8 @@ fun SettingsScreen(model: SettingsViewModel,onBack:(()->Unit)?=null,onBackups:((
         }
         SettingsSection("外观") {
             ChoiceChips(ThemeMode.entries, { it == form.value.theme }, { it.label() }) { form.value = form.value.copy(theme = it) }
+            Text("时段主题按时间切换清晨、白天、傍晚和夜晚四套配色，夜晚为深色；训练页打开时不会中途换色。",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         PixelButton(onClick = {
@@ -208,4 +210,4 @@ fun SplitType.label(): String = when (this) {
     SplitType.FULL_BODY -> "全身"; SplitType.UPPER_LOWER -> "上下肢"
     SplitType.PUSH_PULL_LEGS -> "推拉腿"; SplitType.FREE -> "自由安排"
 }
-fun ThemeMode.label(): String = when (this) { ThemeMode.SYSTEM -> "跟随系统"; ThemeMode.LIGHT -> "浅色"; ThemeMode.DARK -> "深色" }
+fun ThemeMode.label(): String = when (this) { ThemeMode.TIME -> "时段主题"; ThemeMode.SYSTEM -> "跟随系统"; ThemeMode.LIGHT -> "浅色"; ThemeMode.DARK -> "深色" }

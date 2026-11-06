@@ -50,7 +50,13 @@ class SearchAndEmptyStateTest {
         val model=WorkoutViewModel(container);models.put("gif",model)
         val item=dev.lzk.fitlog.domain.Exercise("barbell-bench-press","杠铃卧推","Bench",
             dev.lzk.fitlog.domain.EquipmentType.BARBELL,setOf(dev.lzk.fitlog.domain.Muscle.CHEST))
-        compose.setContent {FitLogTheme {ExerciseLibraryScreen(WorkoutUiState(loading=false,exercises=listOf(item)),model,{})}}
+        val ui=WorkoutUiState(loading=false,exercises=listOf(item))
+        // Details are a separate page now; the test shows it next to the library once the row is tapped.
+        var open by androidx.compose.runtime.mutableStateOf(false)
+        compose.setContent {FitLogTheme {
+            ExerciseLibraryScreen(ui,model,{},onOpen={open=true})
+            if(open) ExerciseDetailScreen(item,ui,model,onBack={},onHistory={},onAdd={})
+        }}
         compose.waitUntil(15_000) {
             val pixels=compose.onNodeWithContentDescription("杠铃卧推动作演示").captureToImage().toPixelMap()
             val colors=mutableSetOf<androidx.compose.ui.graphics.Color>()

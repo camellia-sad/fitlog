@@ -194,7 +194,8 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
             }
         }
         val next = exercise.sets.firstOrNull { it.status == SetStatus.PLANNED }
-        Surface(color = MaterialTheme.colorScheme.background) {
+        val ground = MaterialTheme.colorScheme.background
+        Box(Modifier.background(androidx.compose.ui.graphics.Brush.verticalGradient(0f to Color.Transparent, .3f to ground))) {
             PixelButton(onClick = { next?.let(complete) }, enabled = canEdit && next != null, minHeight = 56.dp,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp)
                     .semanticsLabel(if (next == null) "本动作已完成" else "完成当前第${next.setIndex}组")) {
