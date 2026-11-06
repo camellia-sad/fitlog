@@ -39,15 +39,10 @@ fun TemplateScreen(model: TemplateViewModel, canStart: Boolean, onBack: () -> Un
         return
     }
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            IconButton(onClick = onBack, modifier = Modifier.semanticsLabel("返回动作库")) {
-                LineIcon(Symbol.BACK, Modifier.size(24.dp))
-            }
-            OneLineText("训练模板", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-            TextButton(onClick = model::create, enabled = !saving) { Text("新建") }
+        FitTopBar("训练模板", onBack, backLabel = "返回动作库") {
+            TextButton(onClick = model::create, enabled = !saving) { LineIcon(Symbol.PLUS, Modifier.size(12.dp)); Spacer(Modifier.width(6.dp)); Text("新建") }
         }
-        LazyColumn(Modifier.weight(1f).testTag("template-list"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        LazyColumn(Modifier.weight(1f).testTag("template-list"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 20.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
                 if (!canStart) Text("已有未结束训练，可先返回今日继续。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
@@ -66,6 +61,11 @@ fun TemplateScreen(model: TemplateViewModel, canStart: Boolean, onBack: () -> Un
                 SoftCard {
                     OneLineText(template.name, style = MaterialTheme.typography.titleLarge)
                     Text("${template.exercises.size} 个动作 · ${template.splitType.label()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val groups = template.exercises.mapNotNull { item -> state.exercises.find { it.id == item.exerciseId } }
+                        .flatMap { it.primaryMuscles }.map { it.group }.distinct()
+                    if (groups.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        groups.forEach { MuscleChip(it.label, it) }
+                    }
                     Text(template.exercises.joinToString(" · ") { item -> state.exercises.find { it.id == item.exerciseId }?.nameZh ?: "已归档动作" },
                         style = MaterialTheme.typography.bodySmall)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

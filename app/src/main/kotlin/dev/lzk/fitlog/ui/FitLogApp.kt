@@ -1,7 +1,10 @@
 package dev.lzk.fitlog.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -115,24 +118,13 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
         }
         return
     }
+    CompositionLocalProvider(LocalHapticsEnabled provides state.preferences.hapticsEnabled) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background, contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbars) },
         bottomBar = {
-            if (route in listOf("home", "library", "friends", "me") && !(route in listOf("friends","me") && socialSubpage)) NavigationBar(
-                modifier = Modifier.testTag("main-navigation"), containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
-                val destinations = listOf("home" to "主页", "library" to "动作", "friends" to "好友", "me" to "我的")
-                destinations.forEachIndexed { index, (destination, label) ->
-                    NavigationBarItem(selected = route == destination,
-                        onClick = {
-                            if (route != destination) {
-                                nav.navigate(destination) { popUpTo("home"); launchSingleTop = true }
-                            }
-                        },
-                        icon = { LineIcon(listOf(Symbol.HOME, Symbol.DUMBBELL, Symbol.FRIENDS, Symbol.PERSON)[index], Modifier.size(23.dp),
-                            if (route == destination) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
-                        label = { Text(label, maxLines = 1) })
-                }
+            if (route in listOf("home", "library", "friends", "me") && !(route in listOf("friends","me") && socialSubpage)) FitNavigationBar(route) { destination ->
+                nav.navigate(destination) { popUpTo("home"); launchSingleTop = true }
             }
         },
     ) { padding ->
@@ -148,7 +140,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                     onRemovePrepared = model::removePreparedExercise, updates=container.updates,
                     onReserve = { model.reserveToday(selectedTemplateId) },
                     onExtra = { onWorkoutStarted(); model.startExtraWorkout(); goWorkout() },
-                    onAddDailySet = model::addDailySet, onRemoveAction = model::removeExercise)
+                    onAddDailySet = model::addDailySet, onRemoveAction = model::removeExercise, catalog = templateState.exercises)
             }
             composable("backups") {BackupScreen(container,onBack={nav.popBackStack()},onLogin={nav.navigate("me")})}
             composable("library") {
@@ -161,7 +153,8 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             }
             composable("workout") {
                 LaunchedEffect(state.selectedExercise?.id) { container.social.selectTrainingExercise(state.selectedExercise?.id) }
-                WorkoutScreen(state, model, onBack = { model.setPaused(true); nav.popBackStack("home", false) }, onAdd = { nav.navigate("library") }, onFinish = { finishing = true })
+                WorkoutScreen(state, model, onBack = { model.setPaused(true); nav.popBackStack("home", false) }, onAdd = { nav.navigate("library") },
+                    onFinish = { finishing = true }, catalog = templateState.exercises)
             }
             composable("templates") { TemplateScreen(templates, state.workout == null, onBack = { nav.popBackStack() }, onExitEditor = { requestTemplateExit("template-list", false) }) { selectedTemplateId = it; selectionChanged = true; nav.popBackStack("home", false) } }
             composable("history") {
@@ -237,5 +230,41 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                 sharingWorkout=null;model.dismissSummary()
                 shareScope.launch {snackbars.showSnackbar("已分享到动态")}
             })
+    }
+    }
+}
+
+/** Bottom navigation with a pixel indicator; the newly selected icon hops 3dp in two frames. */
+@Composable
+private fun FitNavigationBar(route: String, onSelect: (String) -> Unit) {
+    val destinations = listOf(Triple("home", "主页", Symbol.HOME), Triple("library", "动作", Symbol.DUMBBELL),
+        Triple("friends", "好友", Symbol.FRIENDS), Triple("me", "我的", Symbol.PERSON))
+    Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.testTag("main-navigation")) {
+        Column {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).height(64.dp)) {
+                destinations.forEach { (destination, label, symbol) ->
+                    val selected = route == destination
+                    val hop = remember { androidx.compose.animation.core.Animatable(0f) }
+                    LaunchedEffect(selected) {
+                        if (selected) { hop.snapTo(-3f); kotlinx.coroutines.delay(120); hop.snapTo(0f) }
+                    }
+                    val tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    Column(
+                        Modifier.weight(1f).fillMaxHeight()
+                            .selectable(selected, role = Role.Tab) { if (!selected) onSelect(destination) },
+                        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(3.dp, androidx.compose.ui.Alignment.CenterVertically),
+                    ) {
+                        Box(Modifier.size(56.dp, 30.dp).background(if (selected) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent, PixelShapeSmall),
+                            contentAlignment = androidx.compose.ui.Alignment.Center) {
+                            LineIcon(symbol, Modifier.size(22.dp).offset { androidx.compose.ui.unit.IntOffset(0, hop.value.dp.roundToPx()) }, tint)
+                        }
+                        Text(label, style = MaterialTheme.typography.labelMedium.copy(fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal),
+                            color = tint, maxLines = 1)
+                    }
+                }
+            }
+        }
     }
 }

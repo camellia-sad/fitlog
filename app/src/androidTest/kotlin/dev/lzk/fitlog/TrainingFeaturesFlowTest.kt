@@ -140,7 +140,8 @@ class TrainingFeaturesFlowTest {
         compose.onNodeWithText("保存设置", substring = false).performScrollTo().performClick()
         compose.waitUntil(10_000) { runBlocking { container.preferences.preferences.first().weightUnit == WeightUnit.LB } }
         assertEquals(ThemeMode.DARK, runBlocking { container.preferences.preferences.first().theme })
-        compose.onNodeWithContentDescription("返回我的").performScrollTo().performClick()
+        // The settings top bar is pinned above the scrolling content.
+        compose.onNodeWithContentDescription("返回我的").performClick()
         compose.onNodeWithText("主页", substring = false).performClick()
         waitText("继续训练")
         compose.onNodeWithText("继续训练").performScrollTo().performClick()

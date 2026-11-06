@@ -83,13 +83,14 @@ fun OnboardingScreen(preferences: UserPreferences, message: String? = null, onSa
     var page by rememberSaveable { mutableIntStateOf(0) }
     var error by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            PixelPuppy(Modifier.size(74.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            PixelWordmark(height = 28.dp)
             TextButton(onClick = { onSave(UserPreferences(onboardingCompleted = true)) }) { Text("跳过设置") }
         }
+        PixelPuppy(Modifier.size(96.dp))
         OneLineText("一起找到你的节奏", Modifier.fillMaxWidth(), style = MaterialTheme.typography.headlineMedium)
         OneLineText("偏好可稍后在设置中修改。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("${page + 1} / 5", color = MaterialTheme.colorScheme.primary)
+        PixelProgress(page + 1, 5, Modifier.fillMaxWidth().semanticsLabel("第 ${page + 1} 步，共 5 步"))
         when (page) {
             0 -> EquipmentChoices(form)
             1 -> SplitChoices(form)
@@ -103,13 +104,13 @@ fun OnboardingScreen(preferences: UserPreferences, message: String? = null, onSa
         }
         (error ?: message)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (page > 0) OutlinedButton(onClick = { page-- }) { Text("上一步") }
-            Button(onClick = {
+            if (page > 0) OutlinedButton(onClick = { page-- }, modifier = Modifier.heightIn(min = 52.dp)) { Text("上一步") }
+            PixelButton(onClick = {
                 try {
                     if (page == 3) form.build()
                     if (page < 4) page++ else onSave(form.build().copy(onboardingCompleted = true))
                 } catch (e: Exception) { error = e.message }
-            }, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) { Text(if (page == 4) "开始使用" else "下一步") }
+            }, modifier = Modifier.weight(1f)) { Text(if (page == 4) "开始使用" else "下一步") }
         }
     }
 }
@@ -129,52 +130,77 @@ fun SettingsScreen(model: SettingsViewModel,onBack:(()->Unit)?=null,onBackups:((
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { model.import(context, it) }
     }
-    Column(Modifier.fillMaxSize().testTag("settings-scroll").verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
-            if(onBack!=null) IconButton(onClick=onBack) {LineIcon(Symbol.BACK,Modifier.size(24.dp).semanticsLabel("返回我的"))}
-            Text("设置",style=MaterialTheme.typography.headlineMedium)
+    Column(Modifier.fillMaxSize()) {
+    FitTopBar("设置", onBack, backLabel = "返回我的")
+    Column(Modifier.weight(1f).testTag("settings-scroll").verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        SettingsSection("训练偏好") {
+            EquipmentChoices(form)
+            SplitChoices(form)
+            MuscleChoices(form)
+            NumberPreference("每次训练时长（分钟）", form.minutes) { form.minutes = it }
+            UnitChoices(form)
+            NumberPreference("重量步长（${form.value.weightUnit.label}）", form.step, true) { form.step = it }
         }
-        EquipmentChoices(form)
-        SplitChoices(form)
-        MuscleChoices(form)
-        NumberPreference("每次训练时长（分钟）", form.minutes) { form.minutes = it }
-        UnitChoices(form)
-        NumberPreference("重量步长（${form.value.weightUnit.label}）", form.step, true) { form.step = it }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("完成一组后自动休息", Modifier.weight(1f).padding(top = 14.dp))
-            Switch(checked = form.value.restEnabled, onCheckedChange = { form.value = form.value.copy(restEnabled = it) })
+        SettingsSection("休息与反馈") {
+            SwitchRow("完成一组后自动休息", form.value.restEnabled) { form.value = form.value.copy(restEnabled = it) }
+            NumberPreference("默认休息时长（秒）", form.rest) { form.rest = it }
+            SwitchRow("操作震动", form.value.hapticsEnabled, "按下按钮、完成一组、休息结束和刷新纪录时轻震。") {
+                form.value = form.value.copy(hapticsEnabled = it)
+            }
         }
-        NumberPreference("默认休息时长（秒）", form.rest) { form.rest = it }
-        Text("外观", style = MaterialTheme.typography.titleMedium)
-        ChoiceChips(ThemeMode.entries, { it == form.value.theme }, { it.label() }) { form.value = form.value.copy(theme = it) }
+        SettingsSection("外观") {
+            ChoiceChips(ThemeMode.entries, { it == form.value.theme }, { it.label() }) { form.value = form.value.copy(theme = it) }
+        }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        Button(onClick = {
+        PixelButton(onClick = {
             try { error = null; model.save(form.build()) } catch (e: Exception) { error = e.message }
-        }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = !busy) { Text("保存设置") }
-        HorizontalDivider()
-        Text("备份与恢复", style = MaterialTheme.typography.titleLarge)
-        if(onBackups!=null) Button(onClick=onBackups,enabled=!busy,modifier=Modifier.fillMaxWidth()) {Text("云端备份与恢复")}
-        Text("JSON 包含训练、动作、模板、计划、偏好、草稿和当前账号的聊天数据区。图片保留在本机，可随云端备份恢复。", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        OutlinedButton(onClick = { exporter.launch("FitLog-${java.time.LocalDate.now()}.json") }, enabled = !busy,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("导出 JSON 备份") }
-        OutlinedButton(onClick = { confirmImport = true }, enabled = !busy,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("导入 JSON 备份") }
-        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
-        HorizontalDivider()
-        val profile by model.profile.collectAsStateWithLifecycle()
-        DataManagementButtons(profile!=null,busy,model::clearTraining,
-            {model.clearChats{onChatCleared()}},
-            {model.deleteAccount{AvatarImages.clear();onChatCleared()}})
-        NetworkDiagnosticsControls(busy, model::exportNetworkLogs, model::clearNetworkLogs)
-        PersonalDataDeleteButton(enabled=!busy)
+        }, modifier = Modifier.fillMaxWidth(), enabled = !busy) { Text("保存设置") }
+        SettingsSection("备份与恢复") {
+            if(onBackups!=null) Button(onClick=onBackups,enabled=!busy,modifier=Modifier.fillMaxWidth().heightIn(min = 48.dp)) {Text("云端备份与恢复")}
+            Text("JSON 包含训练、动作、模板、计划、偏好、草稿和当前账号的聊天数据区。图片保留在本机，可随云端备份恢复。",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(onClick = { exporter.launch("FitLog-${java.time.LocalDate.now()}.json") }, enabled = !busy,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("导出 JSON 备份") }
+            OutlinedButton(onClick = { confirmImport = true }, enabled = !busy,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("导入 JSON 备份") }
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+        }
+        SettingsSection("数据管理") {
+            val profile by model.profile.collectAsStateWithLifecycle()
+            DataManagementButtons(profile!=null,busy,model::clearTraining,
+                {model.clearChats{onChatCleared()}},
+                {model.deleteAccount{AvatarImages.clear();onChatCleared()}})
+            NetworkDiagnosticsControls(busy, model::exportNetworkLogs, model::clearNetworkLogs)
+            PersonalDataDeleteButton(enabled=!busy)
+        }
         Text("FitLog · 训练离线可用", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(16.dp))
+    }
     }
     if (confirmImport) AlertDialog(onDismissRequest = { confirmImport = false }, title = { Text("合并备份数据？") },
         text = { Text("相同记录不会重复导入，同 ID 的不同训练、模板或计划会取消整批导入。动作收藏、归档及偏好采用备份值，旧版备份不改变偏好。建议先导出本机备份。") },
         confirmButton = { TextButton(onClick = { confirmImport = false; importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }) { Text("选择备份") } },
         dismissButton = { TextButton(onClick = { confirmImport = false }) { Text("取消") } })
+}
+
+@Composable
+private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 4.dp))
+        SoftCard(content = content)
+    }
+}
+
+@Composable
+private fun SwitchRow(label: String, checked: Boolean, description: String? = null, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            description?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
 }
 
 private fun <T> Set<T>.toggle(value: T): Set<T> = if (value in this) this - value else this + value

@@ -13,10 +13,7 @@ import dev.lzk.fitlog.domain.*
 @Composable
 fun ExerciseHistoryScreen(exercise: Exercise?, records: List<Workout>, unit: WeightUnit, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack, modifier = Modifier.semanticsLabel("返回动作库")) { LineIcon(Symbol.BACK, Modifier.size(24.dp)) }
-            OneLineText(exercise?.nameZh ?: "动作历史", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-        }
+        FitTopBar(exercise?.nameZh ?: "动作历史", onBack, backLabel = "返回动作库")
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             val points = remember(records, exercise?.id) { exercise?.let { TrainingHistory.performance(records, it.id) }.orEmpty() }
             PerformanceChart(points, unit, exercise?.recordMetric ?: RecordMetric.REPETITIONS)

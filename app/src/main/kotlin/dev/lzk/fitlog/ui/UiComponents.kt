@@ -10,21 +10,21 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.runtime.*
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.lzk.fitlog.domain.EquipmentType
 import dev.lzk.fitlog.domain.Muscle
 import java.time.Duration
 
+/** Quiet container: soft corners and a hairline, never a shadow. Pixel treatment is reserved for controls. */
 @Composable
 fun SoftCard(modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.surface, content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), color = color, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = content)
+    Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = color, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
 }
 
@@ -37,16 +37,27 @@ fun OneLineText(text: String, modifier: Modifier = Modifier, style: TextStyle = 
         autoSize = TextAutoSize.StepBased(minFontSize = size * .75f, maxFontSize = size, stepSize = .5.sp))
 }
 
+/** Square progress cells; a newly lit cell pops in 2 frames. Long plans fold into at most 12 cells. */
 @Composable
 fun PixelProgress(done: Int, total: Int, modifier: Modifier = Modifier) {
     val segments = total.coerceIn(1, 12)
-    Row(modifier.height(8.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+    val filledCount = if (total <= 0) 0 else (0 until segments).count { it.toFloat() / segments < done.toFloat() / total }
+    var shown by remember { mutableStateOf(filledCount) }
+    val pop = remember { androidx.compose.animation.core.Animatable(1f) }
+    var popIndex by remember { mutableStateOf(-1) }
+    LaunchedEffect(filledCount) {
+        if (filledCount > shown) {
+            popIndex = filledCount - 1
+            pop.snapTo(.3f); pop.animateTo(1f, tween(160, easing = StepEasing(2)))
+        }
+        shown = filledCount
+    }
+    Row(modifier.height(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         repeat(segments) { index ->
-            val filled = total > 0 && index.toFloat() / segments < done.toFloat() / total
-            val color by animateColorAsState(
-                if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-                animationSpec = tween(180), label = "训练进度")
-            Box(Modifier.weight(1f).fillMaxHeight().background(color, RoundedCornerShape(3.dp)))
+            val color = if (index < filledCount) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
+            Box(Modifier.weight(1f).fillMaxHeight()
+                .graphicsLayer { if (index == popIndex) scaleY = pop.value }
+                .background(color, RoundedCornerShape(1.dp)))
         }
     }
 }

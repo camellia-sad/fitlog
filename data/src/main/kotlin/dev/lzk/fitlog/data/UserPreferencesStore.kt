@@ -21,6 +21,7 @@ class UserPreferencesStore(context: Context, scope: CoroutineScope, filename: St
         val rest = intPreferencesKey("rest_seconds")
         val onboarded = booleanPreferencesKey("onboarded")
         val theme = stringPreferencesKey("theme")
+        val haptics = booleanPreferencesKey("haptics_enabled")
     }
     override val preparedExercises = store.data.map { values ->
         values[Keys.preparation]?.let { text ->
@@ -43,6 +44,7 @@ class UserPreferencesStore(context: Context, scope: CoroutineScope, filename: St
             restSeconds = (values[Keys.rest] ?: 90).coerceIn(0, 3600),
             onboardingCompleted = values[Keys.onboarded] ?: false,
             theme = values[Keys.theme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM,
+            hapticsEnabled = values[Keys.haptics] ?: true,
         )
     }
 
@@ -59,6 +61,7 @@ class UserPreferencesStore(context: Context, scope: CoroutineScope, filename: St
             values[Keys.rest] = preferences.restSeconds
             values[Keys.onboarded] = preferences.onboardingCompleted
             values[Keys.theme] = preferences.theme.name
+            values[Keys.haptics] = preferences.hapticsEnabled
         }
     }
 }

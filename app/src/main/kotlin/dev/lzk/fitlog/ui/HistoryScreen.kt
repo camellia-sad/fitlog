@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Alignment
 import kotlinx.coroutines.flow.first
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.lzk.fitlog.domain.*
 import dev.lzk.fitlog.features.HistoryViewModel
@@ -48,21 +49,21 @@ fun HistoryScreen(model: HistoryViewModel, unit: WeightUnit, exercises: List<Exe
     val names = (exercises.map { it.id to it.nameZh } +
         workouts.flatMap { it.exercises }.map { it.exerciseId to it.exerciseNameSnapshot }).distinctBy { it.first }
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack, modifier = Modifier.semanticsLabel("返回主页")) {
-                LineIcon(Symbol.BACK, Modifier.size(24.dp))
-            }
-            OneLineText("训练历史", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-            TextButton(onClick = { pickingDate = true }) { Text("选择日期") }
-        }
-        LazyColumn(Modifier.weight(1f).testTag("history-list"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        FitTopBar("训练历史", onBack, backLabel = "返回主页") { TextButton(onClick = { pickingDate = true }) { Text("选择日期") } }
+        LazyColumn(Modifier.weight(1f).testTag("history-list"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 20.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             message?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
             item {
                 SoftCard {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        TextButton(onClick = { model.setYear(year - 1) }, enabled = year > 1970) { Text("上一年") }
-                        Text("$year", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 10.dp))
-                        TextButton(onClick = { model.setYear(year + 1) }, enabled = year < LocalDate.now().year) { Text("下一年") }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { model.setYear(year - 1) }, enabled = year > 1970, modifier = Modifier.semanticsLabel("上一年")) {
+                            LineIcon(Symbol.BACK, Modifier.size(16.dp), if (year > 1970) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
+                        }
+                        Text("$year", Modifier.weight(1f), style = pixelNumber(22.sp, androidx.compose.ui.text.font.FontWeight.Bold),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        val canNext = year < LocalDate.now().year
+                        IconButton(onClick = { model.setYear(year + 1) }, enabled = canNext, modifier = Modifier.semanticsLabel("下一年")) {
+                            LineIcon(Symbol.ARROW, Modifier.size(16.dp), if (canNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
+                        }
                     }
                     TrainingCalendar(year, days, date, model::selectDate)
                     TrainingColorLegend()
@@ -71,13 +72,16 @@ fun HistoryScreen(model: HistoryViewModel, unit: WeightUnit, exercises: List<Exe
             item {
                 SoftCard {
                     Text("$year 年 · 真实完成", style = MaterialTheme.typography.titleMedium)
-                    Text("${statistics.days} 天 · ${statistics.sessions} 次 · ${statistics.completedSets} 组",
-                        style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                     val volume = BigDecimal(statistics.volumeGrams)
                         .divide(if (unit == WeightUnit.KG) BigDecimal("1000") else BigDecimal("453.59237"), 2, java.math.RoundingMode.HALF_UP)
                         .stripTrailingZeros().toPlainString()
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StatTile(statistics.days.toString(), "天", Modifier.weight(1f))
+                        StatTile(statistics.sessions.toString(), "次", Modifier.weight(1f))
+                        StatTile(statistics.completedSets.toString(), "组", Modifier.weight(1f))
+                    }
                     Text("累计 ${Duration.ofSeconds(statistics.durationSeconds).display()} · 训练量 $volume ${unit.label}·次",
-                        style = MaterialTheme.typography.bodySmall)
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             item(key = "selected-day") {
@@ -166,8 +170,8 @@ private fun TrainingCalendar(year: Int, days: Map<LocalDate, TrainingDay>, selec
                     val date = monday.plusDays(day.toLong())
                     val count = days[date]?.completedSets ?: 0
                     Box(Modifier.size(26.dp)
-                        .background(trainingColor(count).copy(alpha = if (date.year == year) 1f else .15f), RoundedCornerShape(4.dp))
-                        .border(if (date == selected) 2.dp else 0.dp, if (date == selected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(4.dp))
+                        .background(trainingColor(count).copy(alpha = if (date.year == year) 1f else .15f), RoundedCornerShape(2.dp))
+                        .border(if (date == selected) 2.dp else 0.dp, if (date == selected) fitColors.orange else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(2.dp))
                         .clickable(enabled = date.year == year) { onSelect(date) }.semanticsLabel("$date：已结束训练完成 $count 组"))
                 }
             }
@@ -192,7 +196,7 @@ private fun TrainingColorLegend() {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         listOf(0 to "0", 1 to "1～3", 4 to "4～8", 9 to "9～15", 16 to "16+").forEach { (count, label) ->
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Box(Modifier.size(16.dp).background(trainingColor(count), RoundedCornerShape(3.dp)).semanticsLabel("完成 $label 组的颜色"))
+                Box(Modifier.size(16.dp).background(trainingColor(count), RoundedCornerShape(2.dp)).semanticsLabel("完成 $label 组的颜色"))
                 Text(label, style = MaterialTheme.typography.labelSmall)
             }
         }

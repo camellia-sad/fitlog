@@ -19,6 +19,7 @@ data class UserPreferences(
     val restSeconds: Int = 90,
     val onboardingCompleted: Boolean = false,
     val theme: ThemeMode = ThemeMode.SYSTEM,
+    val hapticsEnabled: Boolean = true,
 ) {
     fun validate() {
         WorkoutRules.input(workoutMinutes in 5..360, "训练时长须在 5～360 分钟之间")
