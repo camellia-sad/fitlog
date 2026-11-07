@@ -32,7 +32,7 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
     onHistory: () -> Unit = {}, selectedTemplateId: String? = null, onSelectTemplate: (String?) -> Unit = {},
     prepared: List<Exercise> = emptyList(), onRemovePrepared: (String) -> Unit = {}, plan: TrainingPlan? = null, updates:dev.lzk.fitlog.updates.AppUpdates? = null,
     onExtra: () -> Unit = {}, onAddDailySet: (String) -> Unit = {}, onRemoveAction: (String) -> Unit = {},
-    catalog: List<Exercise> = emptyList()) {
+    catalog: List<Exercise> = emptyList(), onTemplates: () -> Unit = {}) {
     val workout = state.workout
     val todayWorkout = state.todayWorkout
     var viewingToday by remember { mutableStateOf(false) }
@@ -76,7 +76,7 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
                     else todayWorkout!!.let { it.historyStatus() + " · " + it.completedSetCount + "/" + it.plannedSetCount + " 组" }
                 else -> plan?.dayIndex(LocalDate.now())?.let { index ->
                     val id = plan.templateIds[index]
-                    if (id == null) "休息日" to "可按需自由训练"
+                    if (id == null) "休息日" to null
                     else templates.find { it.id == id }?.name?.let { it to null } ?: ("模板已删除" to "请到动作页重新安排计划")
                 }
             }
@@ -144,13 +144,9 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
     if(viewingToday && todayWorkout != null) TodayActionsDialog(todayWorkout, onClose = { viewingToday = false },
         onSelect = {}, onAdd = { viewingToday = false; onLibrary() }, onAddSet = onAddDailySet,
         onRemove = onRemoveAction, editable = true)
-    if (pickingTemplate) AlertDialog(onDismissRequest = { pickingTemplate = false }, title = { Text("选择训练模板") },
-        text = { Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
-            if (templates.isEmpty()) Text("还没有模板，可到动作页创建自己的训练安排。")
-            templates.forEach { template ->
-                TextButton(onClick = { onSelectTemplate(template.id); pickingTemplate = false }, modifier = Modifier.fillMaxWidth()) { Text(template.name) }
-            }
-        } }, confirmButton = { TextButton(onClick = { pickingTemplate = false }) { Text("关闭") } })
+    if (pickingTemplate) TemplatePickerSheet(templates, catalog, selectedTemplateId,
+        plannedId = plan?.dayIndex(LocalDate.now())?.let { plan.templateIds[it] },
+        onPick = { onSelectTemplate(it) }, onManage = onTemplates, onDismiss = { pickingTemplate = false })
 }
 
 /**

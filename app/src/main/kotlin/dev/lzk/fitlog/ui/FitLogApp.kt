@@ -156,7 +156,8 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                     prepared = state.preparedExerciseIds.mapNotNull { id -> templateState.exercises.find { it.id == id } },
                     onRemovePrepared = model::removePreparedExercise, updates=container.updates,
                     onExtra = { onWorkoutStarted(); model.startExtraWorkout(); goWorkout() },
-                    onAddDailySet = model::addDailySet, onRemoveAction = model::removeExercise, catalog = templateState.exercises)
+                    onAddDailySet = model::addDailySet, onRemoveAction = model::removeExercise, catalog = templateState.exercises,
+                    onTemplates = { nav.navigate("templates") })
             }
             composable("backups") {BackupScreen(container,onBack={nav.popBackStack()},onLogin={nav.navigate("me")})}
             composable("library") {

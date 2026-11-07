@@ -71,10 +71,23 @@ class WorkoutExperienceTest {
         show()
         waitText("休息日")
         compose.onNodeWithText("今日计划", substring = false).assertExists()
-        compose.onNodeWithText("可按需自由训练", substring = false).assertExists()
+        compose.onNodeWithText("可按需自由训练", substring = false).assertDoesNotExist()
         compose.onNodeWithTag("week-day-${LocalDate.now().dayOfWeek.value - 1}").performScrollTo().performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("week-day-info").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("未训练", substring = false).assertExists()
+    }
+
+    @Test fun templatePickerSelectsTemplateAndClosesSheet() {
+        val id = runBlocking { template() }
+        show()
+        compose.onNodeWithText("模板训练", substring = false).performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("template-picker").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("template-option-$id").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("template-picker").fetchSemanticsNodes().isEmpty() }
+        waitText("自己的推日")
+        compose.onNodeWithText("开始训练", substring = false).performScrollTo().performClick()
+        waitDescription("完成当前第1组")
+        assertEquals(id, runBlocking { container.workouts.observeActiveWorkout().first()!!.session.templateId })
     }
 
     @Test fun navigationUsesFourTabsAndIndependentHistoryAndTemplates() {
