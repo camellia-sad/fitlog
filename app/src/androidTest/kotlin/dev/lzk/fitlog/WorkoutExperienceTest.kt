@@ -41,7 +41,7 @@ class WorkoutExperienceTest {
     }
     private fun show() {
         compose.setContent { FitLogTheme { FitLogApp(container) } }
-        waitText("今日训练")
+        waitText("历史")
     }
     private suspend fun template() = container.training.saveTemplate(TemplateDraft(name = "自己的推日", exercises = listOf(
         TemplateExercise("one","barbell-bench-press",0,1,8,12,37_500,90))))
@@ -63,7 +63,18 @@ class WorkoutExperienceTest {
         assertEquals("记录今天的进步",runBlocking {container.workouts.observeWorkout(id).first()!!.session.feedback})
         compose.onNodeWithText("取消").performClick()
         compose.onNodeWithText("完成").performClick()
-        waitText("今日训练")
+        waitText("历史")
+    }
+
+    @Test fun restPlanLeadsHomeAndWeekDayShowsSummary() {
+        runBlocking { container.training.savePlan(TrainingPlan(LocalDate.now(), templateIds = List(7) { null })) }
+        show()
+        waitText("休息日")
+        compose.onNodeWithText("今日计划", substring = false).assertExists()
+        compose.onNodeWithText("可按需自由训练", substring = false).assertExists()
+        compose.onNodeWithTag("week-day-${LocalDate.now().dayOfWeek.value - 1}").performScrollTo().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("week-day-info").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("未训练", substring = false).assertExists()
     }
 
     @Test fun navigationUsesFourTabsAndIndependentHistoryAndTemplates() {
@@ -79,11 +90,11 @@ class WorkoutExperienceTest {
         waitText("训练历史")
         compose.onNodeWithTag("main-navigation").assertDoesNotExist()
         compose.onNodeWithContentDescription("返回主页").performClick()
-        waitText("今日训练")
+        waitText("历史")
         compose.onNodeWithTag("open-history").performClick()
         waitText("训练历史")
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
-        waitText("今日训练")
+        waitText("历史")
 
         compose.onNodeWithText("动作", substring = false).performClick()
         waitText("动作库")
@@ -107,7 +118,7 @@ class WorkoutExperienceTest {
         compose.onNodeWithContentDescription("返回我的").performClick()
         waitText("设置")
         compose.onNodeWithText("主页", substring = false).performClick()
-        waitText("今日训练")
+        waitText("历史")
     }
 
     @Test fun preparationDoesNotStartTimerAndReturningHomePausesUntilContinue() {
@@ -116,7 +127,7 @@ class WorkoutExperienceTest {
             container.training.savePlan(TrainingPlan(LocalDate.now(), templateIds = List(7) { id }))
         }
         show()
-        waitText("今日计划：自己的推日")
+        waitText("自己的推日")
         compose.onNodeWithText("动作", substring = false).performClick()
         waitText("动作库")
         compose.onNodeWithTag("exercise-search").performTextInput("Barbell Bench Press")

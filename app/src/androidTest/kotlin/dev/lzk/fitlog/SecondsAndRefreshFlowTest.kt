@@ -56,7 +56,7 @@ class SecondsAndRefreshFlowTest {
     }
     @Test fun templateOffersSecondsTargetsWithoutWeight() {
         compose.setContent {FitLogTheme {FitLogApp(container)}}
-        waitText("今日训练")
+        waitText("历史")
         compose.onNodeWithText("动作",useUnmergedTree=true).performClick()
         compose.onNodeWithTag("open-templates").performClick()
         waitText("新建");compose.onNodeWithText("新建").performClick()

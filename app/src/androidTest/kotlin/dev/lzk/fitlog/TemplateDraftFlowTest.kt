@@ -33,7 +33,7 @@ class TemplateDraftFlowTest {
     }
     private fun create() {
         compose.setContent { FitLogTheme { FitLogApp(container) } }
-        waitText("今日训练")
+        waitText("历史")
         compose.onNodeWithText("动作", substring = false).performClick()
         waitText("动作库")
         compose.onNodeWithTag("open-templates").performClick()
@@ -98,7 +98,7 @@ class TemplateDraftFlowTest {
         compose.onNodeWithContentDescription("返回动作库").performClick()
         waitText("动作库")
         compose.onNodeWithText("主页", substring = false).performClick()
-        waitText("今日训练")
+        waitText("历史")
         assertEquals("准备练背", runBlocking { container.training.observeTemplateDrafts().first().single().name })
         compose.onNodeWithText("动作", substring = false).performClick()
         waitText("动作库")

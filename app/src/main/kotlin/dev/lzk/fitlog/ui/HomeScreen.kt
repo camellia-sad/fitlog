@@ -2,6 +2,7 @@ package dev.lzk.fitlog.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -68,38 +69,37 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
         }
 
         SoftCard {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                val planIndex = plan?.dayIndex(LocalDate.now())
-                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                    Text("今日训练", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                    if (planIndex != null && plan != null) OneLineText(" · 循环第 ${planIndex + 1} / ${plan.templateIds.size} 天",
-                        style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // The plan (or the session already running) leads the card; when neither exists the mode chips take its place.
+            val headline: Pair<String, String?>? = when {
+                current != null -> current.session.trainingLabel to
+                    if (workout != null) "${if (workout.session.status == SessionStatus.PAUSED) "已暂停" else "训练中"} · ${workout.elapsedDuration(now).timerText()}"
+                    else todayWorkout!!.let { it.historyStatus() + " · " + it.completedSetCount + "/" + it.plannedSetCount + " 组" }
+                else -> plan?.dayIndex(LocalDate.now())?.let { index ->
+                    val id = plan.templateIds[index]
+                    if (id == null) "休息日" to "可按需自由训练"
+                    else templates.find { it.id == id }?.name?.let { it to null } ?: ("模板已删除" to "请到动作页重新安排计划")
                 }
-                HistoryEntry(onHistory)
             }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                OneLineText(workout?.session?.trainingLabel ?: todayWorkout?.session?.trainingLabel ?: selectedTemplate?.name ?: "开始今天的训练",
-                    style = MaterialTheme.typography.headlineSmall)
-                val status = if (workout != null) "${if (workout.session.status == SessionStatus.PAUSED) "已暂停" else "训练中"} · ${workout.elapsedDuration(now).timerText()}"
-                    else todayWorkout?.let { it.historyStatus() + " · " + it.completedSetCount + "/" + it.plannedSetCount + " 组" }
-                status?.let { OneLineText(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
-            }
-            if (groups.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                groups.forEach { MuscleChip(it.label, it) }
-            }
-            TodayStats(current, selectedTemplate, now, largeFont)
-            if (workout == null && todayWorkout == null) {
+            val chips: @Composable () -> Unit = {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     FilterChip(selected = selectedTemplateId == null, onClick = { onSelectTemplate(null) }, label = { Text("自由训练") })
                     FilterChip(selected = selectedTemplateId != null, onClick = { pickingTemplate = true },
                         label = { OneLineText(selectedTemplate?.name ?: "模板训练") },
                         trailingIcon = { LineIcon(Symbol.DOWN, Modifier.size(12.dp), MaterialTheme.colorScheme.onSurfaceVariant) })
                 }
-                plan?.dayIndex(LocalDate.now())?.let { index ->
-                    val id = plan.templateIds[index]
-                    Text("今日计划：" + (if (id == null) "休息，可按需自由训练" else templates.find { it.id == id }?.name ?: "模板已删除，请重新安排"),
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = if (headline == null) Alignment.CenterVertically else Alignment.Top) {
+                Box(Modifier.weight(1f)) {
+                    if (headline != null) TodayHeadline(headline.first, headline.second, planned = current == null) else chips()
                 }
+                HistoryEntry(onHistory)
+            }
+            if (groups.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                groups.forEach { MuscleChip(it.label, it) }
+            }
+            TodayStats(current, selectedTemplate, now, largeFont)
+            if (workout == null && todayWorkout == null) {
+                if (headline != null) chips()
                 if (selectedTemplateId == null) {
                     prepared.forEach { exercise ->
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -138,7 +138,7 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
             }
         }
 
-        WeekCard(dates)
+        WeekCard(dates) { date -> weekDayInfo(date, weekly, catalog, plan, templates) }
         updates?.let {UpdateEntry(it)}
     }
     if(viewingToday && todayWorkout != null) TodayActionsDialog(todayWorkout, onClose = { viewingToday = false },
@@ -199,9 +199,84 @@ private fun TodayStats(current: Workout?, template: WorkoutTemplate?, now: Insta
     else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { tiles.forEach { (v, l) -> StatTile(v, l, Modifier.weight(1f)) } }
 }
 
-/** Seven columns of stacked cells, one cell per four finished sets (max five); today is outlined in orange. */
+/**
+ * Today's plan or session, set as the card's title: a teal pixel tag for a planned day, then the
+ * name in a large bold face with an optional quieter second line.
+ */
 @Composable
-private fun WeekCard(dates: Map<LocalDate, TrainingDay>) {
+private fun TodayHeadline(title: String, detail: String?, planned: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (planned) OneLineText("今日计划", Modifier.background(MaterialTheme.colorScheme.primary, PixelShapeSmall)
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onPrimary)
+        OneLineText(title, Modifier.testTag("home-headline"),
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
+        detail?.let { OneLineText(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+}
+
+private val MuscleGroup.short: String get() = when (this) {
+    MuscleGroup.CHEST -> "胸"; MuscleGroup.BACK -> "背"; MuscleGroup.LEGS -> "腿"
+    MuscleGroup.SHOULDERS -> "肩"; MuscleGroup.ARMS -> "臂"; MuscleGroup.CORE -> "核心"
+}
+
+/** One line for the week popup: "自由训练 · 胸/肩/背 · 12 组"; days without sets fall back to the plan or a rest note. */
+private fun weekDayInfo(date: LocalDate, weekly: List<Workout>, catalog: List<Exercise>, plan: TrainingPlan?,
+    templates: List<WorkoutTemplate>): String {
+    val done = weekly.filter { it.session.localWorkoutDate == date && it.isRecordedTraining() && it.completedSetCount > 0 }
+    if (done.isEmpty()) {
+        val planned = plan?.dayIndex(date)?.let { plan.templateIds[it] }?.let { id -> templates.find { it.id == id }?.name }
+        return when {
+            date.isAfter(LocalDate.now()) -> planned?.let { "计划：$it" } ?: "暂无安排"
+            else -> "未训练"
+        }
+    }
+    val groups = done.flatMap { it.exercises }.filter { e -> e.sets.any { it.status == SetStatus.COMPLETED } }
+        .mapNotNull { e -> catalog.find { it.id == e.exerciseId } }
+        .flatMap { it.primaryMuscles }.map { it.group }.distinct()
+    return buildList {
+        add(done.map { it.session.trainingLabel }.distinct().joinToString("+"))
+        if (groups.isNotEmpty()) add(groups.joinToString("/") { it.short })
+        add("${done.sumOf { it.completedSetCount }} 组")
+    }.joinToString(" · ")
+}
+
+/** Places the popup centred above its anchor, kept inside the window, flipping below when there is no room. */
+private class AboveAnchor(private val gap: Int) : androidx.compose.ui.window.PopupPositionProvider {
+    override fun calculatePosition(anchorBounds: androidx.compose.ui.unit.IntRect, windowSize: androidx.compose.ui.unit.IntSize,
+        layoutDirection: androidx.compose.ui.unit.LayoutDirection, popupContentSize: androidx.compose.ui.unit.IntSize): androidx.compose.ui.unit.IntOffset {
+        val x = (anchorBounds.center.x - popupContentSize.width / 2).coerceIn(0, maxOf(0, windowSize.width - popupContentSize.width))
+        val above = anchorBounds.top - popupContentSize.height - gap
+        return androidx.compose.ui.unit.IntOffset(x, if (above >= 0) above else anchorBounds.bottom + gap)
+    }
+}
+
+/** Small pixel-edged bubble with the day's summary; it pops in over three frames and closes on any outside tap. */
+@Composable
+private fun DayBubble(text: String, onDismiss: () -> Unit) {
+    val gap = with(androidx.compose.ui.platform.LocalDensity.current) { 6.dp.roundToPx() }
+    val grow = remember { androidx.compose.animation.core.Animatable(.6f) }
+    LaunchedEffect(text) { grow.snapTo(.6f); grow.animateTo(1f, androidx.compose.animation.core.tween(120, easing = StepEasing(3))) }
+    androidx.compose.ui.window.Popup(popupPositionProvider = remember(gap) { AboveAnchor(gap) }, onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.PopupProperties(focusable = false)) {
+        Surface(Modifier.testTag("week-day-info").graphicsLayer { scaleX = grow.value; scaleY = grow.value
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(.5f, 1f) },
+            shape = PixelShapeSmall, color = MaterialTheme.colorScheme.inverseSurface, contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+            shadowElevation = 4.dp) {
+            Text(text, Modifier.padding(horizontal = 10.dp, vertical = 6.dp), style = MaterialTheme.typography.labelLarge, maxLines = 1)
+        }
+    }
+}
+
+/**
+ * Seven columns of stacked cells, one cell per four finished sets (max five); today is outlined in orange.
+ * Tapping or long-pressing a day shows its summary in a bubble until the next tap elsewhere.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun WeekCard(dates: Map<LocalDate, TrainingDay>, info: (LocalDate) -> String) {
+    var open by remember { mutableStateOf<LocalDate?>(null) }
+    val haptics = fitHaptics()
     val today = LocalDate.now()
     val monday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
     val trained = dates.values.count { it.completedSets > 0 }
@@ -217,8 +292,14 @@ private fun WeekCard(dates: Map<LocalDate, TrainingDay>) {
                 val count = dates[date]?.completedSets ?: 0
                 val lit = if (count == 0) 0 else ceil(count / 4.0).toInt().coerceAtMost(5)
                 val isToday = date == today
-                Column(Modifier.weight(1f).semanticsLabel("${listOf("一","二","三","四","五","六","日")[index]}：完成 $count 组"),
+                // An outside tap closes the bubble before the next click lands, so a tap always (re)opens this day.
+                val show = { haptics.tick(); open = date }
+                Column(Modifier.weight(1f).testTag("week-day-$index")
+                    .combinedClickable(interactionSource = null, indication = null, onClick = show, onLongClick = { if (open != date) show() })
+                    .semanticsLabel("${listOf("一","二","三","四","五","六","日")[index]}：完成 $count 组"),
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // The popup sits in a Box with the cells so it does not take a gap in the spaced column.
+                    Box(Modifier.fillMaxWidth()) { if (open == date) DayBubble(info(date)) { if (open == date) open = null }
                     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         repeat(5) { level ->
                             val on = 4 - level < lit
@@ -227,7 +308,7 @@ private fun WeekCard(dates: Map<LocalDate, TrainingDay>) {
                                     else -> MaterialTheme.colorScheme.secondaryContainer })
                                 .then(if (isToday && !on) Modifier.border(1.dp, fitColors.orange) else Modifier))
                         }
-                    }
+                    } }
                     Text(if (isToday) "今天" else listOf("一","二","三","四","五","六","日")[index],
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal),
                         color = if (isToday) fitColors.orangeDeep else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)

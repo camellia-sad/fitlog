@@ -35,7 +35,7 @@ class ExerciseWeightTrendFlowTest {
 
     @Test fun defaultWeightCanBeEditedFromDetailsAndUsedByFreeTraining() {
         compose.setContent { FitLogTheme { FitLogApp(container) } }
-        waitText("今日训练")
+        waitText("历史")
         compose.onNodeWithText("动作", useUnmergedTree = true).performClick()
         compose.onNodeWithTag("exercise-search").performTextInput("杠铃卧推")
         waitText("杠铃卧推")
@@ -83,7 +83,7 @@ class ExerciseWeightTrendFlowTest {
 
     @Test fun exerciseDetailsOpenTheSameDateChart() {
         compose.setContent { FitLogTheme { FitLogApp(container) } }
-        waitText("今日训练")
+        waitText("历史")
         compose.onNodeWithText("动作", useUnmergedTree = true).performClick()
         compose.onNodeWithTag("exercise-search").performTextInput("平板支撑")
         waitText("平板支撑")
