@@ -110,9 +110,6 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
         feedback.value = Feedback()
     }
 
-    fun reserveToday(templateId: String?) = mutate {
-        repository.reserveDailyWorkout(templateId, if(templateId == null) container.preparation.preparedExercises.first() else emptyList())
-    }
     fun continueToday() = mutate {
         val prepared = container.preparation.preparedExercises.first()
         repository.startDailyWorkout(exerciseIds = prepared)

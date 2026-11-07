@@ -105,7 +105,7 @@ private fun ExerciseRow(exercise: Exercise, unit: WeightUnit, canAdd: Boolean, o
                     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("最佳", Modifier.padding(bottom = 3.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(WeightUnits.format(best, unit), style = pixelNumber(19.sp), color = MaterialTheme.colorScheme.primary)
-                        Text(unit.label, Modifier.padding(bottom = 3.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Text(unit.label, Modifier.padding(bottom = 3.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
             }
             if (!exercise.isArchived) PixelButton(onClick = onAdd, enabled = canAdd, minHeight = 40.dp,

@@ -42,17 +42,18 @@ private object PuppyFrames {
 private val puppySequence = intArrayOf(0, 1, 2, 3, 2, 1)
 
 @Composable
-fun PixelPuppy(modifier: Modifier = Modifier, pose: PuppyPose = PuppyPose.IDLE) {
+fun PixelPuppy(modifier: Modifier = Modifier, pose: PuppyPose = PuppyPose.IDLE, loop: Boolean = false) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val images = remember(context.resources, pose) { pose.frameIds.map { PuppyFrames.load(context.resources, it) } }
     var frame by remember(pose) { mutableIntStateOf(0) }
-    LaunchedEffect(pose, owner) {
+    LaunchedEffect(pose, owner, loop) {
         owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             frame = 0
             val motion = currentCoroutineContext()[MotionDurationScale]
             val fallbackScale = Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
-            repeat(pose.cycles) {
+            // loop keeps playing while the screen is started (home mascot); otherwise the pose's own cycle count applies.
+            repeat(if (loop) Int.MAX_VALUE else pose.cycles) {
                 for (index in puppySequence) {
                     val scale = motion?.scaleFactor ?: fallbackScale
                     if (scale <= 0f) { frame = 0; return@repeatOnLifecycle }

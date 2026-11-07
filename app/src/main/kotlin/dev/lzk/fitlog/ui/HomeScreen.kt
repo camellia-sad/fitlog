@@ -9,6 +9,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import java.time.Instant
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -28,7 +30,7 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
     weekly: List<Workout> = emptyList(), templates: List<WorkoutTemplate> = emptyList(),
     onHistory: () -> Unit = {}, selectedTemplateId: String? = null, onSelectTemplate: (String?) -> Unit = {},
     prepared: List<Exercise> = emptyList(), onRemovePrepared: (String) -> Unit = {}, plan: TrainingPlan? = null, updates:dev.lzk.fitlog.updates.AppUpdates? = null,
-    onReserve: () -> Unit = {}, onExtra: () -> Unit = {}, onAddDailySet: (String) -> Unit = {}, onRemoveAction: (String) -> Unit = {},
+    onExtra: () -> Unit = {}, onAddDailySet: (String) -> Unit = {}, onRemoveAction: (String) -> Unit = {},
     catalog: List<Exercise> = emptyList()) {
     val workout = state.workout
     val todayWorkout = state.todayWorkout
@@ -62,7 +64,7 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
                 workout?.session?.status == SessionStatus.ACTIVE -> PuppyPose.LIFT
                 (dates[LocalDate.now()]?.completedSets ?: 0) > 0 -> PuppyPose.CELEBRATE
                 else -> PuppyPose.IDLE
-            })
+            }, loop = true)
         }
 
         SoftCard {
@@ -73,17 +75,14 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
                     if (planIndex != null && plan != null) OneLineText(" · 循环第 ${planIndex + 1} / ${plan.templateIds.size} 天",
                         style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                TextButton(onClick = onHistory, modifier = Modifier.testTag("open-history"), contentPadding = PaddingValues(horizontal = 8.dp)) {
-                    LineIcon(Symbol.CLOCK, Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    OneLineText("历史", style = MaterialTheme.typography.labelLarge)
-                }
+                HistoryEntry(onHistory)
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 OneLineText(workout?.session?.trainingLabel ?: todayWorkout?.session?.trainingLabel ?: selectedTemplate?.name ?: "开始今天的训练",
                     style = MaterialTheme.typography.headlineSmall)
-                OneLineText(if (workout == null) (todayWorkout?.let { it.historyStatus() + " · " + it.completedSetCount + "/" + it.plannedSetCount + " 组" } ?: "选择自由训练或自己的模板") else "${if (workout.session.status == SessionStatus.PAUSED) "已暂停" else "训练中"} · ${workout.elapsedDuration(now).timerText()}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                val status = if (workout != null) "${if (workout.session.status == SessionStatus.PAUSED) "已暂停" else "训练中"} · ${workout.elapsedDuration(now).timerText()}"
+                    else todayWorkout?.let { it.historyStatus() + " · " + it.completedSetCount + "/" + it.plannedSetCount + " 组" }
+                status?.let { OneLineText(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
             }
             if (groups.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 groups.forEach { MuscleChip(it.label, it) }
@@ -113,7 +112,6 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
                     }
                 }
             }
-            if(todayWorkout == null && workout == null) OutlinedButton(onClick = onReserve, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("设为今日计划") }
             if(todayWorkout != null) OutlinedButton(onClick = { viewingToday = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("home-today-actions")) {
                 OneLineText("今日动作 · ${todayWorkout.completedSetCount}/${todayWorkout.plannedSetCount} 组", Modifier.weight(1f))
                 LineIcon(Symbol.DOWN, Modifier.size(14.dp))
@@ -153,6 +151,35 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
                 TextButton(onClick = { onSelectTemplate(template.id); pickingTemplate = false }, modifier = Modifier.fillMaxWidth()) { Text(template.name) }
             }
         } }, confirmButton = { TextButton(onClick = { pickingTemplate = false }) { Text("关闭") } })
+}
+
+/**
+ * History entry: a tonal pill with the pixel clock. On tap the clock turns once in four 90° steps
+ * (quarter turns keep the pixels square), then the history page opens.
+ */
+@Composable
+private fun HistoryEntry(onHistory: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val haptics = fitHaptics()
+    val turn = remember { androidx.compose.animation.core.Animatable(0f) }
+    var busy by remember { mutableStateOf(false) }
+    Surface(
+        onClick = {
+            if (!busy) scope.launch {
+                busy = true; haptics.tap()
+                turn.snapTo(0f); turn.animateTo(360f, androidx.compose.animation.core.tween(280, easing = StepEasing(4)))
+                busy = false; onHistory()
+            }
+        },
+        modifier = Modifier.testTag("open-history").heightIn(min = 40.dp),
+        shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.primaryContainer,
+    ) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LineIcon(Symbol.CLOCK, Modifier.size(20.dp).graphicsLayer { rotationZ = turn.value })
+            OneLineText("历史", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+        }
+    }
 }
 
 /** Up to three figures that describe what today's card is about to start or already holds. */

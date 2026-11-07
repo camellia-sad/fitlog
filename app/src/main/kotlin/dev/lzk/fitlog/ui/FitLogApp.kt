@@ -155,7 +155,6 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                     onSelectTemplate = { selectedTemplateId = it; selectionChanged = true },
                     prepared = state.preparedExerciseIds.mapNotNull { id -> templateState.exercises.find { it.id == id } },
                     onRemovePrepared = model::removePreparedExercise, updates=container.updates,
-                    onReserve = { model.reserveToday(selectedTemplateId) },
                     onExtra = { onWorkoutStarted(); model.startExtraWorkout(); goWorkout() },
                     onAddDailySet = model::addDailySet, onRemoveAction = model::removeExercise, catalog = templateState.exercises)
             }
