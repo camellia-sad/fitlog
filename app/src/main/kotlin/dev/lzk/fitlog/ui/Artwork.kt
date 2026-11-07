@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.Color
 import kotlin.math.floor
 
 enum class Symbol { HOME, DUMBBELL, BACK, PLUS, CHECK, SEARCH, ARROW, MINUS, CLOCK, LIST, SETTINGS, FRIENDS, PERSON, PLAY, SPARK, DOWN, CLOSE, PAUSE,
-    STAR, STAR_FILLED, ARCHIVE, UNARCHIVE, EDIT, BARBELL, MACHINE, CABLE, SMITH, BODYWEIGHT, IMAGE }
+    STAR, STAR_FILLED, ARCHIVE, UNARCHIVE, EDIT, BARBELL, MACHINE, CABLE, SMITH, BODYWEIGHT, IMAGE, PIN, TRASH, UP, TUNE }
 
 /** Solid 12×12 pixel glyphs drawn to match the puppy's outline weight. `#` marks a filled cell. */
 private val Glyphs: Map<Symbol, List<String>> = mapOf(
@@ -25,6 +25,11 @@ private val Glyphs: Map<Symbol, List<String>> = mapOf(
     Symbol.BACK to listOf("...##", "..##.", ".##..", "##...", ".##..", "..##.", "...##"),
     Symbol.ARROW to listOf("##...", ".##..", "..##.", "...##", "..##.", ".##..", "##..."),
     Symbol.DOWN to listOf("##.....##", ".##...##.", "..##.##..", "...###...", "....#...."),
+    Symbol.UP to listOf("....#....", "...###...", "..##.##..", ".##...##.", "##.....##"),
+    // Template board: a push pin, a bin with ribs, and two sliders for target tuning.
+    Symbol.PIN to listOf("...####...", "..######..", ".########.", ".########.", "..######..", "...####...", ".########.", "##########", "....##....", "....##....", "....##....", "....#....."),
+    Symbol.TRASH to listOf("....####....", "############", "............", ".##########.", ".#..#..#..#.", ".#..#..#..#.", ".#..#..#..#.", ".#..#..#..#.", ".#..#..#..#.", "..########.."),
+    Symbol.TUNE to listOf(".#.....#.", ".#.....#.", "###....#.", "###....#.", ".#.....#.", ".#....###", ".#....###", ".#.....#.", ".#.....#."),
     Symbol.SEARCH to listOf("..####.....", ".#....#....", "#......#...", "#......#...", "#......#...", ".#....#....", "..####.#...", ".......##..", "........##.", ".........##"),
     Symbol.PLAY to listOf("##.....", "####...", "######.", "#######", "######.", "####...", "##....."),
     Symbol.SPARK to listOf("....#....", "....#....", "...###...", "..#####..", "#########", "..#####..", "...###...", "....#....", "....#...."),

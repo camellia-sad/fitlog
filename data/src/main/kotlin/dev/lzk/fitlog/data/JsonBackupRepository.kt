@@ -36,7 +36,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             }
             data.put(table, rows)
         }
-        JSONObject().put("format", "FitLog").put("schemaVersion", 6).put("data", data).apply {
+        JSONObject().put("format", "FitLog").put("schemaVersion", 7).put("data", data).apply {
             preferences?.let {put("preferences",it.preferences.first().backupJson())}
             preparation?.let {put("preparedExercises",JSONArray(it.preparedExercises.first()))}
         }.toString()
@@ -64,7 +64,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
         }
         val root = JSONObject(json)
         val version = root.integer("schemaVersion")
-        require(root.getString("format") == "FitLog" && version in 1..6) { "不支持的备份版本" }
+        require(root.getString("format") == "FitLog" && version in 1..7) { "不支持的备份版本" }
         val restoredPreferences = if(version>=3) root.optJSONObject("preferences")?.backupPreferences() else null
         val prepared = if(version>=3) root.optJSONArray("preparedExercises")?.strings() else null
         require(prepared==null || prepared.size<=30 && prepared.distinct().size==prepared.size) {"待开始动作无效"}
@@ -77,6 +77,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             require(row.id==templateDraftKey(row.templateId) && row.content.length<=1_000_000) {"模板草稿无效"}
             val draft=row.toDraft()
             require(draft.name.length<=200 && draft.exercises.size<=30) {"模板草稿过大"}
+            require(draft.shortName?.let(TemplateShortNames::isValid) ?: true) {"模板草稿简称无效"}
             draft.exercises.forEach {
                 WorkoutRules.setCount(it.targetSetCount);WorkoutRules.repRange(it.targetRepMin,it.targetRepMax)
                 WorkoutRules.draft(it.defaultWeightGrams,0);WorkoutRules.rest(it.restSeconds)
@@ -90,7 +91,8 @@ class JsonBackupRepository(private val database: FitLogDatabase,
                 if(version>=5) it.optionalLong("defaultWeightGrams") else null,
                 if(version>=5) it.number("defaultWeightRecordGrams") else 0L) },
             data.rows("exercise_muscles") { ExerciseMuscleEntity(it.text("exerciseId"), it.text("muscle"), it.text("role")) },
-            data.rows("workout_templates") { TemplateEntity(it.text("id"), it.text("name"), it.text("splitType"), it.number("createdAt"), it.number("updatedAt")) },
+            data.rows("workout_templates") { TemplateEntity(it.text("id"), it.text("name"), it.text("splitType"), it.number("createdAt"), it.number("updatedAt"),
+                if(version>=7) it.optionalText("shortName") else null) },
             data.rows("template_exercises") { TemplateExerciseEntity(it.text("id"), it.text("templateId"), it.text("exerciseId"),
                 it.integer("sortOrder"), it.integer("targetSetCount"), it.integer("targetRepMin"), it.integer("targetRepMax"),
                 it.number("defaultWeightGrams"), it.integer("restSeconds"),
@@ -129,7 +131,11 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             }
             val newIds = newExercises.map { it.id }.toSet()
             val muscles = incoming.muscles.filter { it.exerciseId in newIds }
-            val templates = fresh(incoming.templates, existing.templates) { it.id }
+            // Backups older than v7 carry no short names, so a template already here is matched without its short name.
+            val localTemplates = existing.templates.associateBy { it.id }
+            val incomingTemplates = if (version >= 7) incoming.templates
+                else incoming.templates.map { t -> localTemplates[t.id]?.let { t.copy(shortName = it.shortName) } ?: t }
+            val templates = fresh(incomingTemplates, existing.templates) { it.id }
             val templateExercises = fresh(incoming.templateExercises, existing.templateExercises) { it.id }
             val sessions = fresh(incoming.sessions, existing.sessions) { it.id }
             val sessionExercises = fresh(incoming.sessionExercises, existing.sessionExercises) { it.id }
@@ -209,6 +215,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             muscles.forEach { Muscle.valueOf(it.muscle); require(it.role in listOf("PRIMARY", "SECONDARY")) }
             templates.forEach {
                 require(it.name.isNotBlank() && it.createdAt >= 0 && it.updatedAt >= it.createdAt)
+                require(it.shortName == null || TemplateShortNames.isValid(it.shortName)) { "模板简称无效" }
                 SplitType.valueOf(it.splitType)
             }
             templateExercises.forEach {

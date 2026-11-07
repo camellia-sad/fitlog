@@ -202,6 +202,16 @@ class WorkoutExperienceTest {
             assertEquals(id,plan.templateIds.last())
             assertNull(container.workouts.observeActiveWorkout().first())
         }
+        // The timetable: cycle length in its own label, a flag on today, a cell per day that shows its summary.
+        compose.onNodeWithContentDescription("14 天循环").assertExists()
+        compose.onNodeWithTag("plan-strip").assertExists()
+        val today = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now().with(java.time.DayOfWeek.MONDAY), java.time.LocalDate.now()).toInt()
+        compose.onNodeWithTag("plan-cell-$today").assert(hasContentDescription("（今天）", substring = true))
+        // The strip opens centred on today, so today's cell is the one on screen to tap.
+        compose.onNodeWithTag("plan-cell-$today").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("plan-day-info").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("plan-day-info").assert(hasAnyDescendant(hasText(if (today == 0) "自己的推日" else "休息日", substring = true)))
+        compose.onNodeWithTag("template-note-$id").assertExists()
     }
 
     @Test fun historyStartsAtCurrentMonthAndShowsIncompleteWithSingleLineFeeling() {

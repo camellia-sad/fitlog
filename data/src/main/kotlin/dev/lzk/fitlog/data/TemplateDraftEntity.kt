@@ -22,6 +22,7 @@ internal fun TemplateDraft.toDraftEntity(): TemplateDraftEntity {
             .put("restSeconds", item.restSeconds).put("useExerciseWeight", item.useExerciseWeight))
     }
     val value = JSONObject().put("name", name).put("splitType", splitType.name).put("exercises", items)
+        .put("shortName", shortName ?: JSONObject.NULL)
     return TemplateDraftEntity(templateDraftKey(id), id, value.toString())
 }
 
@@ -35,5 +36,5 @@ internal fun TemplateDraftEntity.toDraft(): TemplateDraft {
                 item.getInt("targetSetCount"), item.getInt("targetRepMin"), item.getInt("targetRepMax"),
                 item.getLong("defaultWeightGrams"), item.getInt("restSeconds"),
                 item.optBoolean("useExerciseWeight", item.getLong("defaultWeightGrams") == 0L))
-        })
+        }, if (value.isNull("shortName")) null else value.getString("shortName"))
 }

@@ -23,6 +23,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
@@ -128,6 +129,62 @@ fun PixelButton(
         }
     }
 }
+
+/**
+ * Compact hard-shadow key for secondary pixel controls (editor save / cancel, steppers, done). Like [PixelButton]
+ * the face sinks onto its shadow in 2 frames while pressed; [outline] draws an outlined key instead of a filled one.
+ * With [repeatOnHold], holding the key repeats [onClick] after a short pause (the release then adds no extra step).
+ * Disabled keys lie flat and fade.
+ */
+@Composable
+fun PixelKey(
+    onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
+    face: Color = MaterialTheme.colorScheme.primary, shadow: Color = fitColors.tealDeep, outline: Color? = null,
+    contentColor: Color = MaterialTheme.colorScheme.onPrimary, depth: Dp = 3.dp, shape: Shape = PixelShapeSmall,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp), minHeight: Dp = 36.dp, minWidth: Dp = 0.dp,
+    repeatOnHold: Boolean = false, content: @Composable RowScope.() -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
+    val haptics = fitHaptics()
+    val click by rememberUpdatedState(onClick)
+    var repeated by remember { mutableStateOf(false) }
+    LaunchedEffect(pressed, enabled) {
+        if (!pressed || !enabled) return@LaunchedEffect
+        repeated = false
+        haptics.tap()
+        if (repeatOnHold) { delay(420); repeated = true; while (true) { click(); delay(90) } }
+    }
+    val sink by animateDpAsState(if (pressed || !enabled) depth else 0.dp, tween(if (pressed) 70 else 120, easing = StepEasing(2)), label = "按压")
+    Box(modifier.alpha(if (enabled) 1f else .4f)
+        .clickable(interaction, indication = null, enabled = enabled, role = Role.Button) { if (repeated) repeated = false else click() }) {
+        Row(
+            Modifier.padding(bottom = depth).heightIn(min = minHeight).widthIn(min = minWidth)
+                .offset { IntOffset(0, sink.roundToPx()) }
+                .drawBehind { if (enabled) translate(top = (depth - sink).toPx()) { drawOutline(shape.createOutline(size, layoutDirection, this), shadow) } }
+                .background(face, shape)
+                .then(if (outline != null) Modifier.border(1.5.dp, outline, shape) else Modifier)
+                .then(if (focused) Modifier.border(BorderStroke(2.dp, fitColors.orange), shape) else Modifier)
+                .padding(contentPadding),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CompositionLocalProvider(LocalContentColor provides contentColor) {
+                ProvideTextStyle(MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)) { content() }
+            }
+        }
+    }
+}
+
+/** Outlined variant of [PixelKey] on the surface colour, with a hard shadow in the outline colour. */
+@Composable
+fun PixelOutlineKey(
+    onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
+    face: Color = MaterialTheme.colorScheme.surface, edge: Color = MaterialTheme.colorScheme.outline,
+    contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant, contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp),
+    minHeight: Dp = 36.dp, minWidth: Dp = 0.dp, repeatOnHold: Boolean = false, content: @Composable RowScope.() -> Unit,
+) = PixelKey(onClick, modifier, enabled, face = face, shadow = edge, outline = edge, contentColor = contentColor,
+    contentPadding = contentPadding, minHeight = minHeight, minWidth = minWidth, repeatOnHold = repeatOnHold, content = content)
 
 /** Set-completion box: stamps in 4 frames and throws 8 pixel sparks when it becomes checked. */
 @Composable

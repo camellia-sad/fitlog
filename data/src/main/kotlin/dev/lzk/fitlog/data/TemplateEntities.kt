@@ -5,6 +5,7 @@ import androidx.room.*
 @Entity(tableName = "workout_templates")
 data class TemplateEntity(
     @PrimaryKey val id: String, val name: String, val splitType: String, val createdAt: Long, val updatedAt: Long,
+    val shortName: String? = null,
 )
 
 @Entity(

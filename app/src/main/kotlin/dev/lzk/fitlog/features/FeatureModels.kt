@@ -62,13 +62,15 @@ class TemplateViewModel(container: AppContainer) : FeatureModel(container) {
 
     fun create() = execute { openEditor(TemplateDraft()) }
     fun edit(template: WorkoutTemplate) = execute {
-        openEditor(TemplateDraft(template.id, template.name, template.splitType, template.exercises))
+        openEditor(template.toDraft())
     }
     fun resumeDraft(value: TemplateDraft) = execute {
         val template = value.id?.let { id -> container.training.observeTemplates().first().find { it.id == id } }
         if (value.id != null && template == null) error("原模板已删除")
-        openEditor(template?.let { TemplateDraft(it.id, it.name, it.splitType, it.exercises) } ?: TemplateDraft())
+        openEditor(template?.toDraft() ?: TemplateDraft())
     }
+    // Legacy templates have no stored short name; the editor fills the derived one in, so an untouched edit stays unchanged.
+    private fun WorkoutTemplate.toDraft() = TemplateDraft(id, name, splitType, exercises, shortName)
     fun updateDraft(value: TemplateDraft) {
         if (!saving.value && editor.value != null) editor.value = value
     }

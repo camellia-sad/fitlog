@@ -37,8 +37,8 @@ class TemplateDraftFlowTest {
         compose.onNodeWithText("动作", substring = false).performClick()
         waitText("动作库")
         compose.onNodeWithTag("open-templates").performClick()
-        waitText("新建")
-        compose.onNodeWithText("新建").performClick()
+        waitTag("new-template")
+        compose.onNodeWithTag("new-template").performClick()
         waitText("模板名称")
     }
     private fun pickerItem(name: String) = compose.onNode(hasText(name, substring = false) and hasAnyAncestor(hasTestTag("template-exercise-picker")))
@@ -46,18 +46,24 @@ class TemplateDraftFlowTest {
         compose.onNodeWithText("添加模板动作").performScrollTo().performClick()
         compose.onNodeWithTag("template-exercise-search").performTextReplacement("Barbell Bench Press")
         pickerItem("杠铃卧推").performClick()
-        waitText("调整")
+        waitDescription("调整目标")
     }
 
     @Test fun cancelKeepsDraftWithTargetsAndFinalSaveConsumesIt() {
         create()
         compose.onNodeWithText("模板名称").performTextInput("未写完的推日")
         addBench()
-        compose.onNodeWithText("调整").performScrollTo().performClick()
-        compose.onNodeWithText("目标组数").performTextReplacement("2")
-        compose.onNodeWithTag("follow-exercise-weight").performClick()
-        compose.onNodeWithText("默认重量（kg）").performTextReplacement("42.5")
-        compose.onNodeWithText("确认目标").performClick()
+        // The adjuster opens inside the card: one step down from 3 sets, then a fixed weight typed exactly.
+        compose.onNodeWithContentDescription("调整目标").performScrollTo().performClick()
+        compose.onNodeWithTag("target-adjuster").assertExists()
+        compose.onNodeWithContentDescription("减少组数").performScrollTo().performClick()
+        compose.onNodeWithTag("target-sets-value").assert(hasContentDescription("组数 2", substring = true))
+        compose.onNodeWithTag("weight-fixed").performScrollTo().performClick()
+        compose.onNodeWithTag("target-weight-value").performScrollTo().performClick()
+        compose.onNodeWithTag("exact-weight-input").performTextReplacement("42.5")
+        compose.onNodeWithText("确定").performClick()
+        compose.onNodeWithTag("target-done").performScrollTo().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("target-adjuster").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithText("取消", substring = false).performClick()
         waitText("模板还未保存")
         compose.onNodeWithText("继续编辑", substring = false).performClick()
@@ -94,7 +100,7 @@ class TemplateDraftFlowTest {
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         waitText("模板还未保存")
         compose.onNodeWithText("保留草稿并退出").performClick()
-        waitText("模板草稿")
+        waitTag("resume-template-draft-new")
         compose.onNodeWithContentDescription("返回动作库").performClick()
         waitText("动作库")
         compose.onNodeWithText("主页", substring = false).performClick()
@@ -103,7 +109,7 @@ class TemplateDraftFlowTest {
         compose.onNodeWithText("动作", substring = false).performClick()
         waitText("动作库")
         compose.onNodeWithTag("open-templates").performClick()
-        waitText("模板草稿")
+        waitTag("resume-template-draft-new")
         compose.onNodeWithTag("resume-template-draft-new").performClick()
         waitText("模板名称")
         compose.onNodeWithText("模板名称").performTextReplacement("改了一半的背日")
@@ -136,7 +142,7 @@ class TemplateDraftFlowTest {
         assertEquals("", search.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         search.performTextInput("Barbell Bench Press")
         pickerItem("杠铃卧推").performClick()
-        waitText("调整")
+        waitDescription("调整目标")
         compose.onNodeWithText("取消", substring = false).performClick()
         compose.onNodeWithText("保留草稿并退出").performClick()
         waitText("草稿已保留")
@@ -145,7 +151,38 @@ class TemplateDraftFlowTest {
         assertEquals("barbell-bench-press", retained.exercises.single().exerciseId)
     }
 
+    @Test fun shortNameFollowsTheNameUntilEditedAndRejectsClashes() {
+        runBlocking { container.training.saveTemplate(TemplateDraft(name = "胸肩日", exercises = listOf(TemplateExercise("x", "barbell-bench-press", 0)), shortName = "胸肩")) }
+        create()
+        val shortField = compose.onNodeWithTag("template-short-name")
+        compose.onNodeWithText("模板名称").performTextInput("胸背日")
+        compose.onNodeWithText("模板名称").performImeAction()
+        shortField.assert(hasText("胸背"))
+        compose.onNodeWithTag("short-name-preview").assert(hasAnyDescendant(hasText("胸背")))
+        // A hand-written short name stays when the name changes again, and can be put back to automatic.
+        shortField.performTextReplacement("背")
+        compose.onNodeWithText("已自定义 · ", substring = true).assertExists()
+        compose.onNodeWithText("模板名称").performTextReplacement("胸背日二")
+        compose.onNodeWithText("模板名称").performImeAction()
+        shortField.assert(hasText("背"))
+        compose.onNodeWithTag("short-name-restore").performClick()
+        shortField.assert(hasText("胸背"))
+        shortField.performTextReplacement("胸肩")
+        compose.onNodeWithText("与“胸肩日”的简称重复").assertExists()
+        shortField.performTextReplacement("胸背日")
+        shortField.assert(hasText("胸背"))  // capped at two characters
+        addBench()
+        compose.onNodeWithText("保存模板").performClick()
+        waitText("模板已保存")
+        assertEquals(setOf("胸肩", "胸背"), runBlocking { container.training.observeTemplates().first().mapNotNull { it.shortName }.toSet() })
+        compose.onNodeWithText("胸背", substring = false).assertExists()
+    }
+
     private fun waitText(text: String) = compose.waitUntil(15_000) {
         compose.onAllNodesWithText(text, substring = false).fetchSemanticsNodes().isNotEmpty()
+    }
+    private fun waitTag(tag: String) = compose.waitUntil(15_000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitDescription(text: String) = compose.waitUntil(15_000) {
+        compose.onAllNodesWithContentDescription(text).fetchSemanticsNodes().isNotEmpty()
     }
 }

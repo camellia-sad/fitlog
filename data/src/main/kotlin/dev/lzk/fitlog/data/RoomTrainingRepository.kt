@@ -53,8 +53,15 @@ class RoomTrainingRepository(private val database: FitLogDatabase, private val c
         val existing = draft.id?.let { dao.template(it) }
         if (draft.id != null && existing == null) throw WorkoutException(WorkoutError.NOT_FOUND, "模板不存在")
         val id = draft.id ?: UUID.randomUUID().toString()
+        val others = dao.allTemplates().filter { it.id != id }.sortedWith(compareBy<TemplateEntity> { it.createdAt }.thenBy { it.id })
+        val name = draft.name.trim()
+        others.find { it.name.trim() == name }?.let { throw WorkoutException(WorkoutError.INVALID_INPUT, "已有同名模板“${it.name}”") }
+        draft.shortName?.let { short ->
+            val taken = TemplateShortNames.resolve(others.map { TemplateLabel(it.id, it.name, it.shortName) })
+            others.find { taken[it.id] == short }?.let { throw WorkoutException(WorkoutError.INVALID_INPUT, "简称与“${it.name}”重复") }
+        }
         val now = maxOf(clock.millis(), existing?.template?.updatedAt ?: 0)
-        val entity = TemplateEntity(id, draft.name.trim(), draft.splitType.name, existing?.template?.createdAt ?: now, now)
+        val entity = TemplateEntity(id, name, draft.splitType.name, existing?.template?.createdAt ?: now, now, draft.shortName)
         if (existing == null) dao.insertTemplate(entity) else dao.updateTemplate(entity)
         dao.deleteTemplateExercises(id)
         dao.insertTemplateExercises(draft.exercises.mapIndexed { index, item ->
@@ -108,4 +115,5 @@ internal fun TemplateRow.toDomain() = WorkoutTemplate(
     exercises.sortedBy { it.sortOrder }.map {
         TemplateExercise(it.id, it.exerciseId, it.sortOrder, it.targetSetCount, it.targetRepMin, it.targetRepMax, it.defaultWeightGrams, it.restSeconds, it.useExerciseWeight)
     },
+    template.shortName,
 )

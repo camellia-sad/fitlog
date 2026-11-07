@@ -247,15 +247,15 @@ private class AboveAnchor(private val gap: Int) : androidx.compose.ui.window.Pop
     }
 }
 
-/** Small pixel-edged bubble with the day's summary; it pops in over three frames and closes on any outside tap. */
+/** Small pixel-edged bubble with a day's summary; it pops in over three frames and closes on any outside tap. */
 @Composable
-private fun DayBubble(text: String, onDismiss: () -> Unit) {
+internal fun DayBubble(text: String, tag: String = "week-day-info", onDismiss: () -> Unit) {
     val gap = with(androidx.compose.ui.platform.LocalDensity.current) { 6.dp.roundToPx() }
     val grow = remember { androidx.compose.animation.core.Animatable(.6f) }
     LaunchedEffect(text) { grow.snapTo(.6f); grow.animateTo(1f, androidx.compose.animation.core.tween(120, easing = StepEasing(3))) }
     androidx.compose.ui.window.Popup(popupPositionProvider = remember(gap) { AboveAnchor(gap) }, onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.PopupProperties(focusable = false)) {
-        Surface(Modifier.testTag("week-day-info").graphicsLayer { scaleX = grow.value; scaleY = grow.value
+        Surface(Modifier.testTag(tag).graphicsLayer { scaleX = grow.value; scaleY = grow.value
                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin(.5f, 1f) },
             shape = PixelShapeSmall, color = MaterialTheme.colorScheme.inverseSurface, contentColor = MaterialTheme.colorScheme.inverseOnSurface,
             shadowElevation = 4.dp) {

@@ -59,15 +59,21 @@ class SecondsAndRefreshFlowTest {
         waitText("历史")
         compose.onNodeWithText("动作",useUnmergedTree=true).performClick()
         compose.onNodeWithTag("open-templates").performClick()
-        waitText("新建");compose.onNodeWithText("新建").performClick()
+        compose.waitUntil(15_000) {compose.onAllNodesWithTag("new-template").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("new-template").performClick()
         waitText("模板名称");compose.onNodeWithText("模板名称").performTextInput("支撑日")
         compose.onNodeWithText("添加模板动作").performScrollTo().performClick()
         compose.onNodeWithTag("template-exercise-search").performTextInput("平板")
         compose.onNodeWithText("平板支撑").performClick()
-        waitText("调整");compose.onNodeWithText("调整").performClick()
-        compose.onNodeWithText("最少秒数").assertExists()
-        compose.onNodeWithText("最多秒数").assertExists()
-        compose.onNodeWithText("默认重量（kg）").assertDoesNotExist()
+        compose.waitUntil(15_000) {compose.onAllNodesWithContentDescription("调整目标").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("调整目标").performClick()
+        compose.onNodeWithText("目标秒数").assertExists()
+        compose.onNodeWithContentDescription("增加最少秒数").assertExists()
+        compose.onNodeWithTag("target-max-value").assert(hasContentDescription("最多秒数 60秒"))
+        compose.onNodeWithContentDescription("增加最多秒数").performScrollTo().performClick()
+        compose.onNodeWithTag("target-max-value").assert(hasContentDescription("最多秒数 65秒"))
+        compose.onNodeWithTag("weight-fixed").assertDoesNotExist()
+        compose.onNodeWithText("重量").assertDoesNotExist()
     }
     @Test fun enteringFriendsRefreshesSilentlyAndReentryFetchesAgain() {
         val fake=FakeSocial()

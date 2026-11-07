@@ -13,26 +13,6 @@ import java.time.*
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-@Composable
-fun TrainingPlanCard(plan: TrainingPlan?, templates: List<WorkoutTemplate>, onEdit: () -> Unit, onDelete: () -> Unit) {
-    var deleting by remember { mutableStateOf(false) }
-    SoftCard {
-        Text("健身计划", style = MaterialTheme.typography.titleLarge)
-        Text(if (plan == null) "按天选择自己的模板，支持最多两周的循环。" else
-            "从 ${plan.startDate} 开始 · ${plan.cycleDays} 天 · ${if (plan.repeats) "循环执行" else "仅本周期"}",
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onEdit, enabled = templates.isNotEmpty()) { Text(if (plan == null) "设置健身计划" else "编辑计划") }
-            if (plan != null) TextButton(onClick = { deleting = true }) { Text("删除计划") }
-        }
-        if (templates.isEmpty()) Text("先创建模板，再安排每天的训练。", style = MaterialTheme.typography.bodySmall)
-    }
-    if (deleting) AlertDialog(onDismissRequest = { deleting = false }, title = { Text("移除健身计划？") },
-        text = { Text("模板和已有训练记录会保留。") },
-        confirmButton = { TextButton(onClick = { onDelete(); deleting = false }) { Text("移除计划") } },
-        dismissButton = { TextButton(onClick = { deleting = false }) { Text("取消") } })
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrainingPlanEditor(initial: TrainingPlan, templates: List<WorkoutTemplate>, saving: Boolean, message: String?,
@@ -48,17 +28,13 @@ fun TrainingPlanEditor(initial: TrainingPlan, templates: List<WorkoutTemplate>, 
         length = value
     }
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(onClick = onBack, enabled = !saving) { Text("取消") }
-            OneLineText("安排训练周期", Modifier.weight(1f).padding(top = 14.dp), style = MaterialTheme.typography.titleMedium)
-            TextButton(enabled = !saving, onClick = {
-                try {
-                    val count = length.toIntOrNull() ?: throw IllegalArgumentException("请输入整数天数")
-                    val value = TrainingPlan(start, count, repeats, days.take(count.coerceAtLeast(0)))
-                    value.validate(); error = null; onSave(value)
-                } catch (e: Exception) { error = e.message }
-            }) { Text("保存计划") }
-        }
+        EditorHeader("安排训练周期", "保存计划", dirty = false, saving = saving, onCancel = onBack, onSave = {
+            try {
+                val count = length.toIntOrNull() ?: throw IllegalArgumentException("请输入整数天数")
+                val value = TrainingPlan(start, count, repeats, days.take(count.coerceAtLeast(0)))
+                value.validate(); error = null; onSave(value)
+            } catch (e: Exception) { error = e.message }
+        })
         LazyColumn(Modifier.testTag("plan-editor"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 Text("每一天可安排一个模板，也可以留作休息。", color = MaterialTheme.colorScheme.onSurfaceVariant)
