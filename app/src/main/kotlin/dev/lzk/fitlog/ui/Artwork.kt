@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.Color
 import kotlin.math.floor
 
 enum class Symbol { HOME, DUMBBELL, BACK, PLUS, CHECK, SEARCH, ARROW, MINUS, CLOCK, LIST, SETTINGS, FRIENDS, PERSON, PLAY, SPARK, DOWN, CLOSE, PAUSE,
-    STAR, STAR_FILLED, ARCHIVE, UNARCHIVE, EDIT }
+    STAR, STAR_FILLED, ARCHIVE, UNARCHIVE, EDIT, BARBELL, MACHINE, CABLE, SMITH, BODYWEIGHT, IMAGE }
 
 /** Solid 12×12 pixel glyphs drawn to match the puppy's outline weight. `#` marks a filled cell. */
 private val Glyphs: Map<Symbol, List<String>> = mapOf(
@@ -38,6 +38,14 @@ private val Glyphs: Map<Symbol, List<String>> = mapOf(
     Symbol.ARCHIVE to listOf("############", "#..........#", "############", ".#........#.", ".#..####..#.", ".#........#.", ".#........#.", ".##########."),
     Symbol.UNARCHIVE to listOf(".....##.....", "....####....", "...######...", ".....##.....", "############", ".#........#.", ".#..####..#.", ".#........#.", ".##########."),
     Symbol.EDIT to listOf("........##..", ".......####.", "......####..", ".....####...", "....####....", "...####.....", "..####......", ".####.......", ".###........", "####........"),
+    // Equipment: the bar runs past the plates on a barbell; a weight stack for machines; pulley and handle for cables;
+    // rails with a hooked bar for the Smith machine; a small figure for bodyweight.
+    Symbol.BARBELL to listOf("..#......#..", ".##......##.", ".##......##.", "############", ".##......##.", ".##......##.", "..#......#.."),
+    Symbol.MACHINE to listOf(".########.", ".#......#.", ".#.####.#.", ".#......#.", ".#.####.#.", ".#......#.", ".#.####.#.", ".#......#.", "##########"),
+    Symbol.CABLE to listOf("..####..", ".#....#.", ".#.##.#.", ".#....#.", "..####..", "....#...", "....#...", "....#...", "..#####.", "..#...#.", "..#####."),
+    Symbol.SMITH to listOf("#..........#", "#..........#", "#.#......#.#", "############", "#.#......#.#", "#..........#", "#..........#", "#..........#", "##........##"),
+    Symbol.BODYWEIGHT to listOf("....##....", "....##....", "..........", ".########.", "#...##...#", "#...##...#", "....##....", "...#..#...", "...#..#...", "..#....#..", "..#....#.."),
+    Symbol.IMAGE to listOf("############", "#..........#", "#.##.......#", "#.##.......#", "#......#...#", "#.....###..#", "#..#.#####.#", "#.##########", "############"),
     Symbol.SETTINGS to listOf("....##....", ".##.##.##.", ".########.", "..##..##..", "####..####", "####..####", "..##..##..", ".########.", ".##.##.##.", "....##...."),
 )
 

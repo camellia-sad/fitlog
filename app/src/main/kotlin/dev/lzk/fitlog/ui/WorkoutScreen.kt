@@ -132,8 +132,9 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
             item {
                 SoftCard(Modifier.testTag("workout-exercise-card")) {
                     // The GIF's own character is the puppy, so the state mascot only appears when there is no GIF.
-                    if (ExerciseAnimations.has(exercise.exerciseId))
-                        ExerciseStage(exercise.exerciseId, exercise.exerciseNameSnapshot, group, Modifier.fillMaxWidth().height(156.dp))
+                    // Custom exercises show the user's photo here when they have one; the default art stays in the library.
+                    ExerciseThumb(exercise.exerciseId, exercise.exerciseNameSnapshot, group, null,
+                        Modifier.fillMaxWidth().height(156.dp), fallback = false)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (!ExerciseAnimations.has(exercise.exerciseId)) PixelPuppy(Modifier.size(44.dp), puppyPose)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {

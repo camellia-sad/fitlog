@@ -10,6 +10,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
+import kotlinx.coroutines.launch
 import dev.lzk.fitlog.domain.*
 import dev.lzk.fitlog.training.WorkoutUiState
 import dev.lzk.fitlog.training.WorkoutViewModel
@@ -31,10 +33,12 @@ fun ExerciseDetailScreen(exercise: Exercise?, state: WorkoutUiState, model: Work
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             val group = exercise.primaryMuscles.firstOrNull()?.group
-            if (ExerciseAnimations.has(exercise.id))
-                ExerciseStage(exercise.id, exercise.nameZh, group, Modifier.fillMaxWidth().height(240.dp), corner = 18.dp)
+            ExerciseThumb(exercise.id, exercise.nameZh, group, exercise.equipmentType,
+                Modifier.fillMaxWidth().height(240.dp).testTag("exercise-picture"), corner = 18.dp)
+            if (exercise.isCustom) PhotoActions(exercise)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(exercise.nameEn + " · " + exercise.equipmentType.label(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(listOf(exercise.nameEn.trim(), exercise.equipmentType.label()).filter { it.isNotEmpty() }.joinToString(" · "),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (exercise.primaryMuscles.isNotEmpty() || exercise.secondaryMuscles.isNotEmpty())
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         exercise.primaryMuscles.forEach { MuscleChip(it.label(), it.group) }
@@ -71,6 +75,32 @@ fun ExerciseDetailScreen(exercise: Exercise?, state: WorkoutUiState, model: Work
         text = { Text("已有训练记录与名称快照会保留。归档动作可在“已归档”筛选中恢复。") },
         confirmButton = { TextButton(onClick = { archiving = false; model.archive(exercise); onBack() }) { Text("确认") } },
         dismissButton = { TextButton(onClick = { archiving = false }) { Text("取消") } })
+}
+
+/** Custom exercises can carry the user's own picture; it is stored on this device and replaces the default art. */
+@Composable
+private fun PhotoActions(exercise: Exercise) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val haptics = fitHaptics()
+    var error by remember { mutableStateOf<String?>(null) }
+    val hasPhoto = remember(exercise.id, ExercisePhotos.version(exercise.id)) { ExercisePhotos.exists(context, exercise.id) }
+    val pick = rememberImagePicker(onImage = { jpeg ->
+        runCatching { ExercisePhotos.save(context, exercise.id, jpeg) }
+            .onSuccess { haptics.confirm(); error = null }.onFailure { error = it.message ?: "图片保存失败" }
+    }, onError = { error = it })
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            DetailAction(Symbol.IMAGE, if (hasPhoto) "更换图片" else "上传图片", active = false,
+                activeTint = MaterialTheme.colorScheme.primary, activeColor = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.weight(1f).testTag("exercise-photo-pick")) { pick() }
+            if (hasPhoto) DetailAction(Symbol.CLOSE, "恢复默认图", active = false,
+                activeTint = MaterialTheme.colorScheme.primary, activeColor = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.weight(1f)) { scope.launch { ExercisePhotos.remove(context, exercise.id); haptics.tap() } }
+        }
+        Text(error ?: "图片仅保存在本机，不随 JSON 备份导出。", style = MaterialTheme.typography.bodySmall,
+            color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 /** Icon + label action filling half a row; the active state tints the icon and fills the button. */

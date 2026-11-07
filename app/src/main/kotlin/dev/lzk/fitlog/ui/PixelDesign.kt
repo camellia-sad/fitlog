@@ -317,10 +317,16 @@ fun ExerciseStage(id: String, name: String, group: MuscleGroup?, modifier: Modif
     }
     Box(modifier.background(paper, RoundedCornerShape(corner)).padding(2.dp)) {
         ExerciseGif(id, name, Modifier.fillMaxSize())
-        if (tab != null) Canvas(Modifier.size(15.dp).align(Alignment.TopStart).padding(start = 3.dp, top = 3.dp)) {
-            val cell = floor(size.minDimension / 4f)
-            for (row in 0..3) drawRect(tab, Offset(0f, row * cell), Size((4 - row) * cell, cell))
-        }
+        if (tab != null) GroupCornerTab(tab)
+    }
+}
+
+/** The stepped triangle in a stage's top-left corner, coloured by the exercise's main muscle group. */
+@Composable
+internal fun BoxScope.GroupCornerTab(color: Color, inset: Dp = 3.dp) {
+    Canvas(Modifier.align(Alignment.TopStart).padding(start = inset, top = inset).size(12.dp)) {
+        val cell = floor(size.minDimension / 4f)
+        for (row in 0..3) drawRect(color, Offset(0f, row * cell), Size((4 - row) * cell, cell))
     }
 }
 

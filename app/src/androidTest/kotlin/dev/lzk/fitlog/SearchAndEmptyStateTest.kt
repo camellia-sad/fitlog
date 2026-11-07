@@ -68,6 +68,37 @@ class SearchAndEmptyStateTest {
         compose.onAllNodes(hasContentDescription("肌群",substring=true)).assertCountEquals(0)
     }
 
+    @Test fun libraryShowsTagsAndMuscleTabsFilter() {
+        compose.setContent { FitLogTheme { FitLogApp(container) } }
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("历史").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("动作", useUnmergedTree = true).performClick()
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("muscle-tabs").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("50 个动作").assertExists()
+        compose.onNode(hasText("核心") and hasClickAction() and hasAnyAncestor(hasTestTag("muscle-tabs"))).performScrollTo().performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("50 个动作").fetchSemanticsNodes().isEmpty() &&
+            compose.onAllNodesWithText("杠铃卧推").fetchSemanticsNodes().isEmpty() }
+        compose.onNode(hasText("核心") and hasAnyAncestor(hasTestTag("muscle-tabs"))).assertIsSelected()
+        compose.onAllNodesWithText("徒手").onFirst().assertExists()
+    }
+
+    @Test fun customExerciseShowsDefaultArtAndKeepsUploadedPhoto() {
+        val id = runBlocking { container.training.createCustomExercise(dev.lzk.fitlog.domain.CustomExerciseDraft("我的拉伸", "",
+            dev.lzk.fitlog.domain.EquipmentType.CABLE, setOf(dev.lzk.fitlog.domain.Muscle.BACK), "")) }
+        val exercise = runBlocking { container.workouts.observeExercises().first().first { it.id == id } }
+        val model = WorkoutViewModel(container); models.put("photo", model)
+        compose.setContent { FitLogTheme { ExerciseDetailScreen(exercise, WorkoutUiState(loading = false), model, onBack = {}, onHistory = {}, onAdd = {}) } }
+        compose.onNodeWithTag("exercise-picture").assertExists()
+        compose.onNodeWithText("上传图片").assertExists()
+        val bitmap = android.graphics.Bitmap.createBitmap(64, 40, android.graphics.Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.RED) }
+        val jpeg = java.io.ByteArrayOutputStream().also { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }.toByteArray()
+        runBlocking { ExercisePhotos.save(context, id, jpeg) }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("更换图片").fetchSemanticsNodes().isNotEmpty() }
+        assertTrue(ExercisePhotos.exists(context, id))
+        compose.onNodeWithText("恢复默认图").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("上传图片").fetchSemanticsNodes().isNotEmpty() }
+        assertFalse(ExercisePhotos.exists(context, id))
+    }
+
     @Test fun deletingAndEditingSearchSurviveLateQueryResults() {
         val model = WorkoutViewModel(container)
         models.put("search", model)
