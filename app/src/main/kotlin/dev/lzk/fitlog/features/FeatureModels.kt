@@ -149,6 +149,12 @@ class SettingsViewModel(container: AppContainer) : FeatureModel(container) {
         .catch { message.value = it.message }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferences())
     val busy = MutableStateFlow(false)
     fun save(value: UserPreferences) = execute { container.preferences.save(value.copy(onboardingCompleted = true)); message.value = "设置已保存" }
+    /** Settings save as they change; each successful write bumps [saved] so the page can stamp “已保存”. */
+    val saved = MutableStateFlow(0)
+    fun update(value: UserPreferences) = execute {
+        value.validate()
+        container.preferences.save(value.copy(onboardingCompleted = true)); saved.value++
+    }
 
     fun exportNetworkLogs(context: Context, uri: Uri) = transfer {
         withContext(Dispatchers.IO) {

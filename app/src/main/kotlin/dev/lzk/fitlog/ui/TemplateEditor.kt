@@ -381,7 +381,7 @@ private fun TargetAdjuster(item: TemplateExercise, exercise: Exercise?, metric: 
         drawLine(line, Offset.Zero, Offset(size.width, 0f), 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())))
     }.padding(12.dp).testTag("target-adjuster"), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Section("组数", trailing = {
-            Stepper(item.targetSetCount.toLong(), 1, WorkoutRules.MAX_SET_COUNT.toLong(), 1, "组数", tag = "target-sets") {
+            PixelStepper(item.targetSetCount.toLong(), 1, WorkoutRules.MAX_SET_COUNT.toLong(), 1, "组数", tag = "target-sets") {
                 onChange(item.copy(targetSetCount = it.toInt()))
             }
         }) { SetPips(item.targetSetCount, hue) }
@@ -390,11 +390,11 @@ private fun TargetAdjuster(item: TemplateExercise, exercise: Exercise?, metric: 
         val top = if (seconds) 3600L else 100L
         Section(if (seconds) "目标秒数" else "目标次数") {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Stepper(item.targetRepMin.toLong(), step, top, step, "最少${metric.unit}数", tag = "target-min") { v ->
+                PixelStepper(item.targetRepMin.toLong(), step, top, step, "最少${metric.unit}数", tag = "target-min") { v ->
                     onChange(item.copy(targetRepMin = v.toInt(), targetRepMax = maxOf(item.targetRepMax, v.toInt())))
                 }
                 Text("–", style = pixelNumber(22.sp), color = scheme.onSurfaceVariant)
-                Stepper(item.targetRepMax.toLong(), step, top, step, "最多${metric.unit}数", unit = metric.unit, tag = "target-max") { v ->
+                PixelStepper(item.targetRepMax.toLong(), step, top, step, "最多${metric.unit}数", unit = metric.unit, tag = "target-max") { v ->
                     onChange(item.copy(targetRepMax = v.toInt(), targetRepMin = minOf(item.targetRepMin, v.toInt())))
                 }
             }
@@ -413,7 +413,7 @@ private fun TargetAdjuster(item: TemplateExercise, exercise: Exercise?, metric: 
                         Text(WeightUnits.format(it, unit), style = pixelNumber(18.sp), color = scheme.onSurface)
                         Text(unit.label, Modifier.padding(bottom = 1.dp), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                     } ?: Text("尚未记录", Modifier.padding(bottom = 1.dp), style = MaterialTheme.typography.bodySmall, color = scheme.onSurface)
-                } else Stepper(item.defaultWeightGrams, 0, MAX_WEIGHT_GRAMS, preferences.weightStepGrams, "重量", valueWidth = 64.dp,
+                } else PixelStepper(item.defaultWeightGrams, 0, MAX_WEIGHT_GRAMS, preferences.weightStepGrams, "重量", valueWidth = 64.dp,
                     format = { WeightUnits.format(it, unit) }, unit = unit.label, tag = "target-weight", onValueClick = { exact = true }) {
                     onChange(item.copy(defaultWeightGrams = it))
                 }
@@ -421,7 +421,7 @@ private fun TargetAdjuster(item: TemplateExercise, exercise: Exercise?, metric: 
         }
 
         Section("组间休息", trailing = {
-            Stepper(item.restSeconds.toLong(), 0, 3600, 15, "休息秒数", valueWidth = 62.dp, unit = "秒", tag = "target-rest") { onChange(item.copy(restSeconds = it.toInt())) }
+            PixelStepper(item.restSeconds.toLong(), 0, 3600, 15, "休息秒数", valueWidth = 62.dp, unit = "秒", tag = "target-rest") { onChange(item.copy(restSeconds = it.toInt())) }
         }) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 RestPresets.forEach { value ->
@@ -463,38 +463,6 @@ private fun Section(title: String, trailing: (@Composable () -> Unit)? = null, c
     }
 }
 
-/** − value + : pixel keys that sink when pressed and repeat when held; the value rolls over three frames. */
-@Composable
-private fun Stepper(value: Long, min: Long, max: Long, step: Long, label: String, valueWidth: Dp = 48.dp, format: (Long) -> String = { it.toString() },
-    unit: String? = null, tag: String, onValueClick: (() -> Unit)? = null, onChange: (Long) -> Unit) {
-    val haptics = fitHaptics()
-    val current by rememberUpdatedState(value)
-    val change by rememberUpdatedState(onChange)
-    fun bump(by: Long) {
-        val next = (current + by).coerceIn(min, max)
-        if (next != current) { haptics.tick(); change(next) }
-    }
-    val ink = MaterialTheme.colorScheme.onSurface
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        PixelOutlineKey(onClick = { bump(-step) }, enabled = value > min, minHeight = 32.dp, minWidth = 32.dp, contentPadding = PaddingValues(0.dp),
-            repeatOnHold = true, modifier = Modifier.semantics { contentDescription = "减少$label" }) { LineIcon(Symbol.MINUS, Modifier.size(15.dp), ink) }
-        Box(Modifier.width(valueWidth).height(34.dp).padding(bottom = 3.dp).clipToBounds()
-            .then(if (onValueClick != null) Modifier.clickable(onClickLabel = "输入$label", onClick = onValueClick) else Modifier)
-            .testTag("$tag-value").semantics { contentDescription = "$label ${format(value)}${unit ?: ""}" }, contentAlignment = Alignment.Center) {
-            AnimatedContent(value, transitionSpec = {
-                val up = targetState > initialState
-                slideInVertically(tween(150, easing = StepEasing(3))) { if (up) it else -it } togetherWith
-                    slideOutVertically(tween(150, easing = StepEasing(3))) { if (up) -it else it }
-            }, label = label) { shown ->
-                Text(format(shown), style = pixelNumber(26.sp), color = ink, maxLines = 1, softWrap = false)
-            }
-        }
-        PixelOutlineKey(onClick = { bump(step) }, enabled = value < max, minHeight = 32.dp, minWidth = 32.dp, contentPadding = PaddingValues(0.dp),
-            repeatOnHold = true, modifier = Modifier.semantics { contentDescription = "增加$label" }) { LineIcon(Symbol.PLUS, Modifier.size(15.dp), ink) }
-        unit?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
-    }
-}
-
 /** One pixel per target set; a new one pops in over three frames. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -532,26 +500,9 @@ private fun RangeRuler(min: Int, max: Int, cell: Int, hue: Color) {
     }
 }
 
-/** Two-way switch whose pixel slider block steps across in three frames. */
 @Composable
-private fun WeightMode(follow: Boolean, onSelect: (Boolean) -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    BoxWithConstraints(Modifier.fillMaxWidth().height(38.dp).background(scheme.surfaceVariant, PixelShapeSmall).padding(3.dp)) {
-        val half = maxWidth / 2
-        val x by animateDpAsState(if (follow) 0.dp else half, tween(150, easing = StepEasing(3)), label = "重量方式")
-        Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(x.roundToPx(), 0) }.width(half).fillMaxHeight().background(scheme.surface, PixelShapeSmall).border(1.5.dp, scheme.primary, PixelShapeSmall))
-        Row(Modifier.fillMaxSize()) {
-            listOf(true to "跟随动作重量", false to "固定重量").forEach { (value, text) ->
-                val on = follow == value
-                Box(Modifier.weight(1f).fillMaxHeight().clickable { if (!on) onSelect(value) }
-                    .semantics { role = Role.Tab; selected = on }.testTag(if (value) "weight-follow" else "weight-fixed"), contentAlignment = Alignment.Center) {
-                    Text(text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = if (on) FontWeight.ExtraBold else FontWeight.Medium),
-                        color = if (on) scheme.primary else scheme.onSurfaceVariant, maxLines = 1)
-                }
-            }
-        }
-    }
-}
+private fun WeightMode(follow: Boolean, onSelect: (Boolean) -> Unit) =
+    PixelSegmented(listOf("跟随动作重量", "固定重量"), if (follow) 0 else 1, tags = listOf("weight-follow", "weight-fixed")) { onSelect(it == 0) }
 
 @Composable
 private fun ExactWeightDialog(grams: Long, unit: WeightUnit, onDismiss: () -> Unit, onSave: (Long) -> Unit) {

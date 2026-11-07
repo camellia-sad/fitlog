@@ -23,8 +23,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
@@ -142,7 +149,7 @@ fun PixelKey(
     face: Color = MaterialTheme.colorScheme.primary, shadow: Color = fitColors.tealDeep, outline: Color? = null,
     contentColor: Color = MaterialTheme.colorScheme.onPrimary, depth: Dp = 3.dp, shape: Shape = PixelShapeSmall,
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp), minHeight: Dp = 36.dp, minWidth: Dp = 0.dp,
-    repeatOnHold: Boolean = false, content: @Composable RowScope.() -> Unit,
+    repeatOnHold: Boolean = false, fillWidth: Boolean = false, content: @Composable RowScope.() -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -160,7 +167,7 @@ fun PixelKey(
     Box(modifier.alpha(if (enabled) 1f else .4f)
         .clickable(interaction, indication = null, enabled = enabled, role = Role.Button) { if (repeated) repeated = false else click() }) {
         Row(
-            Modifier.padding(bottom = depth).heightIn(min = minHeight).widthIn(min = minWidth)
+            Modifier.then(if (fillWidth) Modifier.fillMaxWidth() else Modifier).padding(bottom = depth).heightIn(min = minHeight).widthIn(min = minWidth)
                 .offset { IntOffset(0, sink.roundToPx()) }
                 .drawBehind { if (enabled) translate(top = (depth - sink).toPx()) { drawOutline(shape.createOutline(size, layoutDirection, this), shadow) } }
                 .background(face, shape)
@@ -185,6 +192,84 @@ fun PixelOutlineKey(
     minHeight: Dp = 36.dp, minWidth: Dp = 0.dp, repeatOnHold: Boolean = false, content: @Composable RowScope.() -> Unit,
 ) = PixelKey(onClick, modifier, enabled, face = face, shadow = edge, outline = edge, contentColor = contentColor,
     contentPadding = contentPadding, minHeight = minHeight, minWidth = minWidth, repeatOnHold = repeatOnHold, content = content)
+
+/** − value + : pixel keys that sink when pressed and repeat when held; the value rolls over three frames. */
+@Composable
+internal fun PixelStepper(value: Long, min: Long, max: Long, step: Long, label: String, valueWidth: Dp = 48.dp, format: (Long) -> String = { it.toString() },
+    unit: String? = null, tag: String, onValueClick: (() -> Unit)? = null, onChange: (Long) -> Unit) {
+    val haptics = fitHaptics()
+    val current by rememberUpdatedState(value)
+    val change by rememberUpdatedState(onChange)
+    fun bump(by: Long) {
+        val next = (current + by).coerceIn(min, max)
+        if (next != current) { haptics.tick(); change(next) }
+    }
+    val ink = MaterialTheme.colorScheme.onSurface
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        PixelOutlineKey(onClick = { bump(-step) }, enabled = value > min, minHeight = 32.dp, minWidth = 32.dp, contentPadding = PaddingValues(0.dp),
+            repeatOnHold = true, modifier = Modifier.semantics { contentDescription = "减少$label" }) { LineIcon(Symbol.MINUS, Modifier.size(15.dp), ink) }
+        Box(Modifier.width(valueWidth).height(34.dp).padding(bottom = 3.dp).clipToBounds()
+            .then(if (onValueClick != null) Modifier.clickable(onClickLabel = "输入$label", onClick = onValueClick) else Modifier)
+            .testTag("$tag-value").semantics { contentDescription = "$label ${format(value)}${unit ?: ""}" }, contentAlignment = Alignment.Center) {
+            AnimatedContent(value, transitionSpec = {
+                val up = targetState > initialState
+                slideInVertically(tween(150, easing = StepEasing(3))) { if (up) it else -it } togetherWith
+                    slideOutVertically(tween(150, easing = StepEasing(3))) { if (up) -it else it }
+            }, label = label) { shown ->
+                Text(format(shown), style = pixelNumber(26.sp), color = ink, maxLines = 1, softWrap = false)
+            }
+        }
+        PixelOutlineKey(onClick = { bump(step) }, enabled = value < max, minHeight = 32.dp, minWidth = 32.dp, contentPadding = PaddingValues(0.dp),
+            repeatOnHold = true, modifier = Modifier.semantics { contentDescription = "增加$label" }) { LineIcon(Symbol.PLUS, Modifier.size(15.dp), ink) }
+        unit?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
+    }
+}
+
+/** One-of-n switch whose pixel slider block steps across in three frames. */
+@Composable
+internal fun PixelSegmented(options: List<String>, selected: Int, modifier: Modifier = Modifier, tags: List<String>? = null, onSelect: (Int) -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val haptics = fitHaptics()
+    BoxWithConstraints(modifier.fillMaxWidth().height(38.dp).background(scheme.surfaceVariant, PixelShapeSmall).padding(3.dp)) {
+        val part = maxWidth / options.size
+        val x by animateDpAsState(part * selected, tween(150, easing = StepEasing(3)), label = "分段")
+        Box(Modifier.offset { IntOffset(x.roundToPx(), 0) }.width(part).fillMaxHeight()
+            .drawBehind { translate(top = 2.dp.toPx()) { drawOutline(PixelShapeSmall.createOutline(size, layoutDirection, this), scheme.primary) } }
+            .background(scheme.surface, PixelShapeSmall).border(1.5.dp, scheme.primary, PixelShapeSmall))
+        Row(Modifier.fillMaxSize()) {
+            options.forEachIndexed { index, text ->
+                val on = index == selected
+                Box(Modifier.weight(1f).fillMaxHeight().clickable(role = Role.Tab) { if (!on) { haptics.tick(); onSelect(index) } }
+                    .semantics { this.selected = on }.then(tags?.getOrNull(index)?.let { Modifier.testTag(it) } ?: Modifier),
+                    contentAlignment = Alignment.Center) {
+                    Text(text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = if (on) FontWeight.ExtraBold else FontWeight.Medium),
+                        color = if (on) scheme.primary else scheme.onSurfaceVariant, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+/** Pixel toggle: a square knob that jumps across in three frames onto a teal track with a hard bottom edge. */
+@Composable
+internal fun PixelSwitch(checked: Boolean, label: String, modifier: Modifier = Modifier, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val fit = fitColors
+    val haptics = fitHaptics()
+    val knob by animateDpAsState(if (checked) 20.dp else 0.dp, tween(150, easing = StepEasing(3)), label = label)
+    Box(modifier.size(46.dp, 26.dp).alpha(if (enabled) 1f else .4f)
+        .toggleable(checked, enabled = enabled, role = Role.Switch) { haptics.tick(); onChange(it) }
+        .semantics { contentDescription = label }
+        .background(if (checked) scheme.primary else scheme.surfaceVariant, PixelShapeSmall)
+        .drawBehind {
+            val edge = 1.5.dp.toPx()
+            if (checked) drawRect(fit.tealDeep, Offset(0f, size.height - 3.dp.toPx()), Size(size.width, 3.dp.toPx()))
+            else drawOutline(PixelShapeSmall.createOutline(size, layoutDirection, this), scheme.outline, style = androidx.compose.ui.graphics.drawscope.Stroke(edge))
+        }
+        .padding(4.dp)) {
+        Box(Modifier.offset { IntOffset(knob.roundToPx(), 0) }.size(18.dp).background(if (checked) scheme.onPrimary else scheme.onSurfaceVariant))
+    }
+}
 
 /** Set-completion box: stamps in 4 frames and throws 8 pixel sparks when it becomes checked. */
 @Composable

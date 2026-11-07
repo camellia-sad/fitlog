@@ -126,7 +126,7 @@ class WorkoutExperienceTest {
         compose.onNodeWithText("我的", substring = false).performClick()
         waitText("设置")
         compose.onNodeWithTag("open-settings").performClick()
-        waitText("保存设置")
+        waitText("我的训练配置")
         compose.onNodeWithTag("main-navigation").assertDoesNotExist()
         compose.onNodeWithContentDescription("返回我的").performClick()
         waitText("设置")

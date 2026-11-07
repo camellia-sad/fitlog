@@ -20,15 +20,21 @@ fun NetworkDiagnosticsControls(busy: Boolean, onExport: (Context, Uri) -> Unit, 
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if(uri != null) onExport(context, uri)
     }
-    HorizontalDivider()
-    Text("网络调试日志", style = MaterialTheme.typography.titleLarge)
-    Text("连接重置、超时等请求错误会自动保存在本机。保留最近 7 天，最多 200 条、256 KB，不自动上传。",
-        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Text("导出包含设备型号、系统版本、网络类型、DNS 服务器和错误阶段；不含验证码、令牌、邮箱及聊天或训练内容。",
-        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    OutlinedButton(onClick = { exporter.launch("FitLog-network-${LocalDate.now()}.json") }, enabled = !busy,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("export-network-logs")) { Text("导出网络调试日志") }
-    TextButton(onClick = { clearing = true }, enabled = !busy, modifier = Modifier.testTag("clear-network-logs")) { Text("清空网络调试日志") }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        ListRow(Symbol.SETTINGS, "网络调试日志", "连接重置、超时等请求错误保存在本机：最近 7 天、最多 200 条，不自动上传", onClick = null)
+        Text("导出包含设备型号、系统版本、网络类型、DNS 服务器和错误阶段；不含验证码、令牌、邮箱及聊天或训练内容。",
+            Modifier.padding(start = 60.dp, end = 14.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.padding(start = 60.dp, end = 14.dp, top = 6.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PixelOutlineKey(onClick = { exporter.launch("FitLog-network-${LocalDate.now()}.json") }, enabled = !busy, minHeight = 34.dp,
+                modifier = Modifier.testTag("export-network-logs")) {
+                LineIcon(Symbol.EXPORT, Modifier.size(13.dp), MaterialTheme.colorScheme.onSurfaceVariant); Text("导出日志", maxLines = 1)
+            }
+            PixelOutlineKey(onClick = { clearing = true }, enabled = !busy, minHeight = 34.dp, modifier = Modifier.testTag("clear-network-logs")) {
+                LineIcon(Symbol.TRASH, Modifier.size(13.dp), MaterialTheme.colorScheme.onSurfaceVariant); Text("清空日志", maxLines = 1)
+            }
+        }
+        HorizontalDivider(color = androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.outlineVariant, .8f))
+    }
     if(clearing) AlertDialog(onDismissRequest = { clearing = false }, title = { OneLineText("清空网络调试日志？") },
         text = { Text("仅清空本机网络错误记录，不影响训练、聊天或账号。已导出的文件需要自行删除。") },
         confirmButton = { TextButton(onClick = { clearing = false; onClear() }, enabled = !busy) { Text("确认清空日志") } },

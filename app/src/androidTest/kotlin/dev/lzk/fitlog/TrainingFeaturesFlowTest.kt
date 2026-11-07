@@ -142,9 +142,10 @@ class TrainingFeaturesFlowTest {
         compose.onNodeWithTag("open-settings").performClick()
         compose.onNodeWithText("lb", substring = false).performScrollTo().performClick()
         compose.onNodeWithText("深色", substring = false).performScrollTo().performClick()
-        compose.onNodeWithText("保存设置", substring = false).performScrollTo().performClick()
-        compose.waitUntil(10_000) { runBlocking { container.preferences.preferences.first().weightUnit == WeightUnit.LB } }
-        assertEquals(ThemeMode.DARK, runBlocking { container.preferences.preferences.first().theme })
+        // Settings save as they change: no save button, a stamp confirms the write.
+        compose.onNodeWithText("保存设置").assertDoesNotExist()
+        compose.waitUntil(10_000) { runBlocking { container.preferences.preferences.first().let { it.weightUnit == WeightUnit.LB && it.theme == ThemeMode.DARK } } }
+        assertEquals(WeightUnits.parse("5", WeightUnit.LB), runBlocking { container.preferences.preferences.first().weightStepGrams })
         // The settings top bar is pinned above the scrolling content.
         compose.onNodeWithContentDescription("返回我的").performClick()
         compose.onNodeWithText("主页", substring = false).performClick()

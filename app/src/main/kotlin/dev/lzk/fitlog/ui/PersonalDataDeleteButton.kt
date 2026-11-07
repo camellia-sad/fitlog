@@ -14,9 +14,12 @@ fun PersonalDataDeleteButton(enabled:Boolean=true,clearData: (() -> Boolean)? = 
     val context = LocalContext.current
     var confirming by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
-    OutlinedButton(onClick = { confirming = true; failed = false }, enabled=enabled,
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("清除全部本机数据") }
+    // The last and widest removal: an outlined pixel key in the error colour.
+    val error = MaterialTheme.colorScheme.error
+    PixelKey(onClick = { confirming = true; failed = false }, enabled = enabled, face = MaterialTheme.colorScheme.surface, shadow = error, outline = error,
+        contentColor = error, minHeight = 44.dp, fillWidth = true, modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
+        LineIcon(Symbol.TRASH, Modifier.size(14.dp), error); Text("清除全部本机数据", maxLines = 1)
+    }
     if (confirming) AlertDialog(onDismissRequest = { confirming = false }, title = { Text("删除全部本机信息？") },
         text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("清除本机训练记录、模板、计划、自定义动作、聊天记录、图片、登录状态、偏好、数据库及缓存。应用将关闭，重新打开后从首次设置开始。")

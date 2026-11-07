@@ -10,7 +10,8 @@ import androidx.compose.ui.graphics.Color
 import kotlin.math.floor
 
 enum class Symbol { HOME, DUMBBELL, BACK, PLUS, CHECK, SEARCH, ARROW, MINUS, CLOCK, LIST, SETTINGS, FRIENDS, PERSON, PLAY, SPARK, DOWN, CLOSE, PAUSE,
-    STAR, STAR_FILLED, ARCHIVE, UNARCHIVE, EDIT, BARBELL, MACHINE, CABLE, SMITH, BODYWEIGHT, IMAGE, PIN, TRASH, UP, TUNE }
+    STAR, STAR_FILLED, ARCHIVE, UNARCHIVE, EDIT, BARBELL, MACHINE, CABLE, SMITH, BODYWEIGHT, IMAGE, PIN, TRASH, UP, TUNE,
+    CLOUD, EXPORT, IMPORT, SUN, MOON, VIBRATE, CHAT }
 
 /** Solid 12×12 pixel glyphs drawn to match the puppy's outline weight. `#` marks a filled cell. */
 private val Glyphs: Map<Symbol, List<String>> = mapOf(
@@ -29,6 +30,14 @@ private val Glyphs: Map<Symbol, List<String>> = mapOf(
     // Template board: a push pin, a bin with ribs, and two sliders for target tuning.
     Symbol.PIN to listOf("...####...", "..######..", ".########.", ".########.", "..######..", "...####...", ".########.", "##########", "....##....", "....##....", "....##....", "....#....."),
     Symbol.TRASH to listOf("....####....", "############", "............", ".##########.", ".#..#..#..#.", ".#..#..#..#.", ".#..#..#..#.", ".#..#..#..#.", ".#..#..#..#.", "..########.."),
+    // Settings: cloud backup, export / import trays, sun and moon for themes, a buzzing phone, a chat bubble.
+    Symbol.CLOUD to listOf("....####....", "...######...", ".#########..", "###########.", "############", "############", ".##########."),
+    Symbol.EXPORT to listOf(".....##.....", "....####....", "...######...", ".....##.....", ".....##.....", ".....##.....", "##........##", "##........##", "############"),
+    Symbol.IMPORT to listOf(".....##.....", ".....##.....", ".....##.....", "...######...", "....####....", ".....##.....", "##........##", "##........##", "############"),
+    Symbol.SUN to listOf("#....##....#", ".#........#.", "....####....", "...######...", "##.######.##", "...######...", "....####....", ".#........#.", "#....##....#"),
+    Symbol.MOON to listOf("...#####", ".####...", "####....", "###.....", "###.....", "####....", ".####...", "...#####"),
+    Symbol.VIBRATE to listOf("#..######..#", "#..#....#..#", ".#.#....#.#.", ".#.#....#.#.", "#..#....#..#", "#..#....#..#", "...######..."),
+    Symbol.CHAT to listOf("############", "#..........#", "#.##.##.##.#", "#..........#", "############", "..##........", ".#.........."),
     Symbol.TUNE to listOf(".#.....#.", ".#.....#.", "###....#.", "###....#.", ".#.....#.", ".#....###", ".#....###", ".#.....#.", ".#.....#."),
     Symbol.SEARCH to listOf("..####.....", ".#....#....", "#......#...", "#......#...", "#......#...", ".#....#....", "..####.#...", ".......##..", "........##.", ".........##"),
     Symbol.PLAY to listOf("##.....", "####...", "######.", "#######", "######.", "####...", "##....."),
