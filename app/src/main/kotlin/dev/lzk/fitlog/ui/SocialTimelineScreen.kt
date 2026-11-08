@@ -28,6 +28,10 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     var posts by remember {mutableStateOf<List<SocialPost>>(emptyList())}
     var morePosts by remember {mutableStateOf(true)}
+    // One's own page also lists the posts kept only on this device (older than the cloud keeps, or all of them offline).
+    val own=owner!=null && owner==me.id
+    var archive by remember {mutableStateOf<List<SocialPost>>(emptyList())}
+    var offline by remember {mutableStateOf(false)}
     var busy by remember {mutableStateOf(false)}
     var error by remember {mutableStateOf<String?>(null)}
     var composing by rememberSaveable {mutableStateOf(false)}
@@ -54,23 +58,34 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
             finally {busy=false}
         }
     }
+    suspend fun refreshArchive() {
+        if(!own) return
+        val cutoff=Instant.now().minus(java.time.Duration.ofDays(SocialRules.POST_DAYS))
+        val shown=posts.map {it.id}.toSet()
+        archive=repository.ownArchive().filter {it.id !in shown && (offline || it.createdAt.isBefore(cutoff))}
+    }
     suspend fun refresh() {
         refreshInbox()
-        posts=repository.feed(owner);morePosts=posts.size==20
+        try {posts=repository.feed(owner);morePosts=posts.size==20;offline=false}
+        catch(e:CancellationException){throw e}
+        catch(e:Exception){if(!own) throw e;offline=true;posts=emptyList();morePosts=false}
+        refreshArchive()
     }
     LaunchedEffect(repository,me.id,owner,lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             try {
                 refresh()
+                // Stay alive while shown: leaving this block runs the cleanup below and would empty the list.
                 if(owner==null) while(isActive) {delay(15_000);try {refreshInbox()} catch(e:CancellationException){throw e} catch(_:Exception){}}
+                else awaitCancellation()
             } catch(e:CancellationException){throw e}
             catch(e:Exception){error=e.message ?: "加载失败，请刷新"}
-            finally {posts=emptyList();commentPost=null;notices=emptyList();focusContext=null}
+            finally {posts=emptyList();archive=emptyList();commentPost=null;notices=emptyList();focusContext=null}
         }
     }
     DisposableEffect(lifecycle) {
         val observer=androidx.lifecycle.LifecycleEventObserver {_,event->
-            if(event==Lifecycle.Event.ON_STOP) {scope.coroutineContext.cancelChildren();posts=emptyList();commentPost=null;notices=emptyList();focusContext=null}
+            if(event==Lifecycle.Event.ON_STOP) {scope.coroutineContext.cancelChildren();posts=emptyList();archive=emptyList();commentPost=null;notices=emptyList();focusContext=null}
         }
         lifecycle.addObserver(observer)
         onDispose {lifecycle.removeObserver(observer)}
@@ -113,25 +128,14 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
         error?.let {Text(it,color=MaterialTheme.colorScheme.error)}
         if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(vertical=12.dp)) {
-            if(posts.isEmpty() && detailPost==null) item {Text("还没有动态",color=MaterialTheme.colorScheme.onSurfaceVariant)}
+            if(!own && detailPost==null) item {
+                Text("只显示 ${SocialRules.POST_DAYS} 天内的动态",Modifier.testTag("post-window-note"),style=MaterialTheme.typography.labelSmall,
+                    color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if(posts.isEmpty() && archive.isEmpty() && detailPost==null) item {Text("还没有动态",color=MaterialTheme.colorScheme.onSurfaceVariant)}
             items(detailPost?.let{listOf(it)} ?: posts,key={it.id}) {post->
                 ActivityCard {
-                    Row(horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically) {
-                        SocialAvatar(repository,SocialProfile(post.ownerId,post.fitlogId,post.nickname,avatarPath=post.avatarPath)){onPerson(post.ownerId)}
-                        Column(Modifier.weight(1f).clickable {onPerson(post.ownerId)}) {
-                            OneLineText(post.nickname,style=MaterialTheme.typography.titleMedium)
-                            if(post.fitlogId.isNotBlank()) Text("ID · "+post.fitlogId,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Text(post.createdAt.socialTime(),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    if(post.body.isNotBlank()) Text(post.body,style=MaterialTheme.typography.bodyLarge)
-                    if(post.mediaPaths.size==1) SocialImage(repository,post.mediaPaths.single(),Modifier.fillMaxWidth().height(240.dp))
-                    else post.mediaPaths.chunked(3).forEach {row->
-                        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-                            row.forEach {path->SocialImage(repository,path,Modifier.weight(1f).height(110.dp),gallery=post.mediaPaths)}
-                            repeat(3-row.size){Spacer(Modifier.weight(1f))}
-                        }
-                    }
+                    PostContent(repository,post,onPerson)
                     PostReactions(post,!busy,onLike={launch {
                         repository.like(post.id,!post.liked)
                         detailPost=detailPost?.let{it.copy(liked=!post.liked,likeCount=(post.likeCount+if(post.liked)-1 else 1).coerceAtLeast(0))}
@@ -144,7 +148,29 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
                 TextButton(onClick={launch {
                     val page=repository.feed(owner,posts.lastOrNull()?.cursor)
                     posts=(posts+page).distinctBy {it.id}.takeLast(60);morePosts=page.size==20
+                    refreshArchive()
                 }},enabled=!busy){Text("加载更早动态")}
+            }
+            if(own && detailPost==null && !morePosts && archive.isNotEmpty()) {
+                item(key="archive-divider") {
+                    Row(Modifier.fillMaxWidth().padding(top=6.dp).testTag("local-archive"),verticalAlignment=Alignment.CenterVertically,
+                        horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        HorizontalDivider(Modifier.weight(1f),color=MaterialTheme.colorScheme.outlineVariant)
+                        Text(if(offline) "仅本机" else "${SocialRules.POST_DAYS} 天前 · 仅本机",style=MaterialTheme.typography.labelSmall,
+                            color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        HorizontalDivider(Modifier.weight(1f),color=MaterialTheme.colorScheme.outlineVariant)
+                    }
+                }
+                items(archive,key={"local:"+it.id}) {post->
+                    ActivityCard {
+                        PostContent(repository,post,onPerson)
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
+                            PixelOutlineKey(onClick={deletePost=post},minHeight=30.dp,modifier=Modifier.testTag("delete-local-${post.id}")) {
+                                LineIcon(Symbol.TRASH,Modifier.size(12.dp),LocalContentColor.current);Text("删除",maxLines=1)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -173,8 +199,32 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
     })}
     deletePost?.let {post->
         AlertDialog(onDismissRequest={deletePost=null},title={Text("删除这条动态？")},
-            confirmButton={TextButton(onClick={launch {repository.deletePost(post.id);posts=posts.filterNot {it.id==post.id};deletePost=null}}){Text("删除")}},
+            confirmButton={TextButton(onClick={launch {
+                // A post the cloud no longer holds (or one shown offline) is removed from this device only.
+                repository.deleteOwnPost(post.id,inCloud=posts.any {it.id==post.id})
+                posts=posts.filterNot {it.id==post.id};archive=archive.filterNot {it.id==post.id};deletePost=null
+            }}){Text("删除")}},
             dismissButton={TextButton(onClick={deletePost=null}){Text("取消")}})
+    }
+}
+
+/** A post's author line, text and images. */
+@Composable private fun PostContent(repository:SocialRepository,post:SocialPost,onPerson:(String)->Unit) {
+    Row(horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically) {
+        SocialAvatar(repository,SocialProfile(post.ownerId,post.fitlogId,post.nickname,avatarPath=post.avatarPath)){onPerson(post.ownerId)}
+        Column(Modifier.weight(1f).clickable {onPerson(post.ownerId)}) {
+            OneLineText(post.nickname,style=MaterialTheme.typography.titleMedium)
+            if(post.fitlogId.isNotBlank()) Text("ID · "+post.fitlogId,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(post.createdAt.socialTime(),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    if(post.body.isNotBlank()) Text(post.body,style=MaterialTheme.typography.bodyLarge)
+    if(post.mediaPaths.size==1) SocialImage(repository,post.mediaPaths.single(),Modifier.fillMaxWidth().height(240.dp))
+    else post.mediaPaths.chunked(3).forEach {row->
+        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+            row.forEach {path->SocialImage(repository,path,Modifier.weight(1f).height(110.dp),gallery=post.mediaPaths)}
+            repeat(3-row.size){Spacer(Modifier.weight(1f))}
+        }
     }
 }
 

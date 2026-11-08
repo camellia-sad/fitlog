@@ -53,6 +53,10 @@ interface SocialRepository {
     suspend fun feed(ownerId:String?=null,before:SocialCursor?=null):List<SocialPost>
     suspend fun publish(draft:PostDraft)
     suspend fun deletePost(id:String)
+    /** One's own posts kept on this device, newest first, including those the cloud no longer holds. */
+    suspend fun ownArchive():List<SocialPost> = emptyList()
+    /** Removes one's own post from this device, and from the cloud while it is still held there. */
+    suspend fun deleteOwnPost(id:String,inCloud:Boolean) {if(inCloud) deletePost(id)}
     suspend fun like(id:String,liked:Boolean)
     suspend fun comments(postId:String,before:SocialCursor?=null):List<SocialComment>
     /** Oldest first; [after] continues from the last reply already shown. */
@@ -86,6 +90,8 @@ object SocialRules {
     const val MESSAGE_PAGE=50
     const val FEED_PAGE=20
     const val MAX_FORWARD=20
+    /** Posts stay in the cloud, and visible to friends, for this many days; one's own copies stay on the device. */
+    const val POST_DAYS=30L
     fun message(draft:MessageDraft) {
         require(draft.body.length<=8000 && (draft.body.isNotBlank() || draft.mediaPath!=null)) {"消息须有文字或图片，最多 8000 字"}
         UUID.fromString(draft.id)

@@ -104,6 +104,9 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             else { goWorkout(); model.setPaused(false) }
         }
     }
+    // Each launch quietly copies one's own posts (and their images) to the device; nothing is shown either way.
+    val accountId = friendsModel.profile.collectAsStateWithLifecycle().value?.id
+    LaunchedEffect(accountId) { if (accountId != null) container.social.syncOwnPosts() }
     LaunchedEffect(state.error) { state.error?.let { snackbars.showSnackbar(it); model.clearError() } }
     LaunchedEffect(state.summary?.session?.id) { if (state.summary != null) nav.popBackStack("home", false) }
     if (state.loading) {

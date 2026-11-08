@@ -243,7 +243,8 @@ class SupabaseSocialRepository(
     }
     override suspend fun forgetPending(peerId:String,id:String) {cache.dao().forget(requireProfileId(),id)}
 
-    override suspend fun feed(ownerId:String?,before:SocialCursor?):List<SocialPost> {
+    /** A cloud page as the server returns it; one's own posts in it are copied to the device. */
+    private suspend fun cloudFeed(ownerId:String?,before:SocialCursor?):List<SocialPost> {
         val owner=requireProfileId()
         val posts=JSONArray(rpc("social_activity",JSONObject().put("p_action","feed").put("p_peer",ownerId).cursor(before),owner)).objects().map {it.post()}
         val old=cache.dao().posts(owner).associateBy {it.id}
@@ -253,6 +254,47 @@ class SupabaseSocialRepository(
         })
         return posts
     }
+    // The server keeps posts for SocialRules.POST_DAYS; filtering here too keeps the window exact before its cleanup runs.
+    override suspend fun feed(ownerId:String?,before:SocialCursor?):List<SocialPost> {
+        val cutoff=Instant.now().minus(java.time.Duration.ofDays(SocialRules.POST_DAYS))
+        return cloudFeed(ownerId,before).filter {it.createdAt.isAfter(cutoff)}
+    }
+    override suspend fun ownArchive():List<SocialPost> {
+        val me=profile.value ?: return emptyList()
+        return cache.dao().posts(me.id).filter {!it.hidden}.mapNotNull {row->
+            try {
+                val j=JSONObject(row.json)
+                SocialPost(j.getString("id"),me.id,me.nickname,me.avatarPath,j.optString("body"),(j.optJSONArray("media_paths")?:JSONArray()).strings(),
+                    Instant.parse(j.getString("created_at")),0,false,0,me.fitlogId)
+            } catch(_:Exception) {null}
+        }.sortedWith(compareByDescending<SocialPost> {it.createdAt}.thenByDescending {it.id})
+    }
+    override suspend fun deleteOwnPost(id:String,inCloud:Boolean) {
+        val owner=requireProfileId()
+        if(inCloud) rpc("social_feed",JSONObject().put("p_action","delete").put("p_id",id),owner)
+        val row=cache.dao().posts(owner).find {it.id==id && !it.hidden}
+        val paths=row?.let {(JSONObject(it.json).optJSONArray("media_paths")?:JSONArray()).strings()}.orEmpty()
+        cache.dao().hidePost(owner,id)
+        localChat.pruneImages(owner,paths)
+    }
+    /** Quietly copies one's own posts and their images to the device; any failure waits for the next start. */
+    suspend fun syncOwnPosts() {
+        val owner=profile.value?.id ?: return
+        try {
+            var cursor:SocialCursor?=null
+            var pages=0
+            do {
+                if(profile.value?.id!=owner) return
+                val page=cloudFeed(owner,cursor)
+                for(post in page.filter {it.ownerId==owner}) for(path in post.mediaPaths) {
+                    // One missing image must not stop the rest; it is fetched again next time.
+                    if(localChat.image(owner,path)==null) try {localChat.saveImage(owner,path,image(path))}
+                        catch(e:kotlinx.coroutines.CancellationException) {throw e} catch(_:Exception) {}
+                }
+                cursor=page.lastOrNull()?.cursor
+            } while(page.size==SocialRules.FEED_PAGE && ++pages<50)
+        } catch(e:kotlinx.coroutines.CancellationException) {throw e} catch(_:Exception) {}
+    }
     override suspend fun publish(draft:PostDraft) {
         SocialRules.post(draft)
         val owner=requireProfileId()
@@ -260,11 +302,7 @@ class SupabaseSocialRepository(
         cache.dao().putPosts(listOf(LocalPostEntity(owner,draft.id,JSONObject().put("id",draft.id).put("body",draft.body)
             .put("created_at",Instant.now().toString()).put("media_paths",JSONArray(draft.mediaPaths)).toString())))
     }
-    override suspend fun deletePost(id:String) {
-        val owner=requireProfileId()
-        rpc("social_feed",JSONObject().put("p_action","delete").put("p_id",id),owner)
-        cache.dao().hidePost(owner,id)
-    }
+    override suspend fun deletePost(id:String) = deleteOwnPost(id,inCloud=true)
     override suspend fun like(id:String,liked:Boolean) {rpc("social_feed",JSONObject().put("p_action",if(liked)"like" else "unlike").put("p_id",id))}
     override suspend fun comments(postId:String,before:SocialCursor?):List<SocialComment> =
         JSONArray(rpc("social_activity",JSONObject().put("p_action","comments").put("p_id",postId).cursor(before))).objects().map {it.comment()}
@@ -383,7 +421,7 @@ class SupabaseSocialRepository(
         var cursor:SocialCursor?=null
         do {
             check(profile.value?.id==owner) {"账号已切换"}
-            val page=feed(owner,cursor)
+            val page=cloudFeed(owner,cursor)
             if(page.isEmpty()) break
             for(post in page) for(path in post.mediaPaths) {
                 if(localChat.image(owner,path)==null) localChat.saveImage(owner,path,image(path))

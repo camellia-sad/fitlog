@@ -1,6 +1,8 @@
 package dev.lzk.fitlog
 
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -107,6 +109,37 @@ class SocialFlowTest {
         assertEquals(22500L,snapshot.weightGrams)
         assertEquals(1,snapshot.done)
         assertEquals(2,snapshot.total)
+    }
+    @Test fun ownPostsStayVisibleAndOlderLocalCopiesSitBelowADividerAndCanBeDeleted() {
+        val now=Instant.now()
+        fake.posts=listOf(SocialPost("recent",fake.me.id,"我",null,"本周的动态",emptyList(),now,1,false,0))
+        fake.archive=listOf(SocialPost("old",fake.me.id,"我",null,"两个月前的动态",emptyList(),now.minus(java.time.Duration.ofDays(60)),0,false,0))
+        compose.setContent {FitLogTheme {ProfileTimelineScreen(fake,fake.me,fake.me,null,ownHistory={},onBack={},onPerson={})}}
+        compose.onNodeWithTag("timeline-tab-posts").performClick()
+        // The list used to empty itself right after loading on a person's page.
+        waitText("本周的动态")
+        compose.waitUntil(5_000){compose.onAllNodesWithTag("local-archive").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("30 天前 · 仅本机").assertExists()
+        compose.onNodeWithTag("post-window-note").assertDoesNotExist()
+        compose.onNodeWithTag("delete-local-old").performScrollTo().performClick()
+        waitText("删除这条动态？")
+        compose.onAllNodesWithText("删除").onLast().performClick()
+        compose.waitUntil(15_000){fake.localDeletes==listOf("old")}
+        assertEquals(1,fake.posts.size)
+        compose.waitUntil(5_000){compose.onAllNodesWithText("两个月前的动态").fetchSemanticsNodes().isEmpty()}
+        waitText("本周的动态")
+    }
+    @Test fun othersPagesSayOnlyThirtyDaysShowAndOwnPageFallsBackToDeviceCopiesOffline() {
+        fake.posts=listOf(SocialPost("peer-post",fake.peer.id,"训练搭子",null,"好友的动态",emptyList(),Instant.now(),0,false,0))
+        var who by androidx.compose.runtime.mutableStateOf(fake.peer.id)
+        compose.setContent {FitLogTheme {androidx.compose.runtime.key(who){SocialTimelineScreen(fake,fake.me,owner=who,onBack={},onPerson={})}}}
+        waitText("好友的动态")
+        compose.onNodeWithTag("post-window-note").assertExists()
+        fake.offline=true
+        fake.archive=listOf(SocialPost("mine",fake.me.id,"我",null,"只在本机的动态",emptyList(),Instant.now(),0,false,0))
+        compose.runOnIdle {who=fake.me.id}
+        waitText("只在本机的动态")
+        compose.onNodeWithText("仅本机").assertExists()
     }
     @Test fun publishMomentAndDeleteOwnPost() {
         compose.setContent {FitLogTheme {SocialTimelineScreen(fake,fake.me,onBack={},onPerson={})}}
