@@ -17,7 +17,8 @@ import java.time.LocalDate
 
 /** Template page: the plan timetable taped on top, templates as sticky notes pinned to the board below. */
 @Composable
-fun TemplateScreen(model: TemplateViewModel, canStart: Boolean, onBack: () -> Unit, onExitEditor: () -> Unit, onStart: (String) -> Unit) {
+fun TemplateScreen(model: TemplateViewModel, canStart: Boolean, onBack: () -> Unit, onExitEditor: () -> Unit, todayStarted: Boolean = false,
+    onPickExercises: () -> Unit = {}, onStart: (String) -> Unit) {
     val state by model.state.collectAsStateWithLifecycle()
     val message by model.message.collectAsStateWithLifecycle()
     val saving by model.saving.collectAsStateWithLifecycle()
@@ -26,14 +27,14 @@ fun TemplateScreen(model: TemplateViewModel, canStart: Boolean, onBack: () -> Un
     val planDraft by model.planEditor.collectAsStateWithLifecycle()
     planDraft?.let { draft ->
         BackHandler { model.cancelPlanEdit() }
-        TrainingPlanEditor(draft, state.templates, saving, message, model::cancelPlanEdit, model::savePlan)
+        TrainingPlanEditor(draft, state.templates, state.exercises, saving, message, model::cancelPlanEdit, model::savePlan)
         return
     }
     var deleting by remember { mutableStateOf<WorkoutTemplate?>(null) }
     editingDraft?.let { draft ->
         BackHandler(onBack = onExitEditor)
         TemplateEditor(draft, state.templates, state.exercises, state.preferences, dirty = model.hasUnsavedChanges, saving = saving, message = message,
-            onBack = onExitEditor, onChange = model::updateDraft) { model.save(it) }
+            onBack = onExitEditor, onChange = model::updateDraft, onAddExercises = onPickExercises) { model.save(it) }
         return
     }
     val shortNames = remember(state.templates) { state.templates.shortNames() }
@@ -52,7 +53,10 @@ fun TemplateScreen(model: TemplateViewModel, canStart: Boolean, onBack: () -> Un
                     message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
                 }
             }
-            item(key = "plan") { PlanTimetable(plan, state.templates, shortNames, state.exercises, model::editPlan, model::deletePlan) }
+            item(key = "plan") {
+                PlanTimetable(plan, state.templates, shortNames, state.exercises, model::editPlan, model::deletePlan, todayStarted,
+                    onPostpone = model::postponeToday, onUndoPostpone = model::undoPostponeToday)
+            }
             item(key = "board") {
                 NoticeBoard(state.templates.size) {
                     var slot = 0

@@ -54,6 +54,18 @@ internal class RoomDailyWorkouts(
         record(row.id)
     }
 
+    /** Today's finished plan back to training for an edit; the stopped stretch is excluded like any explicit continue. */
+    suspend fun reopen(sessionId: String) = db.withTransaction {
+        val row = dao.session(sessionId) ?: throw WorkoutException(WorkoutError.NOT_FOUND, "会话不存在")
+        WorkoutRules.input(row.dailyPlanDate == today(), "只能修改今天的今日计划")
+        if (row.status == "ACTIVE") return@withTransaction
+        WorkoutRules.input(row.status == "FINISHED", "该记录无法继续")
+        WorkoutRules.input(dao.activeSession() == null, "请先结束当前加练，再修改今日计划")
+        val now = maxOf(clock.millis(), requireNotNull(row.endedAtUtc))
+        dao.updateSession(row.copy(status = "ACTIVE", unfinishedSlot = 1, endedAtUtc = null, pausedAtUtc = null, restEndsAtUtc = null,
+            pausedDurationMillis = Math.addExact(row.pausedDurationMillis, now - requireNotNull(row.endedAtUtc))))
+    }
+
     suspend fun addAction(exerciseId: String) = db.withTransaction {
         val session = dao.dailySession(today()) ?: error("请先设置今日计划")
         WorkoutRules.input(session.status in listOf("READY", "ACTIVE", "PAUSED", "FINISHED"), "该记录无法修改")

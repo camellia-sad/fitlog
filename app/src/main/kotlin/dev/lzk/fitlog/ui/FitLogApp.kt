@@ -58,6 +58,9 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
     var sharingWorkout by remember {mutableStateOf<Workout?>(null)}
     val shareScope=rememberCoroutineScope()
     var pendingTemplateExit by rememberSaveable { mutableStateOf<String?>(null) }
+    // A custom exercise made from the picker comes back selected there.
+    var customForPicker by rememberSaveable { mutableStateOf(false) }
+    var pickedCustom by rememberSaveable { mutableStateOf<String?>(null) }
     var resumeWorkoutAfterExit by rememberSaveable { mutableStateOf(false) }
     val monday = remember { LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) }
     val weeklyFlow = remember(container, monday) {
@@ -149,7 +152,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             composable("home") {
                 HomeScreen(state, onStart = { onWorkoutStarted(); model.startWorkout(selectedTemplateId); goWorkout() },
                     onContinue = { onWorkoutStarted(); if(state.workout != null) model.setPaused(false) else model.continueToday(); goWorkout() },
-                    onLibrary = { nav.navigate("library") }, onHistory = { nav.navigate("history") }, weekly = weekly,
+                    onLibrary = { nav.navigate("pick/today") }, onHistory = { nav.navigate("history") }, weekly = weekly,
                     templates = templateState.templates, plan = plan,
                     selectedTemplateId = selectedTemplateId,
                     onSelectTemplate = { selectedTemplateId = it; selectionChanged = true },
@@ -162,7 +165,41 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             composable("backups") {BackupScreen(container,onBack={nav.popBackStack()},onLogin={nav.navigate("me")})}
             composable("library") {
                 ExerciseLibraryScreen(state, model, onTemplates = { nav.navigate("templates") },
-                    onOpen = { nav.navigate("exercise/" + android.net.Uri.encode(it.id)) }, onAdd = addExercise)
+                    onOpen = { nav.navigate("exercise/" + android.net.Uri.encode(it.id)) }, onAdd = addExercise,
+                    onCustom = { customForPicker = false; nav.navigate("custom-exercise") })
+            }
+            composable("pick/{purpose}") { entry ->
+                val purpose = PickPurpose.of(entry.arguments?.getString("purpose"))
+                val draft = templateEditor
+                val shownWorkout = state.workout ?: state.review ?: state.todayWorkout
+                val target = when (purpose) {
+                    PickPurpose.TODAY -> when {
+                        state.workout?.session?.isExtra == true -> "加练"
+                        shownWorkout != null -> "今日计划 · " + shownWorkout.session.trainingLabel
+                        else -> "本次训练"
+                    }
+                    PickPurpose.TEMPLATE -> "模板 · " + (draft?.name?.trim()?.ifEmpty { null } ?: "新模板")
+                    PickPurpose.TREND -> "动作趋势"
+                }
+                val added = when (purpose) {
+                    PickPurpose.TODAY -> shownWorkout?.exercises?.filter { !it.removedFromPlan }?.map { it.exerciseId }?.toSet() ?: state.preparedExerciseIds.toSet()
+                    PickPurpose.TEMPLATE -> draft?.exercises?.map { it.exerciseId }?.toSet().orEmpty()
+                    PickPurpose.TREND -> emptySet()
+                }
+                ExercisePickerScreen(purpose, target, templateState.exercises, added, incoming = pickedCustom, onIncomingTaken = { pickedCustom = null },
+                    onBack = { nav.popBackStack() }, onCustom = { customForPicker = true; nav.navigate("custom-exercise") }) { ids ->
+                    when (purpose) {
+                        PickPurpose.TODAY -> model.addExercises(ids)
+                        PickPurpose.TEMPLATE -> templates.addExercises(ids.mapNotNull { id -> templateState.exercises.find { it.id == id } })
+                        PickPurpose.TREND -> history.selectedExerciseId.value = ids.firstOrNull()
+                    }
+                    nav.popBackStack()
+                }
+            }
+            composable("custom-exercise") {
+                CustomExerciseScreen(saving = false, message = null, onCancel = { nav.popBackStack() }) { draft ->
+                    model.createCustom(draft) { id -> if (customForPicker) pickedCustom = id; nav.popBackStack() }
+                }
             }
             composable("exercise/{exerciseId}") { entry ->
                 val id = entry.arguments?.getString("exerciseId")
@@ -173,13 +210,19 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             }
             composable("workout") {
                 LaunchedEffect(state.selectedExercise?.id) { container.social.selectTrainingExercise(state.selectedExercise?.id) }
-                WorkoutScreen(state, model, onBack = { model.setPaused(true); nav.popBackStack("home", false) }, onAdd = { nav.navigate("library") },
+                WorkoutScreen(state, model, onBack = { model.stopReviewing(); model.setPaused(true); nav.popBackStack("home", false) }, onAdd = { nav.navigate("pick/today") },
                     onFinish = { finishing = true }, catalog = templateState.exercises)
             }
-            composable("templates") { TemplateScreen(templates, state.workout == null, onBack = { nav.popBackStack() }, onExitEditor = { requestTemplateExit("template-list", false) }) { selectedTemplateId = it; selectionChanged = true; nav.popBackStack("home", false) } }
+            composable("templates") {
+                TemplateScreen(templates, state.workout == null, onBack = { nav.popBackStack() }, onExitEditor = { requestTemplateExit("template-list", false) },
+                    todayStarted = state.todayWorkout != null, onPickExercises = { nav.navigate("pick/template") }) {
+                    selectedTemplateId = it; selectionChanged = true; nav.popBackStack("home", false)
+                }
+            }
             composable("history") {
                 LaunchedEffect(Unit) { history.selectDate(LocalDate.now()) }
-                HistoryScreen(history, state.preferences.weightUnit, templateState.exercises, onBack = { nav.popBackStack() },onShare={sharingWorkout=it})
+                HistoryScreen(history, state.preferences.weightUnit, templateState.exercises, onBack = { nav.popBackStack() }, onShare = { sharingWorkout = it },
+                    onPickExercise = { nav.navigate("pick/trend") })
             }
             composable("exercise-history/{exerciseId}") { entry ->
                 val exerciseId = entry.arguments?.getString("exerciseId")

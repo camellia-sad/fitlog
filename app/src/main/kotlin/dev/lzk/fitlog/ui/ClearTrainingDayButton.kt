@@ -3,6 +3,7 @@ package dev.lzk.fitlog.ui
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,10 +17,10 @@ private data class DayClearRequest(val date: LocalDate, val count: Int, val hasU
 fun ClearTrainingDayButton(date: LocalDate, recordCount: Int, hasUnfinished: Boolean, busy: Boolean,
     onClear: (LocalDate) -> Unit) {
     var request by remember { mutableStateOf<DayClearRequest?>(null) }
-    TextButton(onClick = { request = DayClearRequest(date, recordCount, hasUnfinished) },
-        enabled = recordCount > 0 && !busy, modifier = Modifier.testTag("history-clear-date"),
-        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
-        OneLineText("清除当天记录", style = MaterialTheme.typography.labelLarge)
+    val error = MaterialTheme.colorScheme.error
+    PixelOutlineKey(onClick = { request = DayClearRequest(date, recordCount, hasUnfinished) },
+        enabled = recordCount > 0 && !busy, modifier = Modifier.testTag("history-clear-date"), edge = error, contentColor = error, minHeight = 34.dp) {
+        LineIcon(Symbol.TRASH, Modifier.size(12.dp), error); Text("清除当日", maxLines = 1)
     }
     request?.let { target ->
         AlertDialog(onDismissRequest = { if(!busy) request = null }, title = { OneLineText("清除当天记录？") },

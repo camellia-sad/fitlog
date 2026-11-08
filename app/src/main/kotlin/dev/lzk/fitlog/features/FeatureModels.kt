@@ -44,6 +44,26 @@ class TemplateViewModel(container: AppContainer) : FeatureModel(container) {
         finally { saving.value = false }
     }
     fun deletePlan() = execute { container.training.deletePlan(); message.value = "计划已移除" }
+    /** Today becomes a rest day and the rest of the cycle moves back by one; only before today's training starts. */
+    fun postponeToday() = execute {
+        val current = container.training.observePlan().first() ?: return@execute
+        val today = LocalDate.now()
+        require(container.workouts.observeDailyWorkout(today).first() == null) { "今天的训练已经开始，不能推迟" }
+        container.training.savePlan(current.postpone(today))
+    }
+    fun undoPostponeToday() = execute {
+        val current = container.training.observePlan().first() ?: return@execute
+        container.training.savePlan(current.undoPostpone(LocalDate.now()))
+    }
+    /** Exercises chosen on the picker page join the open template draft in the order they were picked. */
+    fun addExercises(items: List<Exercise>) {
+        val draft = editor.value ?: return
+        if (saving.value) return
+        editor.value = draft.copy(exercises = draft.exercises + items.mapIndexed { index, exercise ->
+            TemplateExercise(java.util.UUID.randomUUID().toString(), exercise.id, draft.exercises.size + index,
+                targetRepMin = exercise.recordMetric.defaultMin, targetRepMax = exercise.recordMetric.defaultMax)
+        })
+    }
     val state = combine(container.training.observeTemplates(), container.workouts.observeExercises(),
         container.preferences.preferences, container.training.observeTemplateDrafts()) { templates, exercises, preferences, drafts ->
         TemplateUiState(templates, exercises, preferences, drafts)

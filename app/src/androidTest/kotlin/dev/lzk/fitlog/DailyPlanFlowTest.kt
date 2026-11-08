@@ -51,7 +51,9 @@ class DailyPlanFlowTest {
         assertEquals(id, day().session.id)
         assertEquals(1, day().completedSetCount)
         complete()
-        waitText("全部目标已完成"); compose.onNodeWithText("完成", substring = false).performClick()
+        waitText("今日计划完成"); compose.onNodeWithTag("plan-done-back").performClick()
+        compose.onNodeWithTag("plan-review-banner").assertExists()
+        compose.onNodeWithContentDescription("返回今日").performClick()
         waitText("查看今日计划")
         assertEquals(2, day().completedSetCount)
         val history = runBlocking { container.training.observeHistory(LocalDate.now(), LocalDate.now()).first() }
@@ -63,18 +65,21 @@ class DailyPlanFlowTest {
         complete(); compose.waitUntil(10_000) { day().completedSetCount == 1 }
         compose.onNodeWithTag("workout-exercises").performClick()
         compose.onNodeWithTag("remove-action-barbell-bench-press").performClick()
-        compose.onNodeWithText("确认移除动作").performClick()
+        // Removal is confirmed inside the row itself.
+        compose.onNodeWithTag("confirm-remove-barbell-bench-press").performClick()
         compose.waitUntil(10_000) { day().exercises.single().removedFromPlan }
         assertEquals(1, day().completedSetCount)
         compose.onNodeWithTag("add-action-set-barbell-bench-press").performClick()
         compose.waitUntil(10_000) { day().plannedSetCount == 2 && !day().exercises.single().removedFromPlan }
         compose.onNodeWithText("收起").performClick()
         complete()
-        waitText("全部目标已完成"); compose.onNodeWithText("完成", substring = false).performClick()
+        waitText("今日计划完成"); compose.onNodeWithTag("plan-done-back").performClick()
+        compose.onNodeWithContentDescription("返回今日").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("home-today-actions").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("home-today-actions").performScrollTo().performClick()
-        compose.onNodeWithTag("add-action-set-barbell-bench-press").performClick()
+        compose.onNodeWithTag("add-action-set-barbell-bench-press").performScrollTo().performClick()
         compose.waitUntil(10_000) { day().plannedSetCount == 3 }
-        compose.onNodeWithText("收起").performClick()
+        compose.onNodeWithTag("home-today-actions").performScrollTo().performClick()
         waitText("继续今日计划")
         assertEquals(2, day().completedSetCount)
         assertFalse(day().session.isExtra)

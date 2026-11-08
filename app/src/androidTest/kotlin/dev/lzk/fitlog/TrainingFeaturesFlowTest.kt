@@ -74,15 +74,20 @@ class TrainingFeaturesFlowTest {
         waitWorkout { it.session.restEndsAtUtc == null }
         val sessionId = runBlocking { container.workouts.observeActiveWorkout().first()!!.session.id }
         compose.onNodeWithContentDescription("完成当前第2组").performClick()
-        waitText("全部目标已完成")
-        compose.onNodeWithText("训练感想（选填）").performTextInput("状态不错")
-        compose.onNodeWithText("完成", substring = false).performClick()
+        // Today's plan finishing stays on the page with a back / extra choice.
+        waitText("今日计划完成")
+        compose.onNodeWithText("今天感觉如何（选填）").performTextInput("状态不错")
+        compose.onNodeWithTag("plan-done-back").performClick()
+        compose.onNodeWithTag("plan-review-banner").assertExists()
+        compose.onNodeWithContentDescription("返回今日").performClick()
         compose.onNodeWithTag("open-history").performClick()
         waitText("训练历史")
-        compose.onNodeWithTag("history-list").performScrollToNode(hasText("轻松推日 · 已完成"))
-        compose.onNodeWithText("轻松推日 · 已完成").performClick()
+        compose.onNodeWithTag("history-list").performScrollToNode(hasTestTag("history-session"))
+        compose.onNodeWithTag("history-session").assert(hasAnyDescendant(hasText("已完成")))
         waitText("状态不错")
-        compose.onNodeWithText("1.  37.5 kg × 8 · 已完成").assertExists()
+        compose.onNodeWithText("轻松推日", substring = false).performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("history-session-detail").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("第1组 37.5 kg × 8").assertExists()
         runBlocking {
             val saved = container.workouts.observeWorkout(sessionId).first()!!
             assertEquals(SessionStatus.FINISHED, saved.session.status)

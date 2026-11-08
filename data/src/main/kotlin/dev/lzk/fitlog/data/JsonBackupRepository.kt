@@ -36,7 +36,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             }
             data.put(table, rows)
         }
-        JSONObject().put("format", "FitLog").put("schemaVersion", 7).put("data", data).apply {
+        JSONObject().put("format", "FitLog").put("schemaVersion", 8).put("data", data).apply {
             preferences?.let {put("preferences",it.preferences.first().backupJson())}
             preparation?.let {put("preparedExercises",JSONArray(it.preparedExercises.first()))}
         }.toString()
@@ -64,7 +64,7 @@ class JsonBackupRepository(private val database: FitLogDatabase,
         }
         val root = JSONObject(json)
         val version = root.integer("schemaVersion")
-        require(root.getString("format") == "FitLog" && version in 1..7) { "不支持的备份版本" }
+        require(root.getString("format") == "FitLog" && version in 1..8) { "不支持的备份版本" }
         val restoredPreferences = if(version>=3) root.optJSONObject("preferences")?.backupPreferences() else null
         val prepared = if(version>=3) root.optJSONArray("preparedExercises")?.strings() else null
         require(prepared==null || prepared.size<=30 && prepared.distinct().size==prepared.size) {"待开始动作无效"}
@@ -109,7 +109,8 @@ class JsonBackupRepository(private val database: FitLogDatabase,
                 if(version>=6) it.flag("removedFromPlan") else false) },
             data.rows("set_records") { SetEntity(it.text("id"), it.text("sessionExerciseId"), it.integer("setIndex"), it.number("weightGrams"),
                 it.integer("reps"), it.text("status"), it.optionalLong("completedAtUtc"), it.text("setType")) },
-            if (version >= 2) data.rows("training_plans") { TrainingPlanEntity(it.text("id"), it.text("startDate"), it.integer("cycleDays"), it.flag("repeats")) } else emptyList(),
+            if (version >= 2) data.rows("training_plans") { TrainingPlanEntity(it.text("id"), it.text("startDate"), it.integer("cycleDays"), it.flag("repeats"),
+                if (version >= 8) it.text("postponedDates") else "") } else emptyList(),
             if (version >= 2) data.rows("plan_days") { PlanDayEntity(it.text("planId"), it.integer("dayIndex"), it.optionalText("templateId")) } else emptyList(),
         )
         incoming.validateValues()
@@ -140,7 +141,11 @@ class JsonBackupRepository(private val database: FitLogDatabase,
             val sessions = fresh(incoming.sessions, existing.sessions) { it.id }
             val sessionExercises = fresh(incoming.sessionExercises, existing.sessionExercises) { it.id }
             val sets = fresh(incoming.sets, existing.sets) { it.id }
-            val plans = fresh(incoming.plans, existing.plans) { it.id }
+            // Backups older than v8 carry no postponed days, so the plan already here is matched without them.
+            val localPlans = existing.plans.associateBy { it.id }
+            val incomingPlans = if (version >= 8) incoming.plans
+                else incoming.plans.map { p -> localPlans[p.id]?.let { p.copy(postponedDates = it.postponedDates) } ?: p }
+            val plans = fresh(incomingPlans, existing.plans) { it.id }
             val planDays = fresh(incoming.planDays, existing.planDays) { "${it.planId}:${it.dayIndex}" }
             Bundle(existing.exercises + newExercises, existing.muscles + muscles, existing.templates + templates,
                 existing.templateExercises + templateExercises, existing.sessions + sessions,
@@ -197,7 +202,11 @@ class JsonBackupRepository(private val database: FitLogDatabase,
     ) {
         fun validateValues() {
             require(plans.size <= 1 && plans.all { it.id == "current" && it.cycleDays in 1..14 })
-            plans.forEach { LocalDate.parse(it.startDate) }
+            plans.forEach { plan ->
+                val start = LocalDate.parse(plan.startDate)
+                val postponed = plan.postponed()
+                require(postponed.size <= 366 && postponed.none { it.isBefore(start) } && postponed.joinDates() == plan.postponedDates) { "计划推迟记录无效" }
+            }
             require(planDays.distinctBy { it.planId to it.dayIndex }.size == planDays.size)
             unique(exercises.map { it.id }); unique(templates.map { it.id }); unique(templateExercises.map { it.id })
             unique(sessions.map { it.id }); unique(sessionExercises.map { it.id }); unique(sets.map { it.id })

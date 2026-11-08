@@ -8,7 +8,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -41,10 +43,12 @@ private data class NumberEdit(val kind: EditKind, val setId: String?, val initia
 fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> Unit, onAdd: () -> Unit, onFinish: () -> Unit,
     catalog: List<Exercise> = emptyList()) {
     BackHandler(onBack = onBack)
-    val workout = state.workout
+    val workout = state.shown
+    // After “返回” on the plan-complete popup the finished plan stays here; an edit reopens it.
+    val reviewing = state.workout == null && state.review != null
     val exercise = state.selectedExercise
     val unit = state.preferences.weightUnit
-    val canEdit = workout?.session?.status != SessionStatus.PAUSED
+    val canEdit = reviewing || workout?.session?.status != SessionStatus.PAUSED
     val haptics = fitHaptics()
     val scope = rememberCoroutineScope()
     var showingActions by remember { mutableStateOf(false) }
@@ -52,8 +56,7 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
     var showingEffort by remember { mutableStateOf(false) }
     var celebrating by remember { mutableStateOf(false) }
     var confetti by remember { mutableIntStateOf(0) }
-    // Sets that beat the stored best while this screen was open; the stamp is a moment, not a record field.
-    var recordSetIds by remember { mutableStateOf(emptySet<String>()) }
+    var medalOpen by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(model) {
         model.completedSets.collectLatest {
             showingEffort = true
@@ -75,29 +78,36 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
         model.completeSet(current.id, record.id)
         haptics.confirm()
         if (isRecord) {
-            recordSetIds = recordSetIds + record.id
             confetti++
             scope.launch { delay(120); haptics.double() }
             scope.launch { celebrating = true; delay(1_400); celebrating = false }
         }
     }
-    if(showingActions && workout != null) TodayActionsDialog(workout, onClose = { showingActions = false },
+    if(showingActions && workout != null) TodayActionsSheet(workout, catalog, exercise?.id, editable = canEdit, onClose = { showingActions = false },
         onSelect = { model.selectExercise(it); showingActions = false }, onAdd = { showingActions = false; onAdd() },
         onAddSet = { if(workout.session.dailyPlanDate != null) model.addDailySet(it) else model.adjustTargetSetCount(it, 1) },
-        onRemove = model::removeExercise, editable = canEdit)
+        onRemove = model::removeExercise)
+    state.planDone?.let { done -> PlanDoneDialog(done, state.recordSets, unit, onBack = model::keepReviewing, onExtra = model::extraAfterPlan) }
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { LineIcon(Symbol.BACK, Modifier.size(22.dp).semanticsLabel("返回今日"), MaterialTheme.colorScheme.onSurface) }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(if (workout?.session?.status == SessionStatus.PAUSED) "已暂停" else "训练中", style = MaterialTheme.typography.titleMedium)
+                Text(when { reviewing -> "已完成"; workout?.session?.status == SessionStatus.PAUSED -> "已暂停"; else -> "训练中" },
+                    style = MaterialTheme.typography.titleMedium, color = if (reviewing) MaterialTheme.colorScheme.primary else Color.Unspecified)
                 workout?.let { Text(it.elapsedDuration(now).timerText(), color = MaterialTheme.colorScheme.primary, style = pixelNumber(15.sp)) }
             }
-            if (workout != null) OutlinedButton(onClick = { model.setPaused(canEdit) }, contentPadding = PaddingValues(horizontal = 12.dp),
+            if (workout != null && !reviewing) OutlinedButton(onClick = { model.setPaused(canEdit) }, contentPadding = PaddingValues(horizontal = 12.dp),
                 modifier = Modifier.heightIn(min = 36.dp)) {
                 LineIcon(if (canEdit) Symbol.PAUSE else Symbol.PLAY, Modifier.size(12.dp)); Spacer(Modifier.width(6.dp)); Text(if (canEdit) "暂停" else "恢复")
             }
-            TextButton(onClick = onFinish, enabled = workout != null) { Text("结束") }
+            if (!reviewing) TextButton(onClick = onFinish, enabled = workout != null) { Text("结束") } else Spacer(Modifier.width(48.dp))
+        }
+        if (reviewing) Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp).background(MaterialTheme.colorScheme.primaryContainer, PixelShapeSmall)
+            .padding(horizontal = 12.dp, vertical = 8.dp).testTag("plan-review-banner"), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LineIcon(Symbol.CHECK, Modifier.size(12.dp), MaterialTheme.colorScheme.primary)
+            Text("今日计划已完成", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold), color = MaterialTheme.colorScheme.primary)
         }
         if(workout != null) {
             OutlinedButton(onClick = { showingActions = true }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).heightIn(min = 44.dp).testTag("workout-exercises")) {
@@ -168,13 +178,14 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
             items(exercise.sets, key = { it.id }) { record ->
                 SetRecordCard(
                     record = record, unit = unit, recordMetric=exercise.recordMetricSnapshot,canEdit = canEdit, step = state.preferences.weightStepGrams,
-                    current = record.id == nextId, isRecord = record.id in recordSetIds && record.status == SetStatus.COMPLETED,
+                    current = record.id == nextId, previousBest = state.recordSets[record.id]?.takeIf { record.status == SetStatus.COMPLETED },
+                    medalOpen = medalOpen == record.id, onMedal = { medalOpen = if (medalOpen == record.id) null else record.id },
                     onWeight = { editor = NumberEdit(EditKind.WEIGHT, record.id, WeightUnits.format(record.weightGrams, unit, editing = true)) },
                     onReps = { editor = NumberEdit(EditKind.REPS, record.id, record.reps.toString()) },
                     onWeightDelta = { haptics.tick(); model.adjustDraft(exercise.id, record.id, weightDeltaGrams = it) },
                     onRepsDelta = { haptics.tick(); model.adjustDraft(exercise.id, record.id, repsDelta = it) },
                     onToggle = {
-                        if (record.status == SetStatus.COMPLETED) { haptics.tick(); recordSetIds = recordSetIds - record.id; model.undoSet(exercise.id, record.id) }
+                        if (record.status == SetStatus.COMPLETED) { haptics.tick(); medalOpen = null; model.undoSet(exercise.id, record.id) }
                         else complete(record)
                     },
                 )
@@ -270,7 +281,8 @@ private fun RestBand(rest: Long, planned: Long, onSkip: () -> Unit) {
 private fun SetRecordCard(
     record: SetRecord, unit: WeightUnit, canEdit: Boolean, step: Long, onWeight: () -> Unit, onReps: () -> Unit,
     onWeightDelta: (Long) -> Unit, onRepsDelta: (Int) -> Unit, onToggle: () -> Unit,
-    recordMetric:RecordMetric=RecordMetric.REPETITIONS, current: Boolean = false, isRecord: Boolean = false,
+    recordMetric:RecordMetric=RecordMetric.REPETITIONS, current: Boolean = false, previousBest: Long? = null,
+    medalOpen: Boolean = false, onMedal: () -> Unit = {},
 ) {
     val completed = record.status == SetStatus.COMPLETED
     val editable = canEdit && record.status == SetStatus.PLANNED
@@ -287,10 +299,21 @@ private fun SetRecordCard(
                 }
                 Text(if (completed) "已完成" else if (current && canEdit) "当前组" else "待完成", Modifier.padding(start = 10.dp),
                     style = MaterialTheme.typography.labelLarge, color = if (current && canEdit && !completed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                if (isRecord) PrStamp(Modifier.padding(start = 10.dp))
+                if (previousBest != null) RecordMedal(record.setIndex, onMedal, Modifier.padding(start = 10.dp))
                 Spacer(Modifier.weight(1f))
                 PixelCheck(completed, onToggle, enabled = canEdit, modifier = Modifier.semanticsLabel(
                     if (completed) "撤销第${record.setIndex}组" else "完成第${record.setIndex}组"))
+            }
+            if (previousBest != null) AnimatedVisibility(medalOpen, enter = expandVertically(tween(150, easing = StepEasing(3))), exit = shrinkVertically(tween(120))) {
+                Row(Modifier.padding(end = 8.dp).background(MaterialTheme.colorScheme.inverseSurface, RoundedCornerShape16).padding(horizontal = 10.dp, vertical = 6.dp)
+                    .testTag("record-bubble"), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    val ink = MaterialTheme.colorScheme.inverseOnSurface
+                    Text("新纪录", Modifier.padding(bottom = 1.dp), style = MaterialTheme.typography.labelMedium, color = ink)
+                    Text(WeightUnits.format(record.weightGrams, unit), style = pixelNumber(17.sp), color = ink)
+                    Text("${unit.label} · 之前最高", Modifier.padding(bottom = 1.dp), style = MaterialTheme.typography.labelMedium, color = ink)
+                    Text(WeightUnits.format(previousBest, unit), style = pixelNumber(17.sp), color = ink)
+                    Text(unit.label, Modifier.padding(bottom = 1.dp), style = MaterialTheme.typography.labelMedium, color = ink)
+                }
             }
             Box(Modifier.padding(end = 8.dp)) {
                 val weight: @Composable (Modifier) -> Unit = { modifier ->
@@ -314,6 +337,68 @@ private fun SetRecordCard(
 }
 
 private val RoundedCornerShape16 = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+
+/** Pixel medal on a set that beat the earlier best; stays as long as the set does, a tap shows the comparison. */
+@Composable
+private fun RecordMedal(setIndex: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val fit = fitColors
+    val stamp = remember { Animatable(1.4f) }
+    LaunchedEffect(Unit) { stamp.animateTo(1f, tween(160, easing = StepEasing(3))) }
+    Box(modifier.size(28.dp).graphicsLayer { scaleX = stamp.value; scaleY = stamp.value }
+        .background(fit.cream, PixelShapeSmall).border(1.5.dp, fit.orange, PixelShapeSmall)
+        .clickable(onClick = onClick).testTag("record-medal-$setIndex").semanticsLabel("第${setIndex}组新纪录"),
+        contentAlignment = Alignment.Center) {
+        LineIcon(Symbol.MEDAL, Modifier.size(15.dp), fit.orangeDeep)
+    }
+}
+
+/**
+ * Today's plan is done: figures, this session's records, an optional feeling, then “返回” (stay on the page, the
+ * plan can still be corrected) or “加练” (straight into an extra workout). Dismissing counts as “返回”.
+ */
+@Composable
+private fun PlanDoneDialog(workout: Workout, records: Map<String, Long>, unit: WeightUnit, onBack: (String) -> Unit, onExtra: (String) -> Unit) {
+    var feeling by rememberSaveable(workout.session.id) { mutableStateOf(workout.session.feedback.orEmpty()) }
+    val scheme = MaterialTheme.colorScheme
+    val fit = fitColors
+    val bests = workout.exercises.mapNotNull { e -> e.sets.firstOrNull { it.id in records }?.let { Triple(e.exerciseNameSnapshot, it.weightGrams, records.getValue(it.id)) } }
+    AlertDialog(onDismissRequest = { onBack(feeling) }, modifier = Modifier.testTag("plan-done"),
+        icon = { PixelPuppy(Modifier.size(64.dp), PuppyPose.CELEBRATE) },
+        title = { Text("今日计划完成") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("${workout.completedExerciseCount}" to "动作", "${workout.completedSetCount}" to "组",
+                        "${workout.elapsedDuration(Instant.now()).toMinutes()}" to "分钟").forEach { (value, label) ->
+                        Column(Modifier.weight(1f).background(scheme.surfaceVariant, PixelShapeSmall).padding(horizontal = 8.dp, vertical = 6.dp)) {
+                            Text(value, style = pixelNumber(26.sp), color = scheme.onSurface)
+                            Text(label, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                if (bests.isNotEmpty()) Column(Modifier.fillMaxWidth().background(fit.cream, PixelShapeSmall).padding(10.dp).testTag("plan-done-records"),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    bests.forEach { (name, weight, before) ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            LineIcon(Symbol.MEDAL, Modifier.size(13.dp), fit.orangeDeep)
+                            Text(name, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold), maxLines = 1)
+                            Text(WeightUnits.format(weight, unit), style = pixelNumber(19.sp), color = scheme.onSurface)
+                            Text("${unit.label} · 之前 ${WeightUnits.format(before, unit)}", style = MaterialTheme.typography.labelSmall, color = fit.orangeDeep)
+                        }
+                    }
+                }
+                OutlinedTextField(feeling, { feeling = it.take(2000) }, label = { Text("今天感觉如何（选填）") }, maxLines = 3, modifier = Modifier.fillMaxWidth())
+            }
+        },
+        dismissButton = {
+            PixelOutlineKey(onClick = { onBack(feeling) }, minHeight = 42.dp, minWidth = 96.dp, modifier = Modifier.testTag("plan-done-back")) { Text("返回", maxLines = 1) }
+        },
+        confirmButton = {
+            PixelKey(onClick = { onExtra(feeling) }, minHeight = 42.dp, minWidth = 96.dp, depth = 4.dp, modifier = Modifier.testTag("plan-done-extra")) {
+                LineIcon(Symbol.PLUS, Modifier.size(12.dp), LocalContentColor.current); Text("加练", maxLines = 1)
+            }
+        })
+}
 
 private fun Color.compositeOn(background: Color): Color = Color(
     red = red * alpha + background.red * (1 - alpha), green = green * alpha + background.green * (1 - alpha),

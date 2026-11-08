@@ -11,7 +11,7 @@ import kotlin.math.floor
 
 enum class Symbol { HOME, DUMBBELL, BACK, PLUS, CHECK, SEARCH, ARROW, MINUS, CLOCK, LIST, SETTINGS, FRIENDS, PERSON, PLAY, SPARK, DOWN, CLOSE, PAUSE,
     STAR, STAR_FILLED, ARCHIVE, UNARCHIVE, EDIT, BARBELL, MACHINE, CABLE, SMITH, BODYWEIGHT, IMAGE, PIN, TRASH, UP, TUNE,
-    CLOUD, EXPORT, IMPORT, SUN, MOON, VIBRATE, CHAT }
+    CLOUD, EXPORT, IMPORT, SUN, MOON, VIBRATE, CHAT, MEDAL }
 
 /** Solid 12×12 pixel glyphs drawn to match the puppy's outline weight. `#` marks a filled cell. */
 private val Glyphs: Map<Symbol, List<String>> = mapOf(
@@ -38,6 +38,8 @@ private val Glyphs: Map<Symbol, List<String>> = mapOf(
     Symbol.MOON to listOf("...#####", ".####...", "####....", "###.....", "###.....", "####....", ".####...", "...#####"),
     Symbol.VIBRATE to listOf("#..######..#", "#..#....#..#", ".#.#....#.#.", ".#.#....#.#.", "#..#....#..#", "#..#....#..#", "...######..."),
     Symbol.CHAT to listOf("############", "#..........#", "#.##.##.##.#", "#..........#", "############", "..##........", ".#.........."),
+    // Record medal: a ribbon over a round medal with a square boss.
+    Symbol.MEDAL to listOf(".##....##.", "..##..##..", "...####...", "..######..", ".##....##.", ".#..##..#.", ".#..##..#.", ".##....##.", "..######..", "...####..."),
     Symbol.TUNE to listOf(".#.....#.", ".#.....#.", "###....#.", "###....#.", ".#.....#.", ".#....###", ".#....###", ".#.....#.", ".#.....#."),
     Symbol.SEARCH to listOf("..####.....", ".#....#....", "#......#...", "#......#...", "#......#...", ".#....#....", "..####.#...", ".......##..", "........##.", ".........##"),
     Symbol.PLAY to listOf("##.....", "####...", "######.", "#######", "######.", "####...", "##....."),

@@ -96,9 +96,13 @@ class WorkoutFlowTest {
     }
 
     private fun addExercise(name: String) {
+        // The picker is its own page: no bottom navigation, pick then confirm.
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("picker-search").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("main-navigation").assertDoesNotExist()
         compose.onNode(hasSetTextAction()).performTextReplacement(name)
         compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("添加$name").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("添加$name").performClick()
+        compose.onNodeWithTag("picker-confirm").performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("完成本组").fetchSemanticsNodes().isNotEmpty() }
     }
 

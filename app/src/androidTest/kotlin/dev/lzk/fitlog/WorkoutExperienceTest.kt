@@ -184,14 +184,19 @@ class WorkoutExperienceTest {
         compose.onNodeWithTag("open-templates").performClick()
         waitText("设置健身计划")
         compose.onNodeWithText("设置健身计划").performClick()
-        compose.onNodeWithText("周期天数（1～14）").assert(hasText("7"))
+        compose.onNodeWithTag("plan-length").assert(hasContentDescription("7 天循环"))
         compose.onNodeWithContentDescription("循环执行").assertIsOn()
-        compose.onNodeWithText("两周").performClick()
-        compose.onNodeWithTag("plan-day-0").performScrollTo().performClick()
-        compose.onNodeWithText("自己的推日").performClick()
-        compose.onNodeWithTag("plan-editor").performScrollToNode(hasTestTag("plan-day-13"))
-        compose.onNodeWithTag("plan-day-13").performClick()
-        compose.onNodeWithText("自己的推日").performClick()
+        compose.onNodeWithTag("plan-preset-14").performClick()
+        compose.onNodeWithTag("plan-length").assert(hasContentDescription("14 天循环"))
+        fun choose(day: Int) {
+            compose.onNodeWithTag("plan-editor").performScrollToNode(hasTestTag("plan-day-$day"))
+            compose.onNodeWithTag("plan-day-$day").performClick()
+            compose.waitUntil(5_000) { compose.onAllNodesWithTag("plan-option-$id").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("plan-option-$id").performClick()
+            compose.waitUntil(5_000) { compose.onAllNodesWithTag("plan-choice").fetchSemanticsNodes().isEmpty() }
+        }
+        choose(0); choose(13)
+        compose.onNodeWithTag("plan-day-13").assert(hasContentDescription("自己的推日", substring = true))
         compose.onNodeWithText("保存计划").performClick()
         waitText("计划已保存")
         runBlocking {
@@ -230,7 +235,8 @@ class WorkoutExperienceTest {
         listOf("0","1～3","4～8","9～15","16+").forEach { label ->
             compose.onNodeWithContentDescription("完成 $label 组的颜色").assertExists()
         }
-        compose.onNodeWithTag("history-list").performScrollToNode(hasText("自由训练 · 未完成"))
+        compose.onNodeWithTag("history-list").performScrollToNode(hasTestTag("history-session"))
+        compose.onNodeWithTag("history-session").assert(hasAnyDescendant(hasText("自由训练")) and hasAnyDescendant(hasText("未完成")))
         compose.onNodeWithText("0 个完成组", substring = true).assertDoesNotExist()
         compose.onNodeWithText(feeling, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
             val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()

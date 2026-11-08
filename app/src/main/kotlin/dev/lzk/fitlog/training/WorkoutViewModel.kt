@@ -32,10 +32,20 @@ data class WorkoutUiState(
     val summary: Workout? = null,
     val removalRequest: SetRemovalRequest? = null,
     val error: String? = null,
-)
+    /** Today's plan just finished on the workout page: the “今日计划完成” popup. */
+    val planDone: Workout? = null,
+    /** Today's finished plan, kept on the workout page after “返回” so it can be checked or corrected. */
+    val review: Workout? = null,
+    /** Sets that beat this exercise's best from before the session, with that earlier best. */
+    val recordSets: Map<String, Long> = emptyMap(),
+) {
+    /** What the workout page shows: the running session, else the finished plan under review. */
+    val shown: Workout? get() = workout ?: review
+}
 
 private data class LibraryFilter(val query: String = "", val equipment: EquipmentType? = null, val muscle: Muscle? = null, val favorites: Boolean = false, val archived: Boolean = false)
-private data class Feedback(val summary: Workout? = null, val removal: SetRemovalRequest? = null, val error: String? = null)
+private data class Feedback(val summary: Workout? = null, val removal: SetRemovalRequest? = null, val error: String? = null,
+    val planDone: Workout? = null, val reviewing: String? = null)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
@@ -73,19 +83,52 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
             WorkoutUiState(
                 loading = false, exercises = exercises, searchQuery = filter.query, equipment = filter.equipment,
                 muscle = filter.muscle, favoritesOnly = filter.favorites, archived = filter.archived, preferences = preferences, workout = workout,
-                selectedExercise = workout?.exercises?.find { it.id == selected && !it.removedFromPlan } ?: workout?.exercises?.firstOrNull { !it.removedFromPlan && it.sets.any { set -> set.status == SetStatus.PLANNED } }
-                    ?: workout?.exercises?.firstOrNull { !it.removedFromPlan },
-                summary = feedback.summary, removalRequest = feedback.removal, error = feedback.error,
-            )
-        }.combine(todayWorkout) { state, today -> state.copy(todayWorkout = today.second, todayDate = today.first) }
+                selectedExercise = pick(workout, selected),
+                summary = feedback.summary, removalRequest = feedback.removal, error = feedback.error, planDone = feedback.planDone,
+            ) to (feedback.reviewing to selected)
+        }.combine(todayWorkout) { (state, extra), today ->
+            val (reviewing, selected) = extra
+            val review = today.second?.takeIf { state.workout == null && it.session.id == reviewing && it.session.status == SessionStatus.FINISHED }
+            state.copy(todayWorkout = today.second, todayDate = today.first, review = review,
+                selectedExercise = state.selectedExercise ?: pick(review, selected))
+        }
         .combine(container.preparation.preparedExercises) { state, ids -> state.copy(preparedExerciseIds = ids) }.mapLatest { state ->
             val exercise = state.selectedExercise
-            state.copy(lastPerformance = exercise?.let { last(it.exerciseId, it.sessionId) })
+            state.copy(lastPerformance = exercise?.let { last(it.exerciseId, it.sessionId) }, recordSets = records(state.shown))
         })
     }.catch { error ->
         if (error is CancellationException) throw error
         emit(WorkoutUiState(loading = false, error = error.message ?: "读取训练失败"))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WorkoutUiState())
+
+    private fun pick(workout: Workout?, selected: String?): SessionExercise? =
+        workout?.exercises?.find { it.id == selected && !it.removedFromPlan }
+            ?: workout?.exercises?.firstOrNull { !it.removedFromPlan && it.sets.any { set -> set.status == SetStatus.PLANNED } }
+            ?: workout?.exercises?.firstOrNull { !it.removedFromPlan }
+
+    /**
+     * For each exercise, the heaviest completed set that beats the best from every other session; ties go to the first
+     * such set. A first-ever session has nothing to beat, so it carries no medal.
+     */
+    private suspend fun records(workout: Workout?): Map<String, Long> {
+        workout ?: return emptyMap()
+        val result = HashMap<String, Long>()
+        workout.exercises.filter { it.recordMetricSnapshot == RecordMetric.REPETITIONS }.forEach { exercise ->
+            val done = exercise.sets.filter { it.status == SetStatus.COMPLETED }
+            if (done.isEmpty()) return@forEach
+            val before = repository.previousBestWeight(exercise.exerciseId, workout.session.id)?.takeIf { it > 0 } ?: return@forEach
+            val top = done.maxOf { it.weightGrams }
+            if (top > before) done.first { it.weightGrams == top }.let { result[it.id] = before }
+        }
+        return result
+    }
+
+    /** Edits on today's finished plan under review reopen it first (the timer resumes without the stopped stretch). */
+    private suspend fun reopenIfReviewing() {
+        val id = feedback.value.reviewing ?: return
+        if (repository.observeActiveWorkout().first() != null) return
+        repository.reopenDailyWorkout(id)
+    }
 
     val currentSearchQuery: String get() = filters.value.query
 
@@ -96,10 +139,36 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
     fun archived(value: Boolean) { filters.update { it.copy(archived = value) } }
     fun favorite(exercise: Exercise) = mutate { container.training.setFavorite(exercise.id, !exercise.isFavorite) }
     fun archive(exercise: Exercise) = mutate { container.training.setArchived(exercise.id, !exercise.isArchived) }
-    fun createCustom(draft: CustomExerciseDraft) = mutate { container.training.createCustomExercise(draft) }
+    fun createCustom(draft: CustomExerciseDraft, onCreated: (String) -> Unit = {}) = mutate { onCreated(container.training.createCustomExercise(draft)) }
     fun selectExercise(id: String) { selection.value = id }
     fun clearError() { feedback.update { it.copy(error = null) } }
     fun dismissSummary() { feedback.update { it.copy(summary = null) } }
+    /** “返回” on the plan-complete popup: stay on the page with the finished plan. */
+    fun keepReviewing(feeling: String) = mutate {
+        val done = feedback.value.planDone ?: return@mutate
+        if (feeling.isNotBlank()) repository.saveFeedback(done.session.id, feeling)
+        feedback.update { it.copy(planDone = null, reviewing = done.session.id) }
+    }
+    /** “加练” on the plan-complete popup: straight into an empty extra workout, without the home page in between. */
+    fun extraAfterPlan(feeling: String) = mutate {
+        val done = feedback.value.planDone ?: return@mutate
+        if (feeling.isNotBlank()) repository.saveFeedback(done.session.id, feeling)
+        check(repository.observeActiveWorkout().first() == null) { "请先结束当前训练" }
+        repository.startWorkout(exerciseIds = container.preparation.preparedExercises.first())
+        container.preparation.savePreparedExercises(emptyList())
+        selection.value = null; feedback.value = Feedback()
+    }
+    /** Leaving the workout page ends the review of a finished plan. */
+    fun stopReviewing() { feedback.update { it.copy(planDone = null, reviewing = null) } }
+    /** Adds the picker's exercises in order; the last one becomes the current exercise. */
+    fun addExercises(ids: List<String>) = mutate {
+        ids.forEach { exerciseId ->
+            val workout = repository.observeActiveWorkout().first()
+            if (workout != null) selection.value = addDefault(workout.session.id, exerciseId, WorkoutRules.DEFAULT_SET_COUNT)
+            else if (repository.observeDailyWorkout(java.time.LocalDate.now()).first() != null) repository.addDailyExercise(exerciseId)
+            else container.preparation.savePreparedExercises((container.preparation.preparedExercises.first() + exerciseId).distinct())
+        }
+    }
     fun cancelSetRemoval() { feedback.update { it.copy(removal = null) } }
 
     fun startWorkout(templateId: String? = null) = mutate {
@@ -154,6 +223,7 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
     fun setDefaultWeight(exerciseId: String, weight: Long?) = mutate { container.training.setDefaultWeight(exerciseId, weight) }
 
     fun updateDraft(sessionExerciseId: String, setId: String, weightGrams: Long, reps: Int) = mutate {
+        reopenIfReviewing()
         update(sessionExerciseId, setId, weightGrams, reps)
     }
 
@@ -163,15 +233,18 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun adjustDraft(sessionExerciseId: String, setId: String, weightDeltaGrams: Long = 0, repsDelta: Int = 0) = mutate {
+        reopenIfReviewing()
         update.adjust(sessionExerciseId, setId, weightDeltaGrams, repsDelta)
     }
 
     fun setTargetSetCount(sessionExerciseId: String, count: Int) = mutate {
+        reopenIfReviewing()
         val sessionId = repository.observeActiveWorkout().first()?.session?.id
         handleSetCount(sessionId, sessionExerciseId, count, setCount(sessionExerciseId, count, finishWhenAllDone = true))
     }
 
     fun adjustTargetSetCount(sessionExerciseId: String, delta: Int) = mutate {
+        reopenIfReviewing()
         val sessionId = repository.observeActiveWorkout().first()?.session?.id
         val result = setCount.adjust(sessionExerciseId, delta, finishWhenAllDone = true)
         handleSetCount(sessionId, sessionExerciseId, (result as? SetCountResult.ConfirmationRequired)?.targetCount ?: 0, result)
@@ -184,6 +257,7 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun completeSet(sessionExerciseId: String, setId: String) = mutate {
+        reopenIfReviewing()
         val preferences = container.preferences.preferences.first()
         val exercise = repository.observeActiveWorkout().first()?.exercises?.find { it.id == sessionExerciseId }
             ?: throw WorkoutException(WorkoutError.NOT_FOUND, "训练动作不存在")
@@ -193,9 +267,7 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
             if (preferences.restEnabled) exercise.restSecondsSnapshot ?: preferences.restSeconds else 0, finishWhenAllDone = true)
         if (result is CompletionResult.Completed) {
             completions.emit(result.record)
-            repository.observeWorkout(exercise.sessionId).first()?.let { saved ->
-                if (saved.session.status == SessionStatus.FINISHED) feedback.update { it.copy(summary = saved, removal = null) }
-            }
+            repository.observeWorkout(exercise.sessionId).first()?.let(::announceFinished)
         }
     }
 
@@ -206,7 +278,14 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
     }
     fun skipRest() = mutate { repository.observeActiveWorkout().first()?.let { repository.skipRest(it.session.id) } }
 
-    fun undoSet(sessionExerciseId: String, setId: String) = mutate { undo(sessionExerciseId, setId) }
+    fun undoSet(sessionExerciseId: String, setId: String) = mutate { reopenIfReviewing(); undo(sessionExerciseId, setId) }
+
+    /** Today's plan finishing keeps the page and asks back / extra; any other session shows the usual summary. */
+    private fun announceFinished(saved: Workout) {
+        if (saved.session.status != SessionStatus.FINISHED) return
+        if (saved.session.dailyPlanDate == java.time.LocalDate.now()) feedback.update { it.copy(planDone = saved, reviewing = saved.session.id, removal = null) }
+        else feedback.update { it.copy(summary = saved, removal = null) }
+    }
 
     fun finishWorkout(sessionId: String, feedbackText: String? = null) = mutate {
         val summary = finish(sessionId, feedbackText)
@@ -215,9 +294,7 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
 
     private suspend fun handleSetCount(sessionId: String?, id: String, count: Int, result: SetCountResult) {
         if (result == SetCountResult.Updated && sessionId != null) {
-            repository.observeWorkout(sessionId).first()?.let { saved ->
-                if (saved.session.status == SessionStatus.FINISHED) feedback.update { it.copy(summary = saved) }
-            }
+            repository.observeWorkout(sessionId).first()?.let(::announceFinished)
         }
         feedback.update { it.copy(removal = when (result) {
             SetCountResult.Updated -> null

@@ -226,6 +226,11 @@ class RoomWorkoutRepository(
         }
     }
 
+    override suspend fun previousBestWeight(exerciseId: String, excludingSessionId: String): Long? =
+        dao.bestWeightExcluding(exerciseId, excludingSessionId)
+
+    override suspend fun reopenDailyWorkout(sessionId: String) = daily.reopen(sessionId)
+
     override suspend fun getLastExercisePerformance(exerciseId: String, excludingSessionId: String?): ExercisePerformance? =
         database.withTransaction {
             val previous = dao.lastPerformance(exerciseId, excludingSessionId) ?: return@withTransaction null

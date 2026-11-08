@@ -306,7 +306,7 @@ private fun SettingRow(title: String, note: String? = null, flash: Int = 0, trai
 }
 
 @Composable
-private fun EquipmentTiles(selected: Set<EquipmentType>, onToggle: (EquipmentType) -> Unit) {
+internal fun EquipmentTiles(selected: Set<EquipmentType>, onToggle: (EquipmentType) -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val haptics = fitHaptics()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

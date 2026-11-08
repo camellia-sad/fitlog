@@ -86,14 +86,14 @@ private fun String.takeCodePoints(count: Int): String =
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TemplateEditor(draft: TemplateDraft, templates: List<WorkoutTemplate>, exercises: List<Exercise>, preferences: UserPreferences,
-    dirty: Boolean, saving: Boolean, message: String?, onBack: () -> Unit, onChange: (TemplateDraft) -> Unit, onSave: (TemplateDraft) -> Unit) {
+    dirty: Boolean, saving: Boolean, message: String?, onBack: () -> Unit, onChange: (TemplateDraft) -> Unit, onAddExercises: () -> Unit,
+    onSave: (TemplateDraft) -> Unit) {
     val latest by rememberUpdatedState(draft)
     val focus = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val snack = remember { SnackbarHostState() }
     val haptics = fitHaptics()
     var name by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(draft.name)) }
-    var selecting by remember { mutableStateOf(false) }
     var openId by rememberSaveable { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -185,7 +185,7 @@ internal fun TemplateEditor(draft: TemplateDraft, templates: List<WorkoutTemplat
                 }
                 item(key = "add") {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Surface(onClick = { selecting = true }, enabled = !saving, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        Surface(onClick = { commitName(); onAddExercises() }, enabled = !saving, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("template-add-exercises"),
                             shape = RoundedCornerShape(14.dp), color = Color.Transparent) {
                             val outline = MaterialTheme.colorScheme.outline
                             Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).drawBehind {
@@ -201,11 +201,6 @@ internal fun TemplateEditor(draft: TemplateDraft, templates: List<WorkoutTemplat
             }
             SnackbarHost(snack, Modifier.align(Alignment.BottomCenter).padding(horizontal = 12.dp, vertical = 12.dp))
         }
-    }
-    if (selecting) ExercisePickerSheet(exercises, onDismiss = { selecting = false }) { exercise ->
-        onChange(latest.copy(exercises = latest.exercises + TemplateExercise(UUID.randomUUID().toString(), exercise.id, latest.exercises.size,
-            targetRepMin = exercise.recordMetric.defaultMin, targetRepMax = exercise.recordMetric.defaultMax)))
-        selecting = false
     }
 }
 
@@ -235,36 +230,6 @@ private fun ShortNameField(value: TextFieldValue, error: String?, custom: Boolea
                     size = androidx.compose.ui.geometry.Size(size.width, 56.dp.toPx().coerceAtMost(size.height - 8.dp.toPx())),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())) })
         ShortNamePreview(value.text, mix, Modifier.padding(top = 8.dp))
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ExercisePickerSheet(exercises: List<Exercise>, onDismiss: () -> Unit, onPick: (Exercise) -> Unit) {
-    var search by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
-    val matches = remember(exercises, search.text) {
-        val query = search.text.trim()
-        exercises.filter { !it.isArchived && (it.nameZh.contains(query, ignoreCase = true) || it.nameEn.contains(query, ignoreCase = true)) }
-    }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().heightIn(max = 560.dp).imePadding().padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            OneLineText("添加模板动作", style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(search, { search = it }, modifier = Modifier.fillMaxWidth().testTag("template-exercise-search"),
-                singleLine = true, placeholder = { Text("搜索动作中文名或英文名") },
-                leadingIcon = { LineIcon(Symbol.SEARCH, Modifier.size(22.dp)) },
-                trailingIcon = {
-                    if (search.text.isNotEmpty()) IconButton(onClick = { search = TextFieldValue("") },
-                        modifier = Modifier.semanticsLabel("清空模板动作搜索")) { LineIcon(Symbol.CLOSE, Modifier.size(14.dp), MaterialTheme.colorScheme.onSurfaceVariant) }
-                })
-            Text("${matches.size} 个动作", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            LazyColumn(Modifier.weight(1f, fill = false).testTag("template-exercise-picker"), contentPadding = PaddingValues(bottom = 20.dp)) {
-                if (matches.isEmpty()) item { Text("没有符合名称的动作，试试其他关键词。", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                items(matches, key = { it.id }) { exercise ->
-                    TextButton(onClick = { onPick(exercise) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(exercise.nameZh, maxLines = 1) }
-                }
-            }
-        }
     }
 }
 

@@ -74,6 +74,7 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
                 current != null -> current.session.trainingLabel to
                     if (workout != null) "${if (workout.session.status == SessionStatus.PAUSED) "已暂停" else "训练中"} · ${workout.elapsedDuration(now).timerText()}"
                     else todayWorkout!!.let { it.historyStatus() + " · " + it.completedSetCount + "/" + it.plannedSetCount + " 组" }
+                plan?.isPostponed(LocalDate.now()) == true -> "休息" to ("明天：" + (plan.templateOn(LocalDate.now().plusDays(1))?.let { id -> templates.find { it.id == id }?.name } ?: "休息"))
                 else -> plan?.dayIndex(LocalDate.now())?.let { index ->
                     val id = plan.templateIds[index]
                     if (id == null) "休息日" to null
@@ -90,7 +91,8 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = if (headline == null) Alignment.CenterVertically else Alignment.Top) {
                 Box(Modifier.weight(1f)) {
-                    if (headline != null) TodayHeadline(headline.first, headline.second, planned = current == null) else chips()
+                    val postponed = current == null && plan?.isPostponed(LocalDate.now()) == true
+                    if (headline != null) TodayHeadline(headline.first, headline.second, planned = current == null && !postponed, postponed = postponed) else chips()
                 }
                 HistoryEntry(onHistory)
             }
@@ -112,9 +114,9 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
                     }
                 }
             }
-            if(todayWorkout != null) OutlinedButton(onClick = { viewingToday = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("home-today-actions")) {
-                OneLineText("今日动作 · ${todayWorkout.completedSetCount}/${todayWorkout.plannedSetCount} 组", Modifier.weight(1f))
-                LineIcon(Symbol.DOWN, Modifier.size(14.dp))
+            if(todayWorkout != null) Column {
+                TodayActionsStrip(todayWorkout, viewingToday) { viewingToday = !viewingToday }
+                TodayActionsDropdown(viewingToday, todayWorkout, catalog, onAdd = onLibrary, onAddSet = onAddDailySet, onRemove = onRemoveAction)
             }
             PixelButton(onClick = if (workout != null) onContinue else if(todayWorkout?.allSetsCompleted == true) ({ viewingToday = true }) else if(todayWorkout != null) onContinue else onStart,
                 enabled = !state.loading && (selectedTemplateId == null || selectedTemplate != null || workout != null || todayWorkout != null),
@@ -139,9 +141,7 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
         WeekCard(dates) { date -> weekDayInfo(date, weekly, catalog, plan, templates) }
         updates?.let {UpdateEntry(it)}
     }
-    if(viewingToday && todayWorkout != null) TodayActionsDialog(todayWorkout, onClose = { viewingToday = false },
-        onSelect = {}, onAdd = { viewingToday = false; onLibrary() }, onAddSet = onAddDailySet,
-        onRemove = onRemoveAction, editable = true)
+
     if (pickingTemplate) TemplatePickerSheet(templates, catalog, selectedTemplateId,
         plannedId = plan?.dayIndex(LocalDate.now())?.let { plan.templateIds[it] },
         onPick = { onSelectTemplate(it) }, onManage = onTemplates, onDismiss = { pickingTemplate = false })
@@ -198,8 +198,11 @@ private fun TodayStats(current: Workout?, template: WorkoutTemplate?, now: Insta
  * name in a large bold face with an optional quieter second line.
  */
 @Composable
-private fun TodayHeadline(title: String, detail: String?, planned: Boolean) {
+private fun TodayHeadline(title: String, detail: String?, planned: Boolean, postponed: Boolean = false) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (postponed) OneLineText("今天已推迟", Modifier.background(MaterialTheme.colorScheme.surfaceVariant, PixelShapeSmall)
+            .padding(horizontal = 8.dp, vertical = 2.dp).testTag("home-postponed"),
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (planned) OneLineText("今日计划", Modifier.background(MaterialTheme.colorScheme.primary, PixelShapeSmall)
             .padding(horizontal = 8.dp, vertical = 2.dp),
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onPrimary)

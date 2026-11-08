@@ -41,11 +41,17 @@ class TemplateDraftFlowTest {
         compose.onNodeWithTag("new-template").performClick()
         waitText("模板名称")
     }
-    private fun pickerItem(name: String) = compose.onNode(hasText(name, substring = false) and hasAnyAncestor(hasTestTag("template-exercise-picker")))
-    private fun addBench() {
+    private fun pickerItem(id: String) = compose.onNodeWithTag("pick-$id")
+    private fun openPicker() {
         compose.onNodeWithText("添加模板动作").performScrollTo().performClick()
-        compose.onNodeWithTag("template-exercise-search").performTextReplacement("Barbell Bench Press")
-        pickerItem("杠铃卧推").performClick()
+        waitTag("picker-search")
+        compose.onNodeWithTag("main-navigation").assertDoesNotExist()
+    }
+    private fun addBench() {
+        openPicker()
+        compose.onNodeWithTag("picker-search").performTextReplacement("Barbell Bench Press")
+        compose.onNodeWithContentDescription("添加杠铃卧推").performClick()
+        compose.onNodeWithTag("picker-confirm").performClick()
         waitDescription("调整目标")
     }
 
@@ -127,21 +133,23 @@ class TemplateDraftFlowTest {
 
     @Test fun pickerSearchSupportsChineseEnglishAndClearWithoutReappearingText() {
         create()
-        compose.onNodeWithText("添加模板动作").performScrollTo().performClick()
-        val search = compose.onNodeWithTag("template-exercise-search")
+        openPicker()
+        val search = compose.onNodeWithTag("picker-search")
         search.performTextInput("不存在的动作")
-        compose.onNodeWithText("没有符合名称的动作，试试其他关键词。").assertExists()
+        compose.onNodeWithText("没有符合条件的动作").assertExists()
         search.performTextReplacement("卧推")
-        pickerItem("杠铃卧推").assertExists()
-        compose.onNodeWithContentDescription("清空模板动作搜索").performClick()
+        compose.onNodeWithTag("exercise-picker").performScrollToNode(hasTestTag("pick-barbell-bench-press"))
+        pickerItem("barbell-bench-press").assertExists()
+        compose.onNodeWithContentDescription("清空搜索").performClick()
         assertEquals("", search.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
-        compose.onNodeWithText("50 个动作").assertExists()
+        compose.onNodeWithContentDescription("50 个动作").assertExists()
         search.performTextInput("bArBeLl BeNcH pReSs")
-        pickerItem("杠铃卧推").assertExists()
+        pickerItem("barbell-bench-press").assertExists()
         search.performTextClearance()
         assertEquals("", search.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         search.performTextInput("Barbell Bench Press")
-        pickerItem("杠铃卧推").performClick()
+        compose.onNodeWithContentDescription("添加杠铃卧推").performClick()
+        compose.onNodeWithTag("picker-confirm").performClick()
         waitDescription("调整目标")
         compose.onNodeWithText("取消", substring = false).performClick()
         compose.onNodeWithText("保留草稿并退出").performClick()

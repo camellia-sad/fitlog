@@ -148,8 +148,13 @@ class SearchAndEmptyStateTest {
         compose.onNodeWithText("保存模板").performClick()
         compose.onNodeWithText("模板须包含 1～30 个动作").assertExists()
         compose.onNodeWithText("添加模板动作").performClick()
-        compose.onNodeWithTag("template-exercise-picker").performScrollToNode(hasText("杠铃卧推"))
-        compose.onNodeWithText("杠铃卧推").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("exercise-picker").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("模板 · 我的训练安排").assertExists()
+        compose.onNodeWithTag("exercise-picker").performScrollToNode(hasTestTag("pick-barbell-bench-press"))
+        compose.onNodeWithContentDescription("添加杠铃卧推").performClick()
+        compose.onNodeWithTag("picker-confirm").performClick()
+        waitText("保存模板")
+        compose.onNodeWithText("模板名称").assert(hasText("我的训练安排"))
         compose.onNodeWithText("保存模板").performClick()
         waitText("模板已保存")
         runBlocking {

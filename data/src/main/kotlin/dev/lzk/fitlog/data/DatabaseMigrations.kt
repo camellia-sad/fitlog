@@ -5,6 +5,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseMigrations {
     /** Short names for the plan timetable; existing templates keep null and get a derived one for display. */
+    val FROM_8_TO_9 = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE training_plans ADD COLUMN postponedDates TEXT NOT NULL DEFAULT ''")
+        }
+    }
     val FROM_7_TO_8 = object : Migration(7, 8) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE workout_templates ADD COLUMN shortName TEXT")

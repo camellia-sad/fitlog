@@ -31,10 +31,10 @@ import dev.lzk.fitlog.training.WorkoutViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun ExerciseLibraryScreen(state: WorkoutUiState, model: WorkoutViewModel, onAdd: (Exercise) -> Unit, onTemplates: () -> Unit = {}, onOpen: (Exercise) -> Unit = {}) {
+fun ExerciseLibraryScreen(state: WorkoutUiState, model: WorkoutViewModel, onAdd: (Exercise) -> Unit, onTemplates: () -> Unit = {},
+    onOpen: (Exercise) -> Unit = {}, onCustom: () -> Unit = {}) {
     val canAdd = state.workout?.session?.status != SessionStatus.PAUSED
     var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(model.currentSearchQuery)) }
-    var custom by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             OneLineText("动作库", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
@@ -43,7 +43,7 @@ fun ExerciseLibraryScreen(state: WorkoutUiState, model: WorkoutViewModel, onAdd:
                 Spacer(Modifier.width(6.dp))
                 OneLineText("模板")
             }
-            TextButton(onClick = { custom = true }) {
+            TextButton(onClick = onCustom, modifier = Modifier.testTag("open-custom-exercise")) {
                 LineIcon(Symbol.PLUS, Modifier.size(12.dp)); Spacer(Modifier.width(6.dp)); Text("自定义")
             }
         }
@@ -83,7 +83,6 @@ fun ExerciseLibraryScreen(state: WorkoutUiState, model: WorkoutViewModel, onAdd:
             }
         }
     }
-    if (custom) CustomExerciseDialog(onDismiss = { custom = false }) { model.createCustom(it); custom = false }
 }
 
 @Composable
@@ -122,7 +121,7 @@ private fun ExerciseRow(exercise: Exercise, unit: WeightUnit, canAdd: Boolean, o
  * group tints, assisting muscles outlined only. The row scrolls sideways when the tags outgrow it.
  */
 @Composable
-private fun ExerciseTags(exercise: Exercise) {
+internal fun ExerciseTags(exercise: Exercise) {
     val scheme = MaterialTheme.colorScheme
     val tag = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
     val scroll = rememberScrollState()
@@ -178,7 +177,7 @@ private object TabShape : androidx.compose.ui.graphics.Shape {
  * tab fills with the group tint and its bar steps out to full width in three frames.
  */
 @Composable
-private fun MuscleTabs(selected: Muscle?, modifier: Modifier = Modifier, onSelect: (Muscle?) -> Unit) {
+internal fun MuscleTabs(selected: Muscle?, modifier: Modifier = Modifier, onSelect: (Muscle?) -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val haptics = fitHaptics()
     val baseline = scheme.outlineVariant
@@ -208,7 +207,7 @@ private fun MuscleTabs(selected: Muscle?, modifier: Modifier = Modifier, onSelec
 
 /** Quiet toggle for the secondary filters: icon + short label, teal outline and fill when on. */
 @Composable
-private fun ToolToggle(symbol: Symbol, label: String, on: Boolean, trailing: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
+internal fun ToolToggle(symbol: Symbol, label: String, on: Boolean, trailing: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Surface(onClick = onClick, modifier = Modifier.height(32.dp).semantics { selected = on }, shape = MaterialTheme.shapes.small,
         color = if (on) scheme.primaryContainer else scheme.surface,
@@ -223,7 +222,7 @@ private fun ToolToggle(symbol: Symbol, label: String, on: Boolean, trailing: (@C
 
 /** Equipment filter: the toggle shows the chosen equipment's glyph and name; the menu lists every type with its glyph. */
 @Composable
-private fun EquipmentToggle(selected: EquipmentType?, onSelect: (EquipmentType?) -> Unit) {
+internal fun EquipmentToggle(selected: EquipmentType?, onSelect: (EquipmentType?) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         ToolToggle(selected?.symbol() ?: Symbol.DUMBBELL, selected?.label() ?: "器械", selected != null,
@@ -236,27 +235,4 @@ private fun EquipmentToggle(selected: EquipmentType?, onSelect: (EquipmentType?)
             }
         }
     }
-}
-
-@Composable
-private fun CustomExerciseDialog(onDismiss: () -> Unit, onSave: (CustomExerciseDraft) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var english by remember { mutableStateOf("") }
-    var instructions by remember { mutableStateOf("") }
-    var equipment by remember { mutableStateOf(EquipmentType.BODYWEIGHT) }
-    var muscles by remember { mutableStateOf(emptySet<Muscle>()) }
-    var error by remember { mutableStateOf<String?>(null) }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("自定义动作") }, text = {
-        Column(Modifier.heightIn(max = 450.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedTextField(name, { name = it }, label = { Text("动作名称") })
-            OutlinedTextField(english, { english = it }, label = { Text("英文别名（选填）") })
-            ChoiceChips(EquipmentType.entries, { it == equipment }, { it.label() }) { equipment = it }
-            ChoiceChips(Muscle.entries, { it in muscles }, { it.label() }) { muscles = if (it in muscles) muscles - it else muscles + it }
-            OutlinedTextField(instructions, { instructions = it }, label = { Text("说明（选填）") })
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        }
-    }, confirmButton = { TextButton(onClick = {
-        try { val draft = CustomExerciseDraft(name, english, equipment, muscles, instructions); draft.validate(); onSave(draft) }
-        catch (e: Exception) { error = e.message }
-    }) { Text("保存动作") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
 }

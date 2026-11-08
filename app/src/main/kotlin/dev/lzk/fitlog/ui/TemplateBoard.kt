@@ -109,7 +109,7 @@ private fun Tape(modifier: Modifier) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun PlanTimetable(plan: TrainingPlan?, templates: List<WorkoutTemplate>, shortNames: Map<String, String>, catalog: List<Exercise>,
-    onEdit: () -> Unit, onDelete: () -> Unit) {
+    onEdit: () -> Unit, onDelete: () -> Unit, todayStarted: Boolean = false, onPostpone: () -> Unit = {}, onUndoPostpone: () -> Unit = {}) {
     var deleting by remember { mutableStateOf(false) }
     val scheme = MaterialTheme.colorScheme
     val title = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
@@ -141,7 +141,10 @@ internal fun PlanTimetable(plan: TrainingPlan?, templates: List<WorkoutTemplate>
                     LineIcon(Symbol.CLOCK, Modifier.size(14.dp), LocalContentColor.current); Text("设置健身计划")
                 }
                 if (templates.isEmpty()) Text("先创建模板，再安排每天的训练。", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-            } else DayStrip(plan, templates, shortNames, catalog)
+            } else {
+                DayStrip(plan, templates, shortNames, catalog)
+                PostponeRow(plan, templates, todayStarted, onPostpone, onUndoPostpone)
+            }
         }
         Tape(Modifier.align(Alignment.TopStart).padding(start = 14.dp).offset(y = (-7).dp).rotate(-4f))
         Tape(Modifier.align(Alignment.TopEnd).padding(end = 14.dp).offset(y = (-7).dp).rotate(3f))
@@ -166,6 +169,35 @@ private fun PlanAction(symbol: Symbol, text: String?, label: String, enabled: Bo
     }
 }
 
+/**
+ * Under the timetable: today's planned template with a key to push it to tomorrow, or, once pushed, where it went
+ * and an undo. Hidden on rest days and once today's training has started.
+ */
+@Composable
+private fun PostponeRow(plan: TrainingPlan, templates: List<WorkoutTemplate>, todayStarted: Boolean, onPostpone: () -> Unit, onUndo: () -> Unit) {
+    val today = LocalDate.now()
+    val name: (String?) -> String = { id -> templates.find { it.id == id }?.name ?: "模板已删除" }
+    val postponed = plan.isPostponed(today)
+    if (!postponed && (todayStarted || !plan.canPostpone(today))) return
+    val scheme = MaterialTheme.colorScheme
+    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(top = 8.dp).testTag("plan-postpone-row"),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (postponed) {
+            Text(name(plan.templateOn(today.plusDays(1))), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold), maxLines = 1,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Text("改到明天", Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, maxLines = 1)
+            if (!todayStarted) PixelOutlineKey(onClick = onUndo, minHeight = 34.dp, modifier = Modifier.testTag("plan-undo-postpone")) { Text("撤销", maxLines = 1) }
+        } else {
+            Text("今天", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold), maxLines = 1)
+            Text(name(plan.templateOn(today)), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = scheme.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            PixelOutlineKey(onClick = onPostpone, minHeight = 34.dp, modifier = Modifier.testTag("plan-postpone")) {
+                LineIcon(Symbol.ARROW, Modifier.size(11.dp), scheme.onSurfaceVariant); Text("推迟到明天", maxLines = 1)
+            }
+        }
+    }
+}
+
 private val CellWidth = 46.dp
 private val CellGap = 6.dp
 private val StripPadding = 14.dp
@@ -178,7 +210,9 @@ private val StripPadding = 14.dp
 @Composable
 private fun DayStrip(plan: TrainingPlan, templates: List<WorkoutTemplate>, shortNames: Map<String, String>, catalog: List<Exercise>) {
     val today = LocalDate.now()
-    val todayIndex = plan.dayIndex(today)
+    // When today was postponed, the flag sits on the day that now comes tomorrow.
+    val tomorrowFlag = plan.isPostponed(today)
+    val todayIndex = plan.dayIndex(today) ?: if (tomorrowFlag) plan.dayIndex(today.plusDays(1)) else null
     val scroll = rememberScrollState()
     val density = LocalDensity.current
     val haptics = fitHaptics()
@@ -219,7 +253,7 @@ private fun DayStrip(plan: TrainingPlan, templates: List<WorkoutTemplate>, short
                     },
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Box(Modifier.height(22.dp).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
-                        if (isToday) TodayFlag() else Text(String.format(java.util.Locale.ROOT, "%02d", index + 1), Modifier.alpha(if (past) .5f else 1f),
+                        if (isToday) TodayFlag(if (tomorrowFlag) "明天" else "今天") else Text(String.format(java.util.Locale.ROOT, "%02d", index + 1), Modifier.alpha(if (past) .5f else 1f),
                             style = pixelNumber(15.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                     }
                     Box(Modifier.fillMaxWidth()) {
@@ -239,11 +273,11 @@ private suspend fun snapshotFlowMax(scroll: androidx.compose.foundation.ScrollSt
 }
 
 @Composable
-private fun TodayFlag() {
+private fun TodayFlag(text: String) {
     val deep = fitColors.orangeDeep
     val ink = if (deep.luminance() > .4f) Color(0xFF2A1A05) else Color.White
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("今天", Modifier.background(deep).padding(horizontal = 6.dp, vertical = 1.dp),
+        Text(text, Modifier.background(deep).padding(horizontal = 6.dp, vertical = 1.dp),
             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, fontSize = 11.sp), color = ink, maxLines = 1)
         Canvas(Modifier.size(8.dp, 4.dp)) {
             val cell = size.width / 4

@@ -26,4 +26,8 @@ interface WorkoutRepository {
     suspend fun finishWorkout(sessionId: String, feedback: String?): Workout
     suspend fun saveFeedback(sessionId: String, feedback: String?)
     suspend fun getLastExercisePerformance(exerciseId: String, excludingSessionId: String?): ExercisePerformance?
+    /** Heaviest completed set of this exercise in any other kept session: the bar a new record has to clear. */
+    suspend fun previousBestWeight(exerciseId: String, excludingSessionId: String): Long?
+    /** Reopens today's finished plan for an edit (undo or extra set), resuming the timer without the stopped stretch. */
+    suspend fun reopenDailyWorkout(sessionId: String)
 }

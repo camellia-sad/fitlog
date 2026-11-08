@@ -63,8 +63,10 @@ class SecondsAndRefreshFlowTest {
         compose.onNodeWithTag("new-template").performClick()
         waitText("模板名称");compose.onNodeWithText("模板名称").performTextInput("支撑日")
         compose.onNodeWithText("添加模板动作").performScrollTo().performClick()
-        compose.onNodeWithTag("template-exercise-search").performTextInput("平板")
-        compose.onNodeWithText("平板支撑").performClick()
+        compose.waitUntil(10_000) {compose.onAllNodesWithTag("picker-search").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("picker-search").performTextInput("平板")
+        compose.onNodeWithContentDescription("添加平板支撑").performClick()
+        compose.onNodeWithTag("picker-confirm").performClick()
         compose.waitUntil(15_000) {compose.onAllNodesWithContentDescription("调整目标").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("调整目标").performClick()
         compose.onNodeWithText("目标秒数").assertExists()

@@ -37,6 +37,13 @@ interface WorkoutDao {
         AND sr.status = 'COMPLETED' AND ws.status != 'DISCARDED'""")
     suspend fun bestWeight(id: String): Long?
 
+    @Query("""SELECT MAX(sr.weightGrams) FROM set_records sr
+        JOIN session_exercises se ON se.id = sr.sessionExerciseId
+        JOIN workout_sessions ws ON ws.id = se.sessionId
+        WHERE se.exerciseId = :id AND se.recordMetricSnapshot = 'REPETITIONS' AND ws.id != :sessionId
+        AND sr.status = 'COMPLETED' AND ws.status != 'DISCARDED'""")
+    suspend fun bestWeightExcluding(id: String, sessionId: String): Long?
+
     @Query("UPDATE exercises SET defaultWeightGrams = :weight, defaultWeightRecordGrams = :record WHERE id = :id")
     suspend fun defaultWeight(id: String, weight: Long?, record: Long): Int
 

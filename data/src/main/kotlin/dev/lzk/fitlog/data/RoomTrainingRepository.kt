@@ -30,13 +30,14 @@ class RoomTrainingRepository(private val database: FitLogDatabase, private val c
 
     override fun observePlan() = dao.observePlan().map { row ->
         row?.let { TrainingPlan(LocalDate.parse(it.plan.startDate), it.plan.cycleDays, it.plan.repeats,
-            it.days.sortedBy { day -> day.dayIndex }.map { day -> day.templateId }) }
+            it.days.sortedBy { day -> day.dayIndex }.map { day -> day.templateId }, it.plan.postponed()) }
     }
     override suspend fun savePlan(plan: TrainingPlan) = database.withTransaction {
         plan.validate()
         plan.templateIds.filterNotNull().forEach { require(dao.template(it) != null) { "计划中的模板已不存在" } }
         dao.deletePlan()
-        dao.putPlan(TrainingPlanEntity(startDate = plan.startDate.toString(), cycleDays = plan.cycleDays, repeats = plan.repeats))
+        dao.putPlan(TrainingPlanEntity(startDate = plan.startDate.toString(), cycleDays = plan.cycleDays, repeats = plan.repeats,
+            postponedDates = plan.postponedDates.joinDates()))
         dao.insertPlanDays(plan.templateIds.mapIndexed { index, id -> PlanDayEntity(dayIndex = index, templateId = id) })
     }
     override suspend fun deletePlan() = database.withTransaction { dao.deletePlan() }
@@ -103,8 +104,9 @@ class RoomTrainingRepository(private val database: FitLogDatabase, private val c
         draft.validate()
         val id = UUID.randomUUID().toString()
         dao.importExercises(listOf(ExerciseEntity(id, draft.name.trim(), draft.nameEn.trim(), draft.equipment.name,
-            draft.instructions.trim().ifBlank { null }, null, null, false, true, false)))
-        dao.importMuscles(draft.primaryMuscles.map { ExerciseMuscleEntity(id, it.name, "PRIMARY") })
+            draft.instructions.trim().ifBlank { null }, null, null, false, true, false, draft.recordMetric.name)))
+        dao.importMuscles(draft.primaryMuscles.map { ExerciseMuscleEntity(id, it.name, "PRIMARY") } +
+            draft.secondaryMuscles.map { ExerciseMuscleEntity(id, it.name, "SECONDARY") })
         id
     }
 }
