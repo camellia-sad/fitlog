@@ -65,7 +65,7 @@ fun ExerciseDetailScreen(exercise: Exercise?, state: WorkoutUiState, model: Work
             }
             if (!exercise.isArchived) PixelButton(enabled = canAdd, onClick = { onAdd(exercise) }, modifier = Modifier.fillMaxWidth()) {
                 LineIcon(Symbol.PLUS, Modifier.size(14.dp), LocalContentColor.current)
-                Text(if (state.workout == null) "加入待开始训练" else "添加到本次训练")
+                Text(if (state.workout == null) "加入今日训练" else "添加到本次训练")
             }
             if (!canAdd) Text("训练已暂停，请先从主页继续训练后再添加动作。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

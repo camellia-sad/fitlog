@@ -36,15 +36,19 @@ class DailyWorkoutTest {
     }
     @After fun close() { db.close(); context.deleteDatabase(name) }
     private suspend fun day() = repo.observeDailyWorkout(date).first()!!
-    private suspend fun template() = RoomTrainingRepository(db, clock).saveTemplate(TemplateDraft(name = "今日推日",
-        exercises = listOf(TemplateExercise("a", "barbell-bench-press", 0, 3, 8, 12, 37_500))))
+    private suspend fun records() = repo.observeDayRecords(date).first()
+    private suspend fun template(name: String = "今日推日", exercise: String = "barbell-bench-press") = RoomTrainingRepository(db, clock).saveTemplate(TemplateDraft(name = name,
+        exercises = listOf(TemplateExercise("a", exercise, 0, 3, 8, 12, 37_500))))
+
     @Test fun reservationDoesNotStartTimerAndMultipleStopsKeepOneRecordAndAllDrafts() = runBlocking {
-        val reserved = repo.reserveDailyWorkout(template())
+        val t = template()
+        val reserved = repo.reserveDailyWorkout(t)
         assertEquals(SessionStatus.READY, reserved.session.status)
         assertNull(repo.observeActiveWorkout().first())
         clock.now = clock.now.plusSeconds(3600)
         assertEquals(0L, day().elapsedDuration(clock.instant()).seconds)
-        val started = repo.startDailyWorkout()
+        val started = repo.startDailyWorkout(t)
+        assertEquals(reserved.session.id, started.session.id)
         val e = started.exercises.single()
         repo.completeSet(e.id, e.sets[0].id, 40_000, 10)
         repo.updateSetDraft(e.id, e.sets[1].id, 42_500, 9)
@@ -52,7 +56,7 @@ class DailyWorkoutTest {
         clock.now = clock.now.plusSeconds(30)
         repo.finishWorkout(started.session.id, "保留感想")
         clock.now = clock.now.plusSeconds(7200)
-        val resumed = repo.startDailyWorkout()
+        val resumed = repo.startDailyWorkout(t)
         assertEquals(reserved.session.id, resumed.session.id)
         assertEquals(1, resumed.completedSetCount)
         assertEquals(42_500L, resumed.exercises.first().sets[1].weightGrams)
@@ -66,26 +70,60 @@ class DailyWorkoutTest {
         assertEquals(1, db.trainingDao().allSessions().size)
         assertEquals("保留感想", day().session.feedback)
     }
-    @Test fun finishedActionsCanGainSetsAndOnlyExplicitExtraCreatesAnotherRecord() = runBlocking {
-        val w = repo.startDailyWorkout(exerciseIds = listOf("barbell-bench-press"))
+
+    @Test fun finishedTemplateGainsSetsStaysForReviewAndFreeTrainingBecomesExtra() = runBlocking {
+        val t = template()
+        val w = repo.startDailyWorkout(t)
         val e = w.exercises.single()
         for(set in e.sets) repo.completeSet(e.id, set.id, 30_000, 8, finishWhenAllDone = true)
         assertEquals(SessionStatus.FINISHED, day().session.status)
+        // Choosing a finished template again opens it as it is.
+        assertEquals(SessionStatus.FINISHED, repo.startDailyWorkout(t).session.status)
+        assertNull(repo.observeActiveWorkout().first())
         repo.addDailySet(e.id)
         assertEquals(SessionStatus.FINISHED, day().session.status)
         assertEquals(3, day().completedSetCount)
-        val resumed = repo.startDailyWorkout()
+        val resumed = repo.startDailyWorkout(t)
         assertEquals(w.session.id, resumed.session.id)
         assertEquals(4, resumed.plannedSetCount)
-        val fourth = resumed.exercises.single().sets.last()
-        repo.completeSet(e.id, fourth.id, 32_500, 8, finishWhenAllDone = true)
-        val extra = repo.startWorkout(exerciseIds = listOf("plank"))
-        assertTrue(extra.session.isExtra)
-        assertEquals(w.session.id, day().session.id)
-        assertFalse(day().session.isExtra)
-        assertEquals(4, day().completedSetCount)
-        assertEquals(2, db.trainingDao().allSessions().size)
+        repo.completeSet(e.id, resumed.exercises.single().sets.last().id, 32_500, 8, finishWhenAllDone = true)
+        val free = repo.startDailyWorkout(exerciseIds = listOf("plank"))
+        assertTrue(free.session.isExtra)
+        assertEquals("加练", free.session.trainingLabel)
+        assertEquals(listOf(w.session.id, free.session.id), records().map { it.session.id })
+        assertFalse(records().first().session.isExtra)
+        assertEquals(4, records().first().completedSetCount)
+        // Free training has no fixed target, so finishing every set keeps it running.
+        val plank = free.exercises.single()
+        for (set in plank.sets) repo.completeSet(plank.id, set.id, 0, 30, finishWhenAllDone = true)
+        assertEquals(SessionStatus.ACTIVE, repo.observeWorkout(free.session.id).first()!!.session.status)
+        // Choosing free training again continues the same record.
+        assertEquals(free.session.id, repo.startDailyWorkout().session.id)
     }
+
+    @Test fun switchingStopsTheRunningRecordKeepingSetsAndDropsAnEmptyOne() = runBlocking {
+        val push = template("推日")
+        val pull = template("拉日", "lat-pulldown")
+        val a = repo.startDailyWorkout(push)
+        val e = a.exercises.single()
+        repo.completeSet(e.id, e.sets[0].id, 40_000, 8)
+        val b = repo.startDailyWorkout(pull)
+        assertEquals(b.session.id, repo.observeActiveWorkout().first()!!.session.id)
+        val stopped = repo.observeWorkout(a.session.id).first()!!
+        assertEquals(SessionStatus.FINISHED, stopped.session.status)
+        assertEquals(1, stopped.completedSetCount)
+        // 拉日 has nothing completed, so leaving it leaves no record.
+        val free = repo.startDailyWorkout()
+        assertNull(repo.observeWorkout(b.session.id).first())
+        assertEquals(listOf(a.session.id, free.session.id), records().map { it.session.id })
+        // Stopping an empty record drops it too.
+        repo.finishWorkout(free.session.id, null)
+        assertEquals(listOf(a.session.id), records().map { it.session.id })
+        val again = repo.startDailyWorkout(push)
+        assertEquals(a.session.id, again.session.id)
+        assertEquals(SessionStatus.ACTIVE, again.session.status)
+    }
+
     @Test fun removalKeepsCompletedFactsAndRenumbersGapsWithoutTouchingTemplate() = runBlocking {
         val t = template()
         val w = repo.startDailyWorkout(t)
@@ -102,7 +140,7 @@ class DailyWorkoutTest {
         assertEquals(3, RoomTrainingRepository(db).observeTemplates().first().single().exercises.single().targetSetCount)
         repo.addDailySet(e.id)
         assertFalse(day().exercises.single().removedFromPlan)
-        repo.addDailyExercise("plank")
+        repo.addDailyExercise(w.session.id, "plank")
         val other = day().exercises.last()
         repo.removeExercise(other.id)
         assertEquals(1, day().exercises.size)
@@ -111,50 +149,68 @@ class DailyWorkoutTest {
         JsonBackupRepository(db).importJson(json)
         Unit
     }
-    @Test fun backupRetainsDailyIdentityAndReservationAndRejectsDuplicateDates() = runBlocking {
-        repo.reserveDailyWorkout(template())
-        repo.addDailyExercise("plank")
+
+    @Test fun backupRetainsDayRecordsAndRejectsDuplicateSlots() = runBlocking {
+        val t = template()
+        val reserved = repo.reserveDailyWorkout(t)
+        repo.addDailyExercise(reserved.session.id, "plank")
         val json = JsonBackupRepository(db).exportJson()
+        assertEquals(9, JSONObject(json).getInt("schemaVersion"))
         val restoredName = "daily-restored-" + UUID.randomUUID()
         val restored = FitLogDatabase.create(context, restoredName)
         try {
             JsonBackupRepository(restored).importJson(json)
             val r = RoomWorkoutRepository(restored, clock)
             assertEquals(day().session.id, r.observeDailyWorkout(date).first()!!.session.id)
-            assertEquals(2, r.startDailyWorkout().exercises.size)
+            assertEquals(t, r.observeDailyWorkout(date).first()!!.session.daySlot)
+            assertEquals(2, r.startDailyWorkout(t).exercises.size)
             val malformed = JSONObject(json)
             val sessions = malformed.getJSONObject("data").getJSONArray("workout_sessions")
             sessions.put(JSONObject(sessions.getJSONObject(0).toString()).put("id", "another"))
-            try { JsonBackupRepository(restored).importJson(malformed.toString()); fail("duplicate day") } catch(_: IllegalArgumentException) {}
+            try { JsonBackupRepository(restored).importJson(malformed.toString()); fail("duplicate slot") } catch(_: IllegalArgumentException) {}
+            // Older backups get the slot from the template, or the free slot.
+            val legacy = JSONObject(json).put("schemaVersion", 8)
+            legacy.getJSONObject("data").getJSONArray("workout_sessions").getJSONObject(0).remove("daySlot")
+            val legacyName = "daily-legacy-" + UUID.randomUUID()
+            val legacyDb = FitLogDatabase.create(context, legacyName)
+            try {
+                JsonBackupRepository(legacyDb).importJson(legacy.toString())
+                assertEquals(t, RoomWorkoutRepository(legacyDb, clock).observeDailyWorkout(date).first()!!.session.daySlot)
+            } finally { legacyDb.close(); context.deleteDatabase(legacyName) }
         } finally { restored.close(); context.deleteDatabase(restoredName) }
     }
-    @Test fun concurrentStartsAdoptLegacyRecordAndYesterdayRemainsReadOnly() = runBlocking {
-        val legacy = repo.startWorkout(exerciseIds = listOf("barbell-bench-press"))
-        val e = legacy.exercises.single()
+
+    @Test fun concurrentStartsShareOneFreeRecordAndYesterdayRemainsReadOnly() = runBlocking {
+        val standalone = repo.startWorkout(exerciseIds = listOf("barbell-bench-press"))
+        val e = standalone.exercises.single()
         repo.completeSet(e.id, e.sets.first().id, 30_000, 8)
-        repo.finishWorkout(legacy.session.id, null)
+        repo.finishWorkout(standalone.session.id, null)
         val ids = (1..8).map { async { repo.startDailyWorkout().session.id } }.awaitAll()
-        assertEquals(setOf(legacy.session.id), ids.toSet())
-        repo.finishWorkout(legacy.session.id, null)
+        assertEquals(1, ids.toSet().size)
+        assertNotEquals(standalone.session.id, ids.first())
+        assertNull(repo.observeWorkout(standalone.session.id).first()!!.session.dailyPlanDate)
         clock.now = clock.now.plusSeconds(86400)
         val next = repo.startDailyWorkout(exerciseIds = listOf("plank"))
-        assertNotEquals(legacy.session.id, next.session.id)
+        assertNotEquals(ids.first(), next.session.id)
         try { repo.addDailySet(e.id); fail("yesterday changed") } catch(_: WorkoutException) {}
-        assertEquals(1, repo.observeWorkout(legacy.session.id).first()!!.completedSetCount)
+        assertEquals(1, repo.observeWorkout(standalone.session.id).first()!!.completedSetCount)
     }
-    @Test fun versionSixUpgradeKeepsOrdinaryRecordsAndCanAdoptThemExplicitly() = runBlocking {
+
+    @Test fun versionNineUpgradeGivesExistingDayRecordsTheirSlot() = runBlocking {
         val oldName = "daily-migration-" + UUID.randomUUID()
-        helper.createDatabase(oldName, 6).apply {
-            execSQL("INSERT INTO workout_sessions(id,startedAtUtc,localWorkoutDate,status,endedAtUtc,unfinishedSlot,pausedDurationMillis) VALUES('old',1000,'2026-11-03','FINISHED',2000,NULL,0)")
+        helper.createDatabase(oldName, 9).apply {
+            execSQL("INSERT INTO workout_sessions(id,startedAtUtc,localWorkoutDate,status,endedAtUtc,unfinishedSlot,pausedDurationMillis,dailyPlanDate) VALUES('old',1000,'2026-11-03','FINISHED',2000,NULL,0,'2026-11-03')")
+            execSQL("INSERT INTO workout_sessions(id,startedAtUtc,localWorkoutDate,status,endedAtUtc,unfinishedSlot,pausedDurationMillis) VALUES('plain',3000,'2026-11-03','FINISHED',4000,NULL,0)")
             close()
         }
-        helper.runMigrationsAndValidate(oldName, 7, true, DatabaseMigrations.FROM_6_TO_7).close()
+        helper.runMigrationsAndValidate(oldName, 10, true, DatabaseMigrations.FROM_9_TO_10).close()
         val migrated = FitLogDatabase.create(context, oldName)
         try {
             val r = RoomWorkoutRepository(migrated, clock)
-            assertNull(r.observeWorkout("old").first()!!.session.dailyPlanDate)
-            assertEquals("old", r.reserveDailyWorkout().session.id)
-            assertEquals(date, r.observeWorkout("old").first()!!.session.dailyPlanDate)
+            assertEquals("", r.observeWorkout("old").first()!!.session.daySlot)
+            assertNull(r.observeWorkout("plain").first()!!.session.daySlot)
+            assertEquals(listOf("old"), r.observeDayRecords(date).first().map { it.session.id })
+            assertEquals("old", r.startDailyWorkout().session.id)
         } finally { migrated.close(); context.deleteDatabase(oldName) }
     }
 }

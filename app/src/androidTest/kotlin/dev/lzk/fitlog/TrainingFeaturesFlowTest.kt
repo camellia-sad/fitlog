@@ -53,8 +53,8 @@ class TrainingFeaturesFlowTest {
         waitText("动作库")
         compose.onNodeWithTag("open-templates").performClick()
         waitText("轻松推日")
+        // The template page starts training directly.
         compose.onNodeWithTag("start-template-$id").performScrollTo().performClick()
-        compose.onNodeWithText("开始训练", substring = false).performScrollTo().performClick()
         waitDescription("完成当前第1组")
         compose.onNodeWithText("暂停", substring = false).performClick()
         waitText("已暂停")
@@ -75,7 +75,7 @@ class TrainingFeaturesFlowTest {
         val sessionId = runBlocking { container.workouts.observeActiveWorkout().first()!!.session.id }
         compose.onNodeWithContentDescription("完成当前第2组").performClick()
         // Today's plan finishing stays on the page with a back / extra choice.
-        waitText("今日计划完成")
+        waitText("轻松推日完成")
         compose.onNodeWithText("今天感觉如何（选填）").performTextInput("状态不错")
         compose.onNodeWithTag("plan-done-back").performClick()
         compose.onNodeWithTag("plan-review-banner").assertExists()

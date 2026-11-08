@@ -59,7 +59,7 @@ class TemplateShortNameTest {
             assertEquals("草", a.trainingDao().allDrafts().single().toDraft().shortName)
 
             val json = JsonBackupRepository(a).exportJson()
-            assertEquals(8, JSONObject(json).getInt("schemaVersion"))
+            assertEquals(9, JSONObject(json).getInt("schemaVersion"))
             JsonBackupRepository(b).importJson(json)
             assertEquals(setOf("胸肩", "胸背"), b.trainingDao().allTemplates().map { it.shortName }.toSet())
             // An older backup without short names still re-imports over the same templates.

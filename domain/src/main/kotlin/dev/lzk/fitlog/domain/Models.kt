@@ -46,8 +46,14 @@ data class WorkoutSession(
     val restEndsAtUtc: Instant? = null,
     val isExtra: Boolean = false,
     val dailyPlanDate: LocalDate? = null,
+    /** A day record's slot: the template id, or "" for the day's free record; null for older standalone sessions. */
+    val daySlot: String? = null,
 ) {
     val trainingLabel: String get() = if (isExtra) "加练" else templateNameSnapshot ?: "自由训练"
+    /** The slot this session occupies or would occupy among today's records. */
+    val slot: String get() = daySlot ?: templateId.orEmpty()
+    /** Free and extra records have no fixed target, so they never end on their own. */
+    val isFreeRecord: Boolean get() = daySlot == ""
 }
 
 data class SetRecord(

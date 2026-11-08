@@ -27,26 +27,28 @@ import kotlin.math.ceil
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Unit, onLibrary: () -> Unit,
+fun HomeScreen(state: WorkoutUiState, onOpen: (String?) -> Unit, onContinue: () -> Unit, onLibrary: () -> Unit,
     weekly: List<Workout> = emptyList(), templates: List<WorkoutTemplate> = emptyList(),
-    onHistory: () -> Unit = {}, selectedTemplateId: String? = null, onSelectTemplate: (String?) -> Unit = {},
-    prepared: List<Exercise> = emptyList(), onRemovePrepared: (String) -> Unit = {}, plan: TrainingPlan? = null, updates:dev.lzk.fitlog.updates.AppUpdates? = null,
-    onExtra: () -> Unit = {}, onAddDailySet: (String) -> Unit = {}, onRemoveAction: (String) -> Unit = {},
+    onHistory: () -> Unit = {}, plan: TrainingPlan? = null, updates:dev.lzk.fitlog.updates.AppUpdates? = null,
+    onAddDailySet: (String) -> Unit = {}, onRemoveAction: (String) -> Unit = {},
     catalog: List<Exercise> = emptyList(), onTemplates: () -> Unit = {}) {
     val workout = state.workout
     val todayWorkout = state.todayWorkout
     var viewingToday by remember { mutableStateOf(false) }
-    var pickingTemplate by remember { mutableStateOf(false) }
-    val selectedTemplate = templates.find { it.id == selectedTemplateId }
+    var pickingTraining by remember { mutableStateOf(false) }
+    val today = LocalDate.now()
+    val plannedId = plan?.templateOn(today)
+    val plannedTemplate = templates.find { it.id == plannedId }
     val now by produceState(Instant.now(), workout?.session?.id) { while (true) { value = Instant.now(); delay(1_000) } }
     val largeFont = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
     val dates = TrainingHistory.days(weekly).associateBy { it.date }
     val current = workout ?: todayWorkout
+    // A stopped record can be picked up again; a template whose targets are all done waits for an explicit choice.
+    val resumable = workout != null || (todayWorkout != null && !(todayWorkout.session.templateId != null && todayWorkout.allSetsCompleted))
     val exerciseIds = current?.exercises?.filter { !it.removedFromPlan }?.map { it.exerciseId }
-        ?: selectedTemplate?.exercises?.map { it.exerciseId }
-        ?: if (selectedTemplateId == null) prepared.map { it.id } else emptyList()
-    val groups = remember(exerciseIds, catalog, prepared) {
-        exerciseIds.mapNotNull { id -> catalog.find { it.id == id } ?: prepared.find { it.id == id } }
+        ?: plannedTemplate?.exercises?.map { it.exerciseId }.orEmpty()
+    val groups = remember(exerciseIds, catalog) {
+        exerciseIds.mapNotNull { id -> catalog.find { it.id == id } }
             .flatMap { it.primaryMuscles }.map { it.group }.distinct().take(4)
     }
     Column(
@@ -69,64 +71,47 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
         }
 
         SoftCard {
-            // The plan (or the session already running) leads the card; when neither exists the mode chips take its place.
-            val headline: Pair<String, String?>? = when {
+            // The record training now (or used last) leads the card; otherwise today's plan, a rest note or an open question.
+            val postponed = current == null && plan?.isPostponed(today) == true
+            val tomorrow = plan?.templateOn(today.plusDays(1))?.let { id -> templates.find { it.id == id }?.name } ?: "休息"
+            val headline: Pair<String, String?> = when {
                 current != null -> current.session.trainingLabel to
                     if (workout != null) "${if (workout.session.status == SessionStatus.PAUSED) "已暂停" else "训练中"} · ${workout.elapsedDuration(now).timerText()}"
-                    else todayWorkout!!.let { it.historyStatus() + " · " + it.completedSetCount + "/" + it.plannedSetCount + " 组" }
-                plan?.isPostponed(LocalDate.now()) == true -> "休息" to ("明天：" + (plan.templateOn(LocalDate.now().plusDays(1))?.let { id -> templates.find { it.id == id }?.name } ?: "休息"))
-                else -> plan?.dayIndex(LocalDate.now())?.let { index ->
-                    val id = plan.templateIds[index]
-                    if (id == null) "休息日" to null
-                    else templates.find { it.id == id }?.name?.let { it to null } ?: ("模板已删除" to "请到动作页重新安排计划")
-                }
+                    else current.let { it.historyStatus() + " · " + it.completedSetCount + "/" + it.plannedSetCount + " 组" }
+                postponed -> "休息" to "明天：$tomorrow"
+                plan?.dayIndex(today) != null && plannedId == null -> "休息日" to "明天：$tomorrow"
+                plannedId != null -> (plannedTemplate?.name ?: "模板已删除") to (if (plannedTemplate == null) "请到动作页重新安排计划" else null)
+                else -> "今天想练什么" to null
             }
-            val chips: @Composable () -> Unit = {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    FilterChip(selected = selectedTemplateId == null, onClick = { onSelectTemplate(null) }, label = { Text("自由训练") })
-                    FilterChip(selected = selectedTemplateId != null, onClick = { pickingTemplate = true },
-                        label = { OneLineText(selectedTemplate?.name ?: "模板训练") },
-                        trailingIcon = { LineIcon(Symbol.DOWN, Modifier.size(12.dp), MaterialTheme.colorScheme.onSurfaceVariant) })
-                }
-            }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = if (headline == null) Alignment.CenterVertically else Alignment.Top) {
-                Box(Modifier.weight(1f)) {
-                    val postponed = current == null && plan?.isPostponed(LocalDate.now()) == true
-                    if (headline != null) TodayHeadline(headline.first, headline.second, planned = current == null && !postponed, postponed = postponed) else chips()
-                }
+            val planned = if (current != null) current.session.templateId != null && current.session.templateId == plannedId
+                else plannedTemplate != null && !postponed
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Box(Modifier.weight(1f)) { TodayHeadline(headline.first, headline.second, planned = planned, postponed = postponed) }
                 HistoryEntry(onHistory)
             }
-            if (groups.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (groups.isNotEmpty() && (current != null || plannedTemplate != null)) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 groups.forEach { MuscleChip(it.label, it) }
             }
-            TodayStats(current, selectedTemplate, now, largeFont)
-            if (workout == null && todayWorkout == null) {
-                if (headline != null) chips()
-                if (selectedTemplateId == null) {
-                    prepared.forEach { exercise ->
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(exercise.nameZh, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                            TextButton(onClick = { onRemovePrepared(exercise.id) }) { Text("移除") }
-                        }
-                    }
-                    OutlinedButton(onClick = onLibrary, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                        LineIcon(Symbol.PLUS, Modifier.size(14.dp)); Spacer(Modifier.width(8.dp)); Text("添加本次动作")
-                    }
+            TodayStats(current, plannedTemplate.takeIf { current == null && !postponed }, now, largeFont)
+            val record = current?.takeIf { it.session.dailyPlanDate == today }
+            if (record != null) Column {
+                TodayActionsStrip(record, viewingToday) { viewingToday = !viewingToday }
+                TodayActionsDropdown(viewingToday, record, catalog, onAdd = onLibrary, onAddSet = onAddDailySet, onRemove = onRemoveAction)
+            }
+            if (resumable) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PixelButton(onClick = onContinue, enabled = !state.loading, modifier = Modifier.weight(1f).testTag("home-continue"), minHeight = 56.dp) {
+                    LineIcon(Symbol.ARROW, Modifier.size(18.dp), LocalContentColor.current); OneLineText("继续训练")
                 }
+                PixelOutlineKey(onClick = { pickingTraining = true }, enabled = !state.loading, minHeight = 56.dp,
+                    contentColor = MaterialTheme.colorScheme.onSurface, modifier = Modifier.testTag("home-switch")) {
+                    LineIcon(Symbol.SWAP, Modifier.size(16.dp), LocalContentColor.current); Spacer(Modifier.width(6.dp)); OneLineText("换训练")
+                }
+            } else PixelButton(onClick = { pickingTraining = true }, enabled = !state.loading,
+                modifier = Modifier.fillMaxWidth().testTag("home-start"), minHeight = 56.dp) {
+                LineIcon(Symbol.PLAY, Modifier.size(18.dp), LocalContentColor.current); Text("开始训练")
             }
-            if(todayWorkout != null) Column {
-                TodayActionsStrip(todayWorkout, viewingToday) { viewingToday = !viewingToday }
-                TodayActionsDropdown(viewingToday, todayWorkout, catalog, onAdd = onLibrary, onAddSet = onAddDailySet, onRemove = onRemoveAction)
-            }
-            PixelButton(onClick = if (workout != null) onContinue else if(todayWorkout?.allSetsCompleted == true) ({ viewingToday = true }) else if(todayWorkout != null) onContinue else onStart,
-                enabled = !state.loading && (selectedTemplateId == null || selectedTemplate != null || workout != null || todayWorkout != null),
-                modifier = Modifier.fillMaxWidth(), minHeight = 56.dp) {
-                LineIcon(if (workout == null && todayWorkout == null) Symbol.PLAY else Symbol.ARROW, Modifier.size(18.dp), LocalContentColor.current)
-                Text(if(workout != null) "继续训练" else if(todayWorkout?.allSetsCompleted == true) "查看今日计划" else if(todayWorkout != null && todayWorkout.session.status != SessionStatus.READY) "继续今日计划" else "开始训练")
-            }
+            if (state.dayRecords.size >= 2) DayRecords(state.dayRecords, catalog, workout?.session?.id ?: todayWorkout?.session?.id, onOpen)
         }
-
-        if(todayWorkout != null && workout == null) OutlinedButton(onClick = onExtra, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("start-extra-workout")) { Text("开始加练") }
 
         if (workout != null && workout.exercises.isNotEmpty()) {
             SoftCard {
@@ -142,9 +127,61 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
         updates?.let {UpdateEntry(it)}
     }
 
-    if (pickingTemplate) TemplatePickerSheet(templates, catalog, selectedTemplateId,
-        plannedId = plan?.dayIndex(LocalDate.now())?.let { plan.templateIds[it] },
-        onPick = { onSelectTemplate(it) }, onManage = onTemplates, onDismiss = { pickingTemplate = false })
+    if (pickingTraining) TemplatePickerSheet(templates, catalog, plannedId, state.dayRecords,
+        onPick = onOpen, onManage = onTemplates, onDismiss = { pickingTraining = false })
+}
+
+/**
+ * Today's records under the card, one row each: muscle-group strip, name with its state, completed sets and minutes.
+ * The current one is outlined in teal; tapping a row continues it.
+ */
+@Composable
+private fun DayRecords(records: List<Workout>, catalog: List<Exercise>, currentId: String?, onOpen: (String?) -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth().testTag("day-records"), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        HorizontalDivider(color = scheme.outlineVariant)
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("今日记录", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = scheme.onSurfaceVariant)
+            Text("${records.size}", style = pixelNumber(18.sp), color = scheme.onSurface)
+        }
+        records.forEach { record ->
+            val groups = remember(record, catalog) {
+                record.exercises.mapNotNull { e -> catalog.find { it.id == e.exerciseId } }.flatMap { it.primaryMuscles }.map { it.group }.distinct()
+            }
+            val status = record.session.status
+            val live = status == SessionStatus.ACTIVE || status == SessionStatus.PAUSED
+            val done = !live && record.session.templateId != null && record.plannedSetCount > 0 && record.allSetsCompleted
+            val cur = record.session.id == currentId
+            Surface(onClick = { onOpen(record.session.daySlot) }, modifier = Modifier.fillMaxWidth().testTag("day-record-${record.session.daySlot.orEmpty().ifEmpty { "free" }}"),
+                shape = MaterialTheme.shapes.small, color = scheme.surface,
+                border = androidx.compose.foundation.BorderStroke(if (cur) 2.dp else 1.dp, if (cur) scheme.primary else scheme.outlineVariant)) {
+                Row(Modifier.height(IntrinsicSize.Min).padding(horizontal = 10.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    GroupStrip(groups)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            OneLineText(record.session.trainingLabel, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold))
+                            when {
+                                status == SessionStatus.ACTIVE -> StateTag("训练中", strong = true)
+                                status == SessionStatus.PAUSED -> StateTag("已暂停", strong = false)
+                                done -> StateTag("已完成", strong = false)
+                                else -> OneLineText("已停止", Modifier.background(scheme.surfaceVariant, PixelShapeSmall).padding(horizontal = 6.dp, vertical = 1.dp),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = scheme.onSurfaceVariant)
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            val sets = if (record.session.templateId != null) "${record.completedSetCount}/${record.plannedSetCount}" else "${record.completedSetCount}"
+                            Text(sets, style = pixelNumber(16.sp), color = scheme.onSurface)
+                            Text("组 · ", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                            Text("${record.elapsedDuration(Instant.now()).toMinutes()}", style = pixelNumber(16.sp), color = scheme.onSurface)
+                            Text("分钟", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                        }
+                    }
+                    LineIcon(Symbol.ARROW, Modifier.size(11.dp), scheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
 }
 
 /**

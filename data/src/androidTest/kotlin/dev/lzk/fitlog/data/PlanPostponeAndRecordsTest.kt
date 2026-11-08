@@ -60,7 +60,7 @@ class PlanPostponeAndRecordsTest {
         assertEquals(template, saved.templateOn(today.plusDays(2)))
 
         val json = JsonBackupRepository(db).exportJson()
-        assertEquals(8, JSONObject(json).getInt("schemaVersion"))
+        assertEquals(9, JSONObject(json).getInt("schemaVersion"))
         val otherName = "postpone-b-" + UUID.randomUUID()
         val other = FitLogDatabase.create(context, otherName)
         try {
@@ -108,12 +108,13 @@ class PlanPostponeAndRecordsTest {
     }
 
     @Test fun todaysFinishedPlanReopensForAnUndoWithoutCountingTheStop() = runBlocking {
-        val day = workouts.startDailyWorkout(exerciseIds = listOf(bench))
+        val template = training.saveTemplate(TemplateDraft(name = "推日", exercises = listOf(TemplateExercise("a", bench, 0))))
+        val day = workouts.startDailyWorkout(template)
         val exercise = workouts.observeActiveWorkout().first()!!.exercises.single()
         exercise.sets.forEach { workouts.completeSet(exercise.id, it.id, 40_000, 10, finishWhenAllDone = true) }
         val finished = workouts.observeWorkout(day.session.id).first()!!
         assertEquals(SessionStatus.FINISHED, finished.session.status)
-        try { workouts.startDailyWorkout(); fail("finished plan restarted without a change") } catch (_: WorkoutException) { }
+        assertEquals(SessionStatus.FINISHED, workouts.startDailyWorkout(template).session.status)
 
         workouts.reopenDailyWorkout(day.session.id)
         val reopened = workouts.observeActiveWorkout().first()!!
@@ -123,9 +124,11 @@ class PlanPostponeAndRecordsTest {
         workouts.undoCompletedSet(exercise.id, exercise.sets.last().id)
         assertEquals(exercise.sets.size - 1, workouts.observeActiveWorkout().first()!!.completedSetCount)
 
-        // An extra workout cannot reopen a different session's plan underneath it.
+        // Reopening switches away from whatever else is running; an empty session leaves nothing behind.
         workouts.finishWorkout(day.session.id, null)
-        workouts.startWorkout()
-        try { workouts.reopenDailyWorkout(day.session.id); fail("reopened under an active extra workout") } catch (_: WorkoutException) { }
+        val other = workouts.startWorkout()
+        workouts.reopenDailyWorkout(day.session.id)
+        assertEquals(day.session.id, workouts.observeActiveWorkout().first()!!.session.id)
+        assertNull(workouts.observeWorkout(other.session.id).first())
     }
 }

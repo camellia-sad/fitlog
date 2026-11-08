@@ -6,10 +6,18 @@ interface WorkoutRepository {
     fun observeExercises(query: String = "", equipment: EquipmentType? = null, muscle: Muscle? = null, archived: Boolean = false): Flow<List<Exercise>>
     fun observeActiveWorkout(): Flow<Workout?>
     fun observeWorkout(sessionId: String): Flow<Workout?>
+    /** The day's records in start order: one per template trained that day plus at most one free record. */
+    fun observeDayRecords(date: java.time.LocalDate): Flow<List<Workout>>
+    /** The day's current record: the one training now, else the one used last. */
     fun observeDailyWorkout(date: java.time.LocalDate): Flow<Workout?>
     suspend fun reserveDailyWorkout(templateId: String? = null, exerciseIds: List<String> = emptyList()): Workout
+    /**
+     * Opens today's record for this template (null: the free record), creating it when missing. A different session
+     * still running is stopped first, or dropped when it has no completed set. A template record whose targets are all
+     * done stays finished and is returned as is, unless exercises are being added.
+     */
     suspend fun startDailyWorkout(templateId: String? = null, exerciseIds: List<String> = emptyList()): Workout
-    suspend fun addDailyExercise(exerciseId: String)
+    suspend fun addDailyExercise(sessionId: String, exerciseId: String)
     suspend fun addDailySet(sessionExerciseId: String)
     suspend fun removeExercise(sessionExerciseId: String)
     suspend fun startWorkout(templateId: String? = null, exerciseIds: List<String> = emptyList()): Workout

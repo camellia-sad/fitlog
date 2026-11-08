@@ -31,7 +31,8 @@ class BranchPagesFlowTest {
     private fun waitText(text: String) = compose.waitUntil(15_000) { compose.onAllNodesWithText(text, substring = false).fetchSemanticsNodes().isNotEmpty() }
     private fun waitTag(tag: String) = compose.waitUntil(15_000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
     private fun show() { compose.setContent { FitLogTheme { FitLogApp(container) } }; waitTag("main-navigation") }
-    private fun day() = runBlocking { container.workouts.observeDailyWorkout(LocalDate.now()).first()!! }
+    /** Today's template record (the free one is never the plan). */
+    private fun day() = runBlocking { container.workouts.observeDayRecords(LocalDate.now()).first().first { !it.session.isFreeRecord } }
     private fun best() = runBlocking { container.workouts.observeExercises().first().single { it.id == bench }.bestWeightGrams }
 
     @Test fun recordMedalStaysOnTheNewBestSetAndUndoTakesItAway() {
@@ -69,7 +70,7 @@ class BranchPagesFlowTest {
             container.workouts.reserveDailyWorkout(id)
         }
         show()
-        compose.onNodeWithText("开始训练").performScrollTo().performClick()
+        waitTag("home-continue"); compose.onNodeWithTag("home-continue").performScrollTo().performClick()
         repeat(2) { waitText("完成本组"); compose.onNodeWithText("完成本组").performClick(); compose.waitUntil(10_000) { day().completedSetCount == it + 1 } }
         waitTag("plan-done")
         compose.onNodeWithTag("plan-done-back").performClick()
@@ -146,7 +147,9 @@ class BranchPagesFlowTest {
 
         // From the picker, a new custom exercise returns already picked.
         compose.onNodeWithText("主页", substring = false).performClick()
-        compose.onNodeWithText("添加本次动作").performScrollTo().performClick()
+        waitTag("home-start"); compose.onNodeWithTag("home-start").performScrollTo().performClick()
+        waitTag("training-option-free"); compose.onNodeWithTag("training-option-free").performClick()
+        waitText("选择动作"); compose.onNodeWithText("选择动作").performClick()
         waitTag("picker-custom")
         compose.onNodeWithTag("picker-custom").performClick()
         waitTag("custom-name")
@@ -156,7 +159,7 @@ class BranchPagesFlowTest {
         waitTag("picker-confirm")
         compose.onNodeWithContentDescription("已选 1 个动作").assertExists()
         compose.onNodeWithTag("picker-confirm").performClick()
-        compose.waitUntil(10_000) { runBlocking { container.preparation.preparedExercises.first().size == 1 } }
+        compose.waitUntil(10_000) { runBlocking { container.workouts.observeActiveWorkout().first()?.exercises?.size == 1 } }
     }
 
     @Test fun historyDateSheetPicksADayInTheMonthGrid() {

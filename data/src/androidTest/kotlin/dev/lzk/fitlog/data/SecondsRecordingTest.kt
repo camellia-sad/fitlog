@@ -62,7 +62,7 @@ class SecondsRecordingTest {
             assertEquals(BigInteger.ZERO,TrainingHistory.statistics(listOf(saved)).volumeGrams)
             assertTrue(saved.socialPostText().contains("45 秒"))
             val json=JsonBackupRepository(a).exportJson()
-            assertEquals(8, JSONObject(json).getInt("schemaVersion"))
+            assertEquals(9, JSONObject(json).getInt("schemaVersion"))
             JsonBackupRepository(b).importJson(json)
             val restored=RoomWorkoutRepository(b).observeWorkout(workout.session.id).first()!!
             assertEquals(RecordMetric.SECONDS,restored.exercises.single().recordMetricSnapshot)

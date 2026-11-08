@@ -107,7 +107,7 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
             .padding(horizontal = 12.dp, vertical = 8.dp).testTag("plan-review-banner"), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             LineIcon(Symbol.CHECK, Modifier.size(12.dp), MaterialTheme.colorScheme.primary)
-            Text("今日计划已完成", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold), color = MaterialTheme.colorScheme.primary)
+            Text("${workout?.session?.trainingLabel ?: "今日计划"}已完成", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold), color = MaterialTheme.colorScheme.primary)
         }
         if(workout != null) {
             OutlinedButton(onClick = { showingActions = true }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).heightIn(min = 44.dp).testTag("workout-exercises")) {
@@ -364,7 +364,7 @@ private fun PlanDoneDialog(workout: Workout, records: Map<String, Long>, unit: W
     val bests = workout.exercises.mapNotNull { e -> e.sets.firstOrNull { it.id in records }?.let { Triple(e.exerciseNameSnapshot, it.weightGrams, records.getValue(it.id)) } }
     AlertDialog(onDismissRequest = { onBack(feeling) }, modifier = Modifier.testTag("plan-done"),
         icon = { PixelPuppy(Modifier.size(64.dp), PuppyPose.CELEBRATE) },
-        title = { Text("今日计划完成") },
+        title = { Text("${workout.session.trainingLabel}完成") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

@@ -38,16 +38,8 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
     val templateSaving by templates.saving.collectAsStateWithLifecycle()
     val templateMessage by templates.message.collectAsStateWithLifecycle()
     val plan by templates.plan.collectAsStateWithLifecycle()
-    var selectedTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectionChanged by rememberSaveable { mutableStateOf(false) }
-    val todayPlanId = plan?.templateOn(state.todayDate)
-    var selectionDate by rememberSaveable { mutableStateOf(state.todayDate.toString()) }
-    LaunchedEffect(state.todayDate) {
-        if(selectionDate != state.todayDate.toString()) {
-            selectionDate = state.todayDate.toString(); selectionChanged = false; selectedTemplateId = todayPlanId
-        }
-    }
-    LaunchedEffect(todayPlanId) { if (!selectionChanged) selectedTemplateId = todayPlanId }
+    // The slot waiting on “暂停当前训练？”: a template id, or "" for the free record.
+    var switchingTo by rememberSaveable { mutableStateOf<String?>(null) }
     val settingsMessage by settings.message.collectAsStateWithLifecycle()
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
@@ -71,6 +63,9 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
     }
     val weekly by weeklyFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     val goWorkout = { nav.navigate("workout") { popUpTo("home"); launchSingleTop = true } }
+    val openNow: (String?) -> Unit = { slot -> onWorkoutStarted(); model.openRecord(slot); goWorkout() }
+    // Every way into training goes through here: a running session with completed sets is paused only after a confirm.
+    val requestOpen: (String?) -> Unit = { slot -> if (state.switchingLosesFocus(slot.orEmpty())) switchingTo = slot.orEmpty() else openNow(slot) }
     val finishTemplateExit: (String, Boolean) -> Unit = { destination, resume ->
         if (destination == "workout") {
             goWorkout()
@@ -129,10 +124,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
     LaunchedEffect(route) { ThemeClock.holdForWorkout = route == "workout" }
     val addExercise: (Exercise) -> Unit = { exercise ->
         model.startAndAddExercise(exercise.id)
-        if (state.workout == null) {
-            selectedTemplateId = null; selectionChanged = true
-            nav.popBackStack("home", false)
-        } else goWorkout()
+        if (state.workout == null) nav.popBackStack("home", false) else goWorkout()
     }
     CompositionLocalProvider(LocalHapticsEnabled provides state.preferences.hapticsEnabled) {
     Box(Modifier.fillMaxSize()) {
@@ -150,15 +142,13 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
     ) { padding ->
         NavHost(nav, startDestination = "home", modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             composable("home") {
-                HomeScreen(state, onStart = { onWorkoutStarted(); model.startWorkout(selectedTemplateId); goWorkout() },
-                    onContinue = { onWorkoutStarted(); if(state.workout != null) model.setPaused(false) else model.continueToday(); goWorkout() },
+                HomeScreen(state, onOpen = requestOpen,
+                    onContinue = {
+                        if (state.workout != null) { onWorkoutStarted(); model.setPaused(false); goWorkout() }
+                        else state.todayWorkout?.let { openNow(it.session.daySlot) }
+                    },
                     onLibrary = { nav.navigate("pick/today") }, onHistory = { nav.navigate("history") }, weekly = weekly,
-                    templates = templateState.templates, plan = plan,
-                    selectedTemplateId = selectedTemplateId,
-                    onSelectTemplate = { selectedTemplateId = it; selectionChanged = true },
-                    prepared = state.preparedExerciseIds.mapNotNull { id -> templateState.exercises.find { it.id == id } },
-                    onRemovePrepared = model::removePreparedExercise, updates=container.updates,
-                    onExtra = { onWorkoutStarted(); model.startExtraWorkout(); goWorkout() },
+                    templates = templateState.templates, plan = plan, updates=container.updates,
                     onAddDailySet = model::addDailySet, onRemoveAction = model::removeExercise, catalog = templateState.exercises,
                     onTemplates = { nav.navigate("templates") })
             }
@@ -173,11 +163,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                 val draft = templateEditor
                 val shownWorkout = state.workout ?: state.review ?: state.todayWorkout
                 val target = when (purpose) {
-                    PickPurpose.TODAY -> when {
-                        state.workout?.session?.isExtra == true -> "加练"
-                        shownWorkout != null -> "今日计划 · " + shownWorkout.session.trainingLabel
-                        else -> "本次训练"
-                    }
+                    PickPurpose.TODAY -> shownWorkout?.session?.trainingLabel ?: "自由训练"
                     PickPurpose.TEMPLATE -> "模板 · " + (draft?.name?.trim()?.ifEmpty { null } ?: "新模板")
                     PickPurpose.TREND -> "动作趋势"
                 }
@@ -214,10 +200,11 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                     onFinish = { finishing = true }, catalog = templateState.exercises)
             }
             composable("templates") {
-                TemplateScreen(templates, state.workout == null, onBack = { nav.popBackStack() }, onExitEditor = { requestTemplateExit("template-list", false) },
-                    todayStarted = state.todayWorkout != null, onPickExercises = { nav.navigate("pick/template") }) {
-                    selectedTemplateId = it; selectionChanged = true; nav.popBackStack("home", false)
-                }
+                // Postponing stays possible until today's planned template has a completed set.
+                val planToday = plan?.let { if (it.isPostponed(state.todayDate)) it.undoPostpone(state.todayDate) else it }?.templateOn(state.todayDate)
+                TemplateScreen(templates, true, onBack = { nav.popBackStack() }, onExitEditor = { requestTemplateExit("template-list", false) },
+                    todayStarted = planToday != null && state.dayRecords.any { it.session.daySlot == planToday && it.completedSetCount > 0 },
+                    onPickExercises = { nav.navigate("pick/template") }, onStart = requestOpen)
             }
             composable("history") {
                 LaunchedEffect(Unit) { history.selectDate(LocalDate.now()) }
@@ -255,12 +242,19 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text("本次完成 ${workout.completedExerciseCount} 个动作、${workout.completedSetCount} 组。" +
-                        if(workout.session.dailyPlanDate != null) "结束只停止计时，今日计划与全部进度保留，稍后可继续。" else "未完成草稿会保留，不计入完成数量。")
+                        if(workout.session.dailyPlanDate != null) (if (workout.completedSetCount == 0) "还没有完成组，结束后不保留这条记录。" else "结束只停止计时，全部进度保留在这条记录，稍后可继续。") else "未完成草稿会保留，不计入完成数量。")
                     OutlinedTextField(feedback, { feedback = it.take(2000) }, label = { Text("今天感觉如何（选填）") }, maxLines = 3)
                 }
             },
             confirmButton = { TextButton(onClick = { finishing = false; model.finishWorkout(workout.session.id, feedback) }) { Text("结束训练") } },
             dismissButton = { TextButton(onClick = { finishing = false }) { Text("继续训练") } })
+    }
+    switchingTo?.let { slot ->
+        val running = state.workout
+        if (running == null) switchingTo = null
+        else SwitchTrainingDialog(running, if (slot.isEmpty()) (if (state.dayRecords.any { !it.session.daySlot.isNullOrEmpty() }) "加练" else "自由训练")
+            else templateState.templates.find { it.id == slot }?.name ?: "训练",
+            onCancel = { switchingTo = null }) { switchingTo = null; openNow(slot) }
     }
     state.removalRequest?.let { request ->
         AlertDialog(onDismissRequest = model::cancelSetRemoval, title = { Text("移除已完成的组？") },

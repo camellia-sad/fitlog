@@ -48,7 +48,9 @@ class TemplateViewModel(container: AppContainer) : FeatureModel(container) {
     fun postponeToday() = execute {
         val current = container.training.observePlan().first() ?: return@execute
         val today = LocalDate.now()
-        require(container.workouts.observeDailyWorkout(today).first() == null) { "今天的训练已经开始，不能推迟" }
+        val planned = current.templateOn(today)
+        require(container.workouts.observeDayRecords(today).first().none { it.session.daySlot == planned && it.completedSetCount > 0 }) {
+            "今天的计划训练已经开始，不能推迟" }
         container.training.savePlan(current.postpone(today))
     }
     fun undoPostponeToday() = execute {

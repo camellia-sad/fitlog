@@ -4,6 +4,15 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseMigrations {
+    /** A day holds one record per template plus one free record; existing day records keep their own slot. */
+    val FROM_9_TO_10 = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE workout_sessions ADD COLUMN daySlot TEXT")
+            db.execSQL("UPDATE workout_sessions SET daySlot = COALESCE(templateId, '') WHERE dailyPlanDate IS NOT NULL")
+            db.execSQL("DROP INDEX IF EXISTS index_workout_sessions_dailyPlanDate")
+            db.execSQL("CREATE UNIQUE INDEX index_workout_sessions_dailyPlanDate_daySlot ON workout_sessions(dailyPlanDate, daySlot)")
+        }
+    }
     /** Short names for the plan timetable; existing templates keep null and get a derived one for display. */
     val FROM_8_TO_9 = object : Migration(8, 9) {
         override fun migrate(db: SupportSQLiteDatabase) {

@@ -42,6 +42,8 @@ class WorkoutFlowTest {
         compose.setContent { FitLogTheme { FitLogApp(container) } }
         compose.waitUntil(15_000) { compose.onAllNodesWithText("开始训练").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("开始训练").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("training-option-free").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("training-option-free").performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("选择动作").fetchSemanticsNodes().any { !it.config.contains(androidx.compose.ui.semantics.SemanticsProperties.Disabled) } }
         compose.onNodeWithText("选择动作").performClick()
         addExercise("杠铃卧推")
@@ -85,7 +87,7 @@ class WorkoutFlowTest {
         assertEquals(6, saved.completedSetCount)
         assertEquals(37_500L, saved.exercises.first().sets.first().weightGrams)
         compose.onNodeWithText("完成", substring = false).performClick()
-        compose.onNodeWithText("继续今日计划").assertExists()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("home-continue").fetchSemanticsNodes().isNotEmpty() }
     }
 
     private fun completeNext(index: Int, expectedCount: Int) {

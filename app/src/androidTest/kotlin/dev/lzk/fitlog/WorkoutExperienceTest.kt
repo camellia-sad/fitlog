@@ -70,7 +70,8 @@ class WorkoutExperienceTest {
         runBlocking { container.training.savePlan(TrainingPlan(LocalDate.now(), templateIds = List(7) { null })) }
         show()
         waitText("休息日")
-        compose.onNodeWithText("今日计划", substring = false).assertExists()
+        compose.onNodeWithText("明天：休息", substring = false).assertExists()
+        compose.onNodeWithTag("home-start").assertExists()
         compose.onNodeWithText("可按需自由训练", substring = false).assertDoesNotExist()
         compose.onNodeWithTag("week-day-${LocalDate.now().dayOfWeek.value - 1}").performScrollTo().performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("week-day-info").fetchSemanticsNodes().isNotEmpty() }
@@ -80,12 +81,11 @@ class WorkoutExperienceTest {
     @Test fun templatePickerSelectsTemplateAndClosesSheet() {
         val id = runBlocking { template() }
         show()
-        compose.onNodeWithText("模板训练", substring = false).performClick()
+        compose.onNodeWithTag("home-start").performScrollTo().performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("template-picker").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("training-option-free").assert(hasText("自由训练"))
         compose.onNodeWithTag("template-option-$id").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("template-picker").fetchSemanticsNodes().isEmpty() }
-        waitText("自己的推日")
-        compose.onNodeWithText("开始训练", substring = false).performScrollTo().performClick()
         waitDescription("完成当前第1组")
         assertEquals(id, runBlocking { container.workouts.observeActiveWorkout().first()!!.session.templateId })
     }
@@ -146,11 +146,11 @@ class WorkoutExperienceTest {
         compose.onNodeWithTag("exercise-search").performTextInput("Barbell Bench Press")
         compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("添加杠铃卧推").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("添加杠铃卧推").performClick()
-        compose.waitUntil(10_000) { runBlocking { container.preparation.preparedExercises.first().isNotEmpty() } }
-        assertNull(runBlocking { container.workouts.observeActiveWorkout().first() })
-        compose.onNodeWithText("开始训练", substring = false).performScrollTo().performClick()
-        waitDescription("完成当前第1组")
+        // Adding from the library opens today's free record with that exercise and lands back home, paused.
+        compose.waitUntil(10_000) { runBlocking { container.workouts.observeActiveWorkout().first()?.exercises?.size == 1 } }
         assertNull(runBlocking { container.workouts.observeActiveWorkout().first()!!.session.templateId })
+        compose.onNodeWithTag("home-continue").performScrollTo().performClick()
+        waitDescription("完成当前第1组")
         compose.onNodeWithContentDescription("返回今日").performClick()
         compose.waitUntil(10_000) { runBlocking { container.workouts.observeActiveWorkout().first()?.session?.status == SessionStatus.PAUSED } }
         val paused = runBlocking { container.workouts.observeActiveWorkout().first()!! }

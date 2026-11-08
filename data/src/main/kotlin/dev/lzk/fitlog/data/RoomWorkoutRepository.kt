@@ -14,10 +14,14 @@ class RoomWorkoutRepository(
 ) : WorkoutRepository {
     private val dao = database.workoutDao()
     private val daily = RoomDailyWorkouts(database, clock, this)
-    override fun observeDailyWorkout(date: LocalDate) = dao.observeDailyWorkout(date.toString()).map { it?.toDomain() }
+    override fun observeDayRecords(date: LocalDate) = dao.observeDayRecords(date.toString()).map { rows -> rows.map { it.toDomain() } }
+    override fun observeDailyWorkout(date: LocalDate) = observeDayRecords(date).map { records ->
+        records.find { it.session.status in listOf(SessionStatus.ACTIVE, SessionStatus.PAUSED) }
+            ?: records.maxWithOrNull(compareBy<Workout> { it.session.endedAtUtc ?: it.session.startedAtUtc }.thenBy { it.session.startedAtUtc })
+    }
     override suspend fun reserveDailyWorkout(templateId: String?, exerciseIds: List<String>) = daily.reserve(templateId, exerciseIds)
     override suspend fun startDailyWorkout(templateId: String?, exerciseIds: List<String>) = daily.start(templateId, exerciseIds)
-    override suspend fun addDailyExercise(exerciseId: String) = daily.addAction(exerciseId)
+    override suspend fun addDailyExercise(sessionId: String, exerciseId: String) = daily.addAction(sessionId, exerciseId)
     override suspend fun addDailySet(sessionExerciseId: String) = daily.addSet(sessionExerciseId)
     override suspend fun removeExercise(sessionExerciseId: String) = daily.remove(sessionExerciseId)
 
@@ -132,7 +136,7 @@ class RoomWorkoutRepository(
             }
             dao.updateSessionExercise(exercise.copy(targetSetCountSnapshot = count,
                 removedFromPlan = if(count > sets.size) false else exercise.removedFromPlan))
-            if (finishWhenAllDone && workout(exercise.sessionId).allSetsCompleted) finishWorkout(exercise.sessionId, null)
+            if (finishWhenAllDone && endsOnItsOwn(exercise.sessionId) && workout(exercise.sessionId).allSetsCompleted) finishWorkout(exercise.sessionId, null)
             SetCountResult.Updated
         }
 
@@ -162,7 +166,7 @@ class RoomWorkoutRepository(
             if (changed == 1) {
                 dao.updateSession(session.copy(restEndsAtUtc = if (restSeconds > 0) Math.addExact(completedAt, restSeconds * 1000L) else null))
             }
-            if (finishWhenAllDone && workout(session.id).allSetsCompleted) finishWorkout(session.id, null)
+            if (finishWhenAllDone && session.daySlot != "" && workout(session.id).allSetsCompleted) finishWorkout(session.id, null)
             val saved = dao.set(setId) ?: missing("组记录不存在")
             if (changed == 1) CompletionResult.Completed(saved.toDomain()) else CompletionResult.AlreadyCompleted(saved.toDomain())
         }
@@ -207,6 +211,11 @@ class RoomWorkoutRepository(
         val session = dao.session(sessionId) ?: missing("会话不存在")
         if (session.status == "FINISHED") return@withTransaction workout(sessionId)
         if (session.status !in listOf("ACTIVE", "PAUSED")) throw WorkoutException(WorkoutError.SESSION_ENDED, "会话已结束")
+        // A day record stopped before any completed set leaves nothing in history.
+        if (session.dailyPlanDate != null) workout(sessionId).takeIf { it.completedSetCount == 0 }?.let { empty ->
+            dao.deleteSession(sessionId)
+            return@withTransaction empty
+        }
         val end = maxOf(clock.millis(), session.startedAtUtc)
         val pause = session.pausedAtUtc?.let { (end - it).coerceAtLeast(0) } ?: 0
         dao.updateSession(session.copy(
@@ -242,7 +251,9 @@ class RoomWorkoutRepository(
     private suspend fun defaultWeight(exercise: ExerciseEntity): Long =
         if(exercise.recordMetric == "SECONDS") 0L else exercise.effectiveWeight(dao.bestWeight(exercise.id)) ?: 0L
 
-    private suspend fun workout(id: String) = dao.workout(id)?.toDomain() ?: missing("会话不存在")
+    private suspend fun endsOnItsOwn(sessionId: String) = dao.session(sessionId)?.daySlot != ""
+
+    private suspend fun workout(id: String) =dao.workout(id)?.toDomain() ?: missing("会话不存在")
 
     private suspend fun activeSession(id: String): SessionEntity {
         val session = dao.session(id) ?: missing("会话不存在")

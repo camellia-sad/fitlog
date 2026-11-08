@@ -38,7 +38,7 @@ data class CatalogVersionEntity(@PrimaryKey val id: String, val version: Int)
 
 @Entity(tableName = "workout_sessions",
     foreignKeys = [ForeignKey(entity = TemplateEntity::class, parentColumns = ["id"], childColumns = ["templateId"], onDelete = ForeignKey.SET_NULL)],
-    indices = [Index(value = ["unfinishedSlot"], unique = true), Index("localWorkoutDate"), Index("templateId"), Index(value = ["dailyPlanDate"], unique = true)])
+    indices = [Index(value = ["unfinishedSlot"], unique = true), Index("localWorkoutDate"), Index("templateId"), Index(value = ["dailyPlanDate", "daySlot"], unique = true)])
 data class SessionEntity(
     @PrimaryKey val id: String,
     val startedAtUtc: Long,
@@ -54,6 +54,8 @@ data class SessionEntity(
     @ColumnInfo(defaultValue = "0") val pausedDurationMillis: Long = 0,
     val restEndsAtUtc: Long? = null,
     val dailyPlanDate: String? = null,
+    /** For a day record: the template id, or "" for the day's free record. */
+    val daySlot: String? = null,
 )
 
 @Entity(

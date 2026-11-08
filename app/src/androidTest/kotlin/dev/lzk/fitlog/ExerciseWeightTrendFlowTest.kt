@@ -46,9 +46,9 @@ class ExerciseWeightTrendFlowTest {
         compose.waitUntil(15_000) { runBlocking {
             container.workouts.observeExercises().first().single { it.id == "barbell-bench-press" }.defaultWeightGrams == 37_500L
         } }
-        compose.onNodeWithText("加入待开始训练").performScrollTo().performClick()
-        waitText("开始训练")
-        compose.onNodeWithText("开始训练").performScrollTo().performClick()
+        compose.onNodeWithText("加入今日训练").performScrollTo().performClick()
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("home-continue").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("home-continue").performScrollTo().performClick()
         waitText("完成本组")
         val workout = runBlocking { container.workouts.observeActiveWorkout().first()!! }
         assertTrue(workout.exercises.single().sets.all { it.weightGrams == 37_500L })

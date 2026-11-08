@@ -25,7 +25,10 @@ data class WorkoutUiState(
     val archived: Boolean = false,
     val preferences: UserPreferences = UserPreferences(),
     val workout: Workout? = null,
+    /** Today's current record: the one training now, else the one used last. */
     val todayWorkout: Workout? = null,
+    /** All of today's records in start order. */
+    val dayRecords: List<Workout> = emptyList(),
     val todayDate: java.time.LocalDate = java.time.LocalDate.now(),
     val selectedExercise: SessionExercise? = null,
     val lastPerformance: ExercisePerformance? = null,
@@ -41,6 +44,13 @@ data class WorkoutUiState(
 ) {
     /** What the workout page shows: the running session, else the finished plan under review. */
     val shown: Workout? get() = workout ?: review
+
+    /** Opening [slot] ("" for free) would stop a session that already holds completed sets. */
+    fun switchingLosesFocus(slot: String): Boolean {
+        val running = workout ?: return false
+        if (running.completedSetCount == 0) return false
+        return running.session.dailyPlanDate != todayDate || running.session.daySlot != slot
+    }
 }
 
 private data class LibraryFilter(val query: String = "", val equipment: EquipmentType? = null, val muscle: Muscle? = null, val favorites: Boolean = false, val archived: Boolean = false)
@@ -69,7 +79,7 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
 
     private val todayWorkout = flow {
         while(true) { emit(java.time.LocalDate.now()); kotlinx.coroutines.delay(15_000) }
-    }.distinctUntilChanged().flatMapLatest { date -> repository.observeDailyWorkout(date).map { date to it } }
+    }.distinctUntilChanged().flatMapLatest { date -> repository.observeDayRecords(date).map { date to it } }
 
     val state: StateFlow<WorkoutUiState> = flow {
         container.ready.await()
@@ -88,8 +98,11 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
             ) to (feedback.reviewing to selected)
         }.combine(todayWorkout) { (state, extra), today ->
             val (reviewing, selected) = extra
-            val review = today.second?.takeIf { state.workout == null && it.session.id == reviewing && it.session.status == SessionStatus.FINISHED }
-            state.copy(todayWorkout = today.second, todayDate = today.first, review = review,
+            val records = today.second
+            val current = records.find { it.session.status in listOf(SessionStatus.ACTIVE, SessionStatus.PAUSED) }
+                ?: records.maxWithOrNull(compareBy<Workout> { it.session.endedAtUtc ?: it.session.startedAtUtc }.thenBy { it.session.startedAtUtc })
+            val review = records.find { state.workout == null && it.session.id == reviewing && it.session.status == SessionStatus.FINISHED }
+            state.copy(todayWorkout = current, dayRecords = records, todayDate = today.first, review = review,
                 selectedExercise = state.selectedExercise ?: pick(review, selected))
         }
         .combine(container.preparation.preparedExercises) { state, ids -> state.copy(preparedExerciseIds = ids) }.mapLatest { state ->
@@ -149,58 +162,45 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
         if (feeling.isNotBlank()) repository.saveFeedback(done.session.id, feeling)
         feedback.update { it.copy(planDone = null, reviewing = done.session.id) }
     }
-    /** “加练” on the plan-complete popup: straight into an empty extra workout, without the home page in between. */
+    /** “加练” on the plan-complete popup: straight into today's extra record, without the home page in between. */
     fun extraAfterPlan(feeling: String) = mutate {
         val done = feedback.value.planDone ?: return@mutate
         if (feeling.isNotBlank()) repository.saveFeedback(done.session.id, feeling)
-        check(repository.observeActiveWorkout().first() == null) { "请先结束当前训练" }
-        repository.startWorkout(exerciseIds = container.preparation.preparedExercises.first())
-        container.preparation.savePreparedExercises(emptyList())
-        selection.value = null; feedback.value = Feedback()
+        open(null)
     }
     /** Leaving the workout page ends the review of a finished plan. */
     fun stopReviewing() { feedback.update { it.copy(planDone = null, reviewing = null) } }
     /** Adds the picker's exercises in order; the last one becomes the current exercise. */
-    fun addExercises(ids: List<String>) = mutate {
-        ids.forEach { exerciseId ->
-            val workout = repository.observeActiveWorkout().first()
-            if (workout != null) selection.value = addDefault(workout.session.id, exerciseId, WorkoutRules.DEFAULT_SET_COUNT)
-            else if (repository.observeDailyWorkout(java.time.LocalDate.now()).first() != null) repository.addDailyExercise(exerciseId)
-            else container.preparation.savePreparedExercises((container.preparation.preparedExercises.first() + exerciseId).distinct())
+    fun addExercises(ids: List<String>) = mutate { ids.forEach { addToToday(it) } }
+
+    /** Into the running session, else today's current record, else a new free record. */
+    private suspend fun addToToday(exerciseId: String) {
+        val workout = repository.observeActiveWorkout().first()
+        val current = repository.observeDailyWorkout(java.time.LocalDate.now()).first()
+        when {
+            workout != null -> selection.value = addDefault(workout.session.id, exerciseId, WorkoutRules.DEFAULT_SET_COUNT)
+            current != null -> repository.addDailyExercise(current.session.id, exerciseId)
+            else -> repository.startDailyWorkout(null, listOf(exerciseId))
         }
     }
+
+    /**
+     * Opens today's record for this slot: a template id, null or "" for the free record. A finished template record
+     * opens for review instead of restarting.
+     */
+    private suspend fun open(slot: String?) {
+        val opened = repository.startDailyWorkout(slot?.ifEmpty { null })
+        selection.value = null
+        feedback.value = Feedback(reviewing = opened.session.id.takeIf { opened.session.status == SessionStatus.FINISHED })
+    }
+    fun openRecord(slot: String?) = mutate { open(slot) }
     fun cancelSetRemoval() { feedback.update { it.copy(removal = null) } }
 
-    fun startWorkout(templateId: String? = null) = mutate {
-        val prepared = if (templateId == null) container.preparation.preparedExercises.first() else emptyList()
-        repository.startDailyWorkout(templateId, prepared)
-        if (templateId == null) container.preparation.savePreparedExercises(emptyList())
-        selection.value = null
-        feedback.value = Feedback()
-    }
-
-    fun continueToday() = mutate {
-        val prepared = container.preparation.preparedExercises.first()
-        repository.startDailyWorkout(exerciseIds = prepared)
-        container.preparation.savePreparedExercises(emptyList())
-        selection.value = null; feedback.value = Feedback()
-    }
-    fun startExtraWorkout() = mutate {
-        check(repository.observeActiveWorkout().first() == null) { "请先结束当前训练" }
-        repository.reserveDailyWorkout()
-        repository.startWorkout(exerciseIds = container.preparation.preparedExercises.first())
-        container.preparation.savePreparedExercises(emptyList())
-        selection.value = null; feedback.value = Feedback()
-    }
+    fun startWorkout(templateId: String? = null) = openRecord(templateId)
     fun addDailySet(id: String) = mutate { repository.addDailySet(id) }
     fun removeExercise(id: String) = mutate { repository.removeExercise(id); selection.value = null }
 
-    fun startAndAddExercise(exerciseId: String) = mutate {
-        val workout = repository.observeActiveWorkout().first()
-        if (workout != null) selection.value = addDefault(workout.session.id, exerciseId,WorkoutRules.DEFAULT_SET_COUNT)
-        else if(repository.observeDailyWorkout(java.time.LocalDate.now()).first() != null) repository.addDailyExercise(exerciseId)
-        else container.preparation.savePreparedExercises((container.preparation.preparedExercises.first() + exerciseId).distinct())
-    }
+    fun startAndAddExercise(exerciseId: String) = mutate { addToToday(exerciseId) }
 
     fun removePreparedExercise(id: String) = mutate {
         container.preparation.savePreparedExercises(container.preparation.preparedExercises.first().filterNot { it == id })
@@ -289,7 +289,8 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
 
     fun finishWorkout(sessionId: String, feedbackText: String? = null) = mutate {
         val summary = finish(sessionId, feedbackText)
-        feedback.update { it.copy(summary = summary, removal = null) }
+        // A day record stopped before any completed set is dropped, so there is nothing to sum up.
+        feedback.update { it.copy(summary = summary.takeIf { s -> s.session.dailyPlanDate == null || s.completedSetCount > 0 }, removal = null) }
     }
 
     private suspend fun handleSetCount(sessionId: String?, id: String, count: Int, result: SetCountResult) {

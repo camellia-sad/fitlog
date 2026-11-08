@@ -8,7 +8,9 @@ import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
-const val WORKOUT_SELECT = """SELECT s.*, CASE WHEN s.dailyPlanDate IS NOT NULL THEN 0 ELSE
+// A day's free record reads as 加练 once the same day has a template record; older standalone sessions keep their rule.
+const val WORKOUT_SELECT = """SELECT s.*, CASE WHEN s.dailyPlanDate IS NOT NULL THEN (s.daySlot = '' AND
+    EXISTS(SELECT 1 FROM workout_sessions p WHERE p.dailyPlanDate = s.dailyPlanDate AND p.daySlot != '')) ELSE
     EXISTS(SELECT 1 FROM workout_sessions p WHERE p.localWorkoutDate = s.localWorkoutDate
     AND (p.dailyPlanDate IS NOT NULL OR p.startedAtUtc < s.startedAtUtc
     OR (p.startedAtUtc = s.startedAtUtc AND p.id < s.id))) END AS isExtra FROM workout_sessions s """
@@ -80,12 +82,12 @@ interface WorkoutDao {
     @Query("SELECT * FROM workout_sessions WHERE id = :id")
     suspend fun session(id: String): SessionEntity?
 
-    @Transaction @Query(WORKOUT_SELECT + "WHERE dailyPlanDate = :date")
-    fun observeDailyWorkout(date: String): Flow<WorkoutRow?>
-    @Query("SELECT * FROM workout_sessions WHERE dailyPlanDate = :date")
-    suspend fun dailySession(date: String): SessionEntity?
-    @Query("SELECT * FROM workout_sessions WHERE localWorkoutDate = :date AND status != 'DISCARDED' ORDER BY startedAtUtc, id LIMIT 1")
-    suspend fun firstOnDate(date: String): SessionEntity?
+    @Transaction @Query(WORKOUT_SELECT + "WHERE dailyPlanDate = :date ORDER BY startedAtUtc, id")
+    fun observeDayRecords(date: String): Flow<List<WorkoutRow>>
+    @Query("SELECT * FROM workout_sessions WHERE dailyPlanDate = :date AND daySlot = :slot")
+    suspend fun daySession(date: String, slot: String): SessionEntity?
+    @Query("DELETE FROM workout_sessions WHERE id = :id")
+    suspend fun deleteSession(id: String)
     @Query("DELETE FROM session_exercises WHERE id = :id")
     suspend fun deleteExercise(id: String)
     @Query("DELETE FROM set_records WHERE sessionExerciseId = :id AND status != 'COMPLETED'")

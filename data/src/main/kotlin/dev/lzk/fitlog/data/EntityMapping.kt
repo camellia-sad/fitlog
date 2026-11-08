@@ -23,7 +23,7 @@ internal fun SessionEntity.toDomain() = WorkoutSession(
     id, Instant.ofEpochMilli(startedAtUtc), LocalDate.parse(localWorkoutDate), SessionStatus.valueOf(status),
     endedAtUtc?.let(Instant::ofEpochMilli), feedback, templateId, templateNameSnapshot,
     pausedAtUtc?.let(Instant::ofEpochMilli), pausedDurationMillis, restEndsAtUtc?.let(Instant::ofEpochMilli),
-    dailyPlanDate = dailyPlanDate?.let(LocalDate::parse),
+    dailyPlanDate = dailyPlanDate?.let(LocalDate::parse), daySlot = daySlot,
 )
 
 internal fun SetEntity.toDomain() = SetRecord(
