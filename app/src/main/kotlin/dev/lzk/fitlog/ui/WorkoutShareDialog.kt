@@ -15,10 +15,10 @@ import kotlinx.coroutines.*
 import java.util.UUID
 
 @Composable internal fun WorkoutShareDialog(workout:Workout,friends:FriendsRepository,social:SocialRepository,
-    onClose:()->Unit,onLogin:()->Unit,onPublished:()->Unit) {
+    onClose:()->Unit,onLogin:()->Unit,onPublished:()->Unit,unit:WeightUnit=WeightUnit.KG) {
     val profile by friends.profile.collectAsStateWithLifecycle()
     val scope=rememberCoroutineScope()
-    var body by rememberSaveable(workout.session.id){mutableStateOf(workout.socialPostText())}
+    var body by rememberSaveable(workout.session.id){mutableStateOf(workout.socialPostText(unit=unit))}
     var id by rememberSaveable(workout.session.id){mutableStateOf(UUID.randomUUID().toString())}
     var busy by remember{mutableStateOf(false)}
     var error by remember{mutableStateOf<String?>(null)}

@@ -41,6 +41,8 @@ data class WorkoutUiState(
     val review: Workout? = null,
     /** Sets that beat this exercise's best from before the session, with that earlier best. */
     val recordSets: Map<String, Long> = emptyMap(),
+    /** The same, for the session in the summary dialog. */
+    val summaryRecords: Map<String, Long> = emptyMap(),
 ) {
     /** What the workout page shows: the running session, else the finished plan under review. */
     val shown: Workout? get() = workout ?: review
@@ -107,7 +109,8 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
         }
         .combine(container.preparation.preparedExercises) { state, ids -> state.copy(preparedExerciseIds = ids) }.mapLatest { state ->
             val exercise = state.selectedExercise
-            state.copy(lastPerformance = exercise?.let { last(it.exerciseId, it.sessionId) }, recordSets = records(state.shown))
+            state.copy(lastPerformance = exercise?.let { last(it.exerciseId, it.sessionId) }, recordSets = records(state.shown),
+                summaryRecords = records(state.summary))
         })
     }.catch { error ->
         if (error is CancellationException) throw error

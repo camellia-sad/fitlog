@@ -20,12 +20,14 @@ class FriendsFlowTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
     private val models=ViewModelStore()
     private val repository=FakeFriends()
+    private val settingsPage=androidx.compose.runtime.mutableStateOf(false)
     private fun show(account:Boolean=false) {
         val model=FriendsViewModel(repository)
         models.put("friends",model)
         compose.setContent { FitLogTheme {
             var accountPage by androidx.compose.runtime.remember {androidx.compose.runtime.mutableStateOf(account)}
-            if(accountPage) MeScreen(model) else FriendsScreen(model,onLogin={accountPage=true})
+            if(settingsPage.value) androidx.compose.foundation.layout.Column {SocialPrivacyRows(model,null){}}
+            else if(accountPage) MeScreen(model,onSettings={settingsPage.value=true}) else FriendsScreen(model,onLogin={accountPage=true})
         } }
     }
     @After fun close() { compose.activityRule.scenario.close(); models.clear() }
@@ -37,17 +39,40 @@ class FriendsFlowTest {
         waitText("邮件验证码")
         compose.onNodeWithText("邮件验证码").performTextInput("123456")
         compose.onNodeWithText("验证并登录").performScrollTo().performClick()
-        waitText("我的资料与 FitLog ID")
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("profile-hero").fetchSemanticsNodes().isNotEmpty() }
         assertEquals("person@example.invalid",repository.email)
-        compose.onNodeWithText("我的资料与 FitLog ID").performClick()
+        compose.onNodeWithTag("profile-nickname").assertTextEquals("我")
+        // Signing out now lives in settings, under “社交与隐私”.
+        compose.onNodeWithTag("open-settings").performScrollTo().performClick()
         waitText("退出登录")
-        compose.onNodeWithText("退出登录").performScrollTo().performClick()
+        compose.onNodeWithText("退出登录").performClick()
         compose.onNodeWithText("取消").performClick()
         assertNotNull(repository.profile.value)
         compose.onNodeWithText("退出登录").performClick()
         compose.onNodeWithText("确认").performClick()
-        waitText("邮箱")
+        waitText("登录后可用")
         assertNull(repository.profile.value)
+    }
+    @Test fun nicknameAndBioEditInPlaceAndFullEditorSavesBoth() {
+        repository.profile.value=repository.me
+        show(true)
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("profile-nickname").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("profile-nickname").performClick()
+        compose.onNodeWithTag("edit-nickname").performTextReplacement("练腿的我")
+        compose.onNodeWithTag("edit-nickname-save").performClick()
+        compose.waitUntil(10_000) { repository.profile.value?.nickname=="练腿的我" }
+        compose.onNodeWithTag("profile-bio").performClick()
+        compose.onNodeWithTag("edit-bio").performTextReplacement("每周四练")
+        compose.onNodeWithTag("edit-bio-save").performClick()
+        compose.waitUntil(10_000) { repository.profile.value?.bio=="每周四练" }
+        assertEquals("练腿的我",repository.profile.value?.nickname)
+        compose.onNodeWithTag("open-edit-profile").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("edit-profile").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("profile-name").performTextReplacement("新的名字")
+        compose.onNodeWithText("保存资料").performClick()
+        compose.waitUntil(10_000) { repository.profile.value?.nickname=="新的名字" }
+        assertEquals("每周四练",repository.profile.value?.bio)
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("profile-hero").fetchSemanticsNodes().isNotEmpty() }
     }
     @Test fun incomingRequestAcceptAndAvatarOpensPrivateRemarkEditor() {
         repository.profile.value=repository.me
@@ -116,7 +141,7 @@ class FriendsFlowTest {
         override suspend fun requestCode(email:String) {this.email=email}
         override suspend fun verifyCode(email:String,code:String) {check(code=="123456");profile.value=me}
         override suspend fun refreshProfile() {}
-        override suspend fun saveProfile(nickname:String,bio:String) {profile.value=me.copy(nickname=nickname,bio=bio)}
+        override suspend fun saveProfile(nickname:String,bio:String) {profile.value=(profile.value ?: me).copy(nickname=nickname,bio=bio)}
         override suspend fun friends():List<Friend> { check(!failFriends) {"好友列表暂不可用"}; return rows }
         override suspend fun find(fitlogId:String)=peer.takeIf{it.fitlogId==fitlogId}
         override suspend fun act(peerId:String,action:String) {

@@ -51,8 +51,9 @@ import kotlinx.coroutines.launch
  * then every setting is a pixel control that saves as it changes. Removal actions live in a dashed danger zone.
  */
 
-private enum class SettingsGroup(val title: String, val symbol: Symbol, val danger: Boolean = false) {
+private enum class SettingsGroup(val title: String, val symbol: Symbol, val danger: Boolean = false, val note: String? = null) {
     TRAINING("训练偏好", Symbol.DUMBBELL), REST("休息与反馈", Symbol.CLOCK), LOOK("外观", Symbol.SUN),
+    SOCIAL("社交与隐私", Symbol.FRIENDS, note = "仅好友可见"),
     BACKUP("备份与恢复", Symbol.CLOUD), DATA("数据管理", Symbol.TRASH, danger = true)
 }
 
@@ -62,7 +63,8 @@ private enum class SettingsRow { MINUTES, REST, STEP }
 private val EquipmentOrder = listOf(EquipmentType.BARBELL, EquipmentType.DUMBBELL, EquipmentType.MACHINE, EquipmentType.SMITH, EquipmentType.CABLE, EquipmentType.BODYWEIGHT)
 
 @Composable
-fun SettingsScreen(model: SettingsViewModel, onBack: (() -> Unit)? = null, onBackups: (() -> Unit)? = null, onChatCleared: () -> Unit = {}) {
+fun SettingsScreen(model: SettingsViewModel, onBack: (() -> Unit)? = null, onBackups: (() -> Unit)? = null, onChatCleared: () -> Unit = {},
+    social: (@Composable ColumnScope.() -> Unit)? = null) {
     val stored by model.preferences.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
     val message by model.message.collectAsStateWithLifecycle()
@@ -139,6 +141,8 @@ fun SettingsScreen(model: SettingsViewModel, onBack: (() -> Unit)? = null, onBac
             SettingsGroupBlock(SettingsGroup.LOOK, { groupTops[SettingsGroup.LOOK] = it }) {
                 SettingRow("主题") { ThemeCards(local.theme) { change(local.copy(theme = it)) } }
             }
+
+            if (social != null) SettingsGroupBlock(SettingsGroup.SOCIAL, { groupTops[SettingsGroup.SOCIAL] = it }, content = social)
 
             SettingsGroupBlock(SettingsGroup.BACKUP, { groupTops[SettingsGroup.BACKUP] = it }) {
                 if (onBackups != null) ListRow(Symbol.CLOUD, "云端备份与恢复", tone = RowTone.HERO, enabled = !busy, onClick = onBackups)
@@ -271,6 +275,7 @@ private fun SettingsGroupBlock(group: SettingsGroup, onTop: (Int) -> Unit, conte
                 LineIcon(group.symbol, Modifier.size(15.dp), accent)
             }
             Text(group.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold), maxLines = 1)
+            group.note?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, maxLines = 1) }
         }
         val shape = RoundedCornerShape(16.dp)
         val card = if (group.danger) {
@@ -286,7 +291,7 @@ private fun SettingsGroupBlock(group: SettingsGroup, onTop: (Int) -> Unit, conte
 
 /** A setting: label (and note) with an optional control on the right, then any wider control below. Flashes when jumped to. */
 @Composable
-private fun SettingRow(title: String, note: String? = null, flash: Int = 0, trailing: (@Composable () -> Unit)? = null,
+internal fun SettingRow(title: String, note: String? = null, flash: Int = 0, trailing: (@Composable () -> Unit)? = null,
     content: (@Composable ColumnScope.() -> Unit)? = null) {
     val glow = remember { Animatable(0f) }
     LaunchedEffect(flash) { if (flash > 0) { glow.snapTo(1f); glow.animateTo(0f, tween(800, easing = StepEasing(4))) } }

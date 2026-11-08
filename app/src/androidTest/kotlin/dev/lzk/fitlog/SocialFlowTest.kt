@@ -33,8 +33,14 @@ class SocialFlowTest {
         waitText("我的好友 · 1")
         compose.onNodeWithTag("friends-list").performScrollToNode(hasText("训练搭子"))
         compose.onNodeWithContentDescription("训练搭子的头像").performClick()
-        waitText("尚未开启训练历史共享")
-        compose.onNodeWithText("个人主页").assertExists()
+        waitText("个人主页")
+        // A friend's page is read only apart from the note.
+        compose.onNodeWithTag("profile-nickname").assertHasNoClickAction()
+        compose.onNodeWithTag("friend-note").assertExists()
+        compose.onNodeWithTag("person-timeline").performScrollTo().performClick()
+        waitText("未开启训练历史共享")
+        compose.onNodeWithTag("timeline-tab-posts").performClick()
+        compose.onNodeWithTag("compose-post").assertDoesNotExist()
     }
     @Test fun failedSendPersistsAndRetryDoesNotDuplicate() {
         fake.failSend=true
@@ -78,7 +84,7 @@ class SocialFlowTest {
     }
     @Test fun sharingRequiresExplicitBindingAndCanBeCancelled() {
         val model=FriendsViewModel(fake);models.put("friends",model)
-        compose.setContent {FitLogTheme {androidx.compose.foundation.layout.Column {SharingControls(model,fake){}}}}
+        compose.setContent {FitLogTheme {androidx.compose.foundation.layout.Column {SocialPrivacyRows(model,fake){}}}}
         compose.onAllNodes(isToggleable()).onFirst().performClick()
         waitText("绑定本机训练记录？")
         compose.onNodeWithText("取消").performClick()
@@ -104,8 +110,8 @@ class SocialFlowTest {
     }
     @Test fun publishMomentAndDeleteOwnPost() {
         compose.setContent {FitLogTheme {SocialTimelineScreen(fake,fake.me,onBack={},onPerson={})}}
-        waitText("发表")
-        compose.onNodeWithText("发表").performClick()
+        waitText("发动态")
+        compose.onNodeWithTag("compose-post").performClick()
         waitText("今天有什么新进步？")
         compose.onNodeWithText("今天有什么新进步？").performTextInput("完成了训练目标")
         compose.onAllNodesWithText("发表").onLast().performClick()

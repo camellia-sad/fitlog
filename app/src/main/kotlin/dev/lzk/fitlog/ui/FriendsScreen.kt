@@ -39,13 +39,20 @@ fun FriendsScreen(model:FriendsViewModel,social:SocialRepository?=null,
     LaunchedEffect(selectedId,chatPeer,timeline){onSubpage(selectedId!=null || chatPeer!=null || timeline)}
     DisposableEffect(Unit){onDispose{onSubpage(false)}}
     if(profile==null) LaunchedEffect(Unit){selectedId=null;chatPeer=null;timeline=false}
-    if(social!=null && profile!=null && (selectedId!=null || timeline)) {
-        SocialTimelineScreen(social,requireNotNull(profile),owner=selectedId,
-            friend=friends.find{it.profile.id==selectedId},
-            onBack={if(selectedId!=null)selectedId=null else timeline=false},
-            onPerson={selectedId=it},onNote={note->selectedId?.let{model.saveNote(it,note)}},
-            onRemove={selectedId?.let{model.act(it,"remove")};selectedId=null;chatPeer=null},
-            onBlock={selectedId?.let{model.act(it,"block")};selectedId=null;chatPeer=null})
+    val me=profile
+    if(social!=null && me!=null && selectedId!=null) {
+        val id=requireNotNull(selectedId)
+        val friend=friends.find{it.profile.id==id}
+        PersonScreen(social,me,id,friend,onBack={selectedId=null},
+            onChat=friend?.takeIf{it.accepted}?.let{{chatPeer=id;selectedId=null}},
+            onNote={model.saveNote(id,it)},
+            onRemove={model.act(id,"remove");selectedId=null;chatPeer=null},
+            onBlock={model.act(id,"block");selectedId=null;chatPeer=null},
+            onPerson={if(it!=me.id)selectedId=it})
+        return
+    }
+    if(social!=null && me!=null && timeline) {
+        SocialTimelineScreen(social,me,owner=null,onBack={timeline=false},onPerson={if(it!=me.id)selectedId=it})
         return
     }
     val chatting=friends.find{it.profile.id==chatPeer}

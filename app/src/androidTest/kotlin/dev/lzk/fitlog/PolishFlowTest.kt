@@ -34,12 +34,16 @@ class PolishFlowTest {
     private val models=ViewModelStore()
     @After fun close(){compose.activityRule.scenario.close();models.clear();AvatarImages.clear()}
     private fun waitText(text:String)=compose.waitUntil(15_000){compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()}
-    @Test fun mySummaryHidesIdAndDetailCopiesFullId() {
+    @Test fun myPageShowsFullIdWithCopyKeyAndAvatarOnlyOpensForViewing() {
         val model=FriendsViewModel(fake);models.put("me",model)
-        compose.setContent {FitLogTheme {MeScreen(model)}}
-        waitText("我的资料与 FitLog ID")
-        compose.onNodeWithText("FitLog ID："+fake.me.fitlogId).assertDoesNotExist()
-        compose.onNodeWithText("我的资料与 FitLog ID").performClick()
+        compose.setContent {FitLogTheme {MeScreen(model,fake)}}
+        compose.waitUntil(15_000){compose.onAllNodesWithTag("profile-fitlog-id").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("profile-fitlog-id").assertTextEquals(fake.me.fitlogId)
+        compose.onNodeWithTag("profile-avatar").performClick()
+        compose.onNodeWithTag("avatar-viewer").assertExists()
+        compose.onNodeWithTag("avatar-viewer").performClick()
+        compose.waitUntil(5_000){compose.onAllNodesWithTag("avatar-viewer").fetchSemanticsNodes().isEmpty()}
+        compose.onNodeWithTag("change-avatar").assertDoesNotExist()
         compose.onNodeWithContentDescription("复制 FitLog ID").performClick()
         compose.runOnIdle {
             val clipboard=compose.activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

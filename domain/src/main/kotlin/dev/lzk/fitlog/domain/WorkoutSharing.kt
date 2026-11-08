@@ -1,7 +1,7 @@
 package dev.lzk.fitlog.domain
 
 /** Publishing this draft is a separate, explicit action from enabling history sharing. */
-fun Workout.socialPostText(feeling:String=session.feedback.orEmpty()):String {
+fun Workout.socialPostText(feeling:String=session.feedback.orEmpty(),unit:WeightUnit=WeightUnit.KG):String {
     require(session.status==SessionStatus.FINISHED) {"训练结束后才能分享"}
     val intro=session.localWorkoutDate.toString()+" · "+session.trainingLabel+" · "+historyStatus()+"\n"+
         (if(completedSetCount==0) "未完成训练组" else "完成 "+completedExerciseCount+" 个动作、"+completedSetCount+" 组")+" · "+
@@ -13,7 +13,7 @@ fun Workout.socialPostText(feeling:String=session.feedback.orEmpty()):String {
             val completed=exercise.sets.filter{it.status==SetStatus.COMPLETED}
             if(completed.isNotEmpty()) {
                 val line="\n"+exercise.exerciseNameSnapshot+"："+completed.joinToString(" / "){
-                    it.displayValue(exercise.recordMetricSnapshot)
+                    it.displayValue(exercise.recordMetricSnapshot,unit)
                 }
                 if(length+line.length<=4000)append(line)
             }

@@ -222,10 +222,23 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                 FriendsScreen(friendsModel,container.social,onLogin={nav.navigate("me")}) {socialSubpage=it}
             }
             composable("me") {
-                MeScreen(friendsModel,container.social,syncHistory={container.sharing.syncHistory()},
-                    onSettings={nav.navigate("settings")}) {socialSubpage=it}
+                val friendList by friendsModel.friends.collectAsStateWithLifecycle()
+                val yearStart = remember { LocalDate.now().withDayOfYear(1) }
+                val yearFlow = remember(container, yearStart) { container.training.observeHistory(yearStart, LocalDate.now()).catch { emit(emptyList()) } }
+                val year by yearFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+                val stats = remember(year) { TrainingHistory.statistics(year) }
+                MeScreen(friendsModel, container.social, onSettings = { nav.navigate("settings") }, onSubpage = { socialSubpage = it },
+                    figures = listOf("${stats.days}" to "今年训练天", "${stats.sessions}" to "次", "${friendList.count { it.accepted }}" to "好友"),
+                    ownHistory = {
+                        LaunchedEffect(Unit) { history.selectDate(LocalDate.now()) }
+                        HistoryScreen(history, state.preferences.weightUnit, templateState.exercises, onBack = {}, onShare = { sharingWorkout = it },
+                            onPickExercise = { nav.navigate("pick/trend") }, embedded = true)
+                    })
             }
-            composable("settings") { SettingsScreen(settings,onBackups={nav.navigate("backups")},onBack={nav.popBackStack()},onChatCleared=friendsModel::clearChatPreviews) }
+            composable("settings") {
+                SettingsScreen(settings, onBackups = { nav.navigate("backups") }, onBack = { nav.popBackStack() }, onChatCleared = friendsModel::clearChatPreviews,
+                    social = { SocialPrivacyRows(friendsModel, container.social, syncHistory = { container.sharing.syncHistory() }) })
+            }
         }
     }
     }
@@ -263,26 +276,15 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             dismissButton = { TextButton(onClick = model::cancelSetRemoval) { Text("取消") } })
     }
     state.summary?.let { summary ->
-        var feeling by rememberSaveable(summary.session.id) { mutableStateOf(summary.session.feedback.orEmpty()) }
-        AlertDialog(onDismissRequest = model::dismissSummary, icon = { PixelPuppy(Modifier.size(64.dp), if (summary.allSetsCompleted) PuppyPose.CELEBRATE else PuppyPose.REST) },
-            title = { Text(if (summary.allSetsCompleted) "全部目标已完成" else "本次训练已结束") }, text = {
-                Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    WorkoutDetails(summary, state.preferences.weightUnit)
-                    Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
-                        Text("训练感想",Modifier.weight(1f),style=MaterialTheme.typography.titleSmall)
-                        TextButton(onClick={
-                            model.saveSummaryFeedback(summary.session.id,feeling,dismiss=false) {
-                                sharingWorkout=summary.copy(session=summary.session.copy(feedback=feeling))
-                            }
-                        }){Text("分享到动态")}
-                    }
-                    OutlinedTextField(feeling, { feeling = it.take(2000) }, label = { Text("训练感想（选填）") }, maxLines = 2)
+        WorkoutSummaryDialog(summary, state.summaryRecords, templateState.exercises, state.preferences.weightUnit,
+            onShare = { feeling ->
+                model.saveSummaryFeedback(summary.session.id, feeling, dismiss = false) {
+                    sharingWorkout = summary.copy(session = summary.session.copy(feedback = feeling.trim().ifBlank { null }))
                 }
-            },
-            confirmButton = { TextButton(onClick = { model.saveSummaryFeedback(summary.session.id, feeling) }) { Text("完成") } })
+            }, onDone = { feeling -> model.saveSummaryFeedback(summary.session.id, feeling) })
     }
     sharingWorkout?.let {workout->
-        WorkoutShareDialog(workout,container.friends,container.social,onClose={sharingWorkout=null},
+        WorkoutShareDialog(workout,container.friends,container.social,unit=state.preferences.weightUnit,onClose={sharingWorkout=null},
             onLogin={sharingWorkout=null;model.dismissSummary();nav.navigate("me"){popUpTo("home");launchSingleTop=true}},
             onPublished={
                 sharingWorkout=null;model.dismissSummary()

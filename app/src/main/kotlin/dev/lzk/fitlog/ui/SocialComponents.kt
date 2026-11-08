@@ -87,10 +87,14 @@ internal object AvatarImages {
     if(preview) SocialPhotoViewer(repository,gallery.ifEmpty{listOf(path)},path){preview=false}
 }
 
-@Composable internal fun SocialAvatar(repository:SocialRepository?,profile:SocialProfile,onClick:()->Unit) {
-    Surface(onClick=onClick,shape=CircleShape,color=MaterialTheme.colorScheme.primaryContainer,modifier=Modifier.size(48.dp).semanticsLabel(profile.nickname+"的头像")) {
-        if(repository!=null && profile.avatarPath!=null) SocialImage(repository,requireNotNull(profile.avatarPath),Modifier.fillMaxSize().clip(CircleShape),avatar=true) {Text(profile.nickname.take(1),style=MaterialTheme.typography.titleLarge)}
-        else Box(contentAlignment=Alignment.Center) {Text(profile.nickname.take(1),style=MaterialTheme.typography.titleLarge)}
+@Composable internal fun SocialAvatar(repository:SocialRepository?,profile:SocialProfile,onClick:()->Unit) =
+    SocialAvatar(repository,profile,48.dp,Modifier,onClick)
+
+@Composable internal fun SocialAvatar(repository:SocialRepository?,profile:SocialProfile,size:androidx.compose.ui.unit.Dp=48.dp,modifier:Modifier=Modifier,onClick:()->Unit) {
+    val initial=if(size>=72.dp) MaterialTheme.typography.displaySmall else MaterialTheme.typography.titleLarge
+    Surface(onClick=onClick,shape=CircleShape,color=MaterialTheme.colorScheme.primaryContainer,modifier=modifier.size(size).semanticsLabel(profile.nickname+"的头像")) {
+        if(repository!=null && profile.avatarPath!=null) SocialImage(repository,requireNotNull(profile.avatarPath),Modifier.fillMaxSize().clip(CircleShape),avatar=true) {Text(profile.nickname.take(1),style=initial)}
+        else Box(contentAlignment=Alignment.Center) {Text(profile.nickname.take(1),style=initial)}
     }
 }
 

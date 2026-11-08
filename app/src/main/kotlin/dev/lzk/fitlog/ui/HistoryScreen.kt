@@ -45,7 +45,7 @@ import java.util.Locale
 
 @Composable
 fun HistoryScreen(model: HistoryViewModel, unit: WeightUnit, exercises: List<Exercise>, onBack: () -> Unit, onShare: ((Workout) -> Unit)? = null,
-    onPickExercise: () -> Unit = {}) {
+    onPickExercise: () -> Unit = {}, embedded: Boolean = false) {
     val year by model.year.collectAsStateWithLifecycle()
     val all by model.history.collectAsStateWithLifecycle()
     val date by model.selectedDate.collectAsStateWithLifecycle()
@@ -62,7 +62,8 @@ fun HistoryScreen(model: HistoryViewModel, unit: WeightUnit, exercises: List<Exe
     var openId by remember { mutableStateOf<String?>(null) }
     val scheme = MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize()) {
-        FitTopBar("训练历史", onBack, backLabel = "返回主页") {
+        // Embedded under a profile, the page around it supplies the title and back key.
+        if (!embedded) FitTopBar("训练历史", onBack, backLabel = "返回主页") {
             TextButton(onClick = { pickingDate = true }, modifier = Modifier.testTag("history-pick-date")) { Text("选择日期") }
         }
         LazyColumn(Modifier.weight(1f).testTag("history-list"), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 20.dp, top = 4.dp),
@@ -145,7 +146,7 @@ fun HistoryScreen(model: HistoryViewModel, unit: WeightUnit, exercises: List<Exe
 
 /** Days, sessions, sets and time in one ruled row, the training volume under them. */
 @Composable
-private fun YearFigures(statistics: TrainingStatistics, unit: WeightUnit) {
+internal fun YearFigures(statistics: TrainingStatistics, unit: WeightUnit, showVolume: Boolean = true) {
     val scheme = MaterialTheme.colorScheme
     val volume = BigDecimal(statistics.volumeGrams)
         .divide(if (unit == WeightUnit.KG) BigDecimal("1000") else BigDecimal("453.59237"), 2, java.math.RoundingMode.HALF_UP)
@@ -164,11 +165,13 @@ private fun YearFigures(statistics: TrainingStatistics, unit: WeightUnit) {
                 }
             }
         }
-        HorizontalDivider(color = scheme.outlineVariant)
-        Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("训练量", Modifier.weight(1f).padding(bottom = 2.dp), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
-            Text(volume, style = pixelNumber(20.sp), color = scheme.onSurface)
-            Text("${unit.label}·次", Modifier.padding(bottom = 2.dp), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+        if (showVolume) {
+            HorizontalDivider(color = scheme.outlineVariant)
+            Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("训练量", Modifier.weight(1f).padding(bottom = 2.dp), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+                Text(volume, style = pixelNumber(20.sp), color = scheme.onSurface)
+                Text("${unit.label}·次", Modifier.padding(bottom = 2.dp), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+            }
         }
     }
 }
@@ -197,9 +200,9 @@ private fun SessionCard(workout: Workout, catalog: List<Exercise>, unit: WeightU
                 }
                 if (workout.session.status == SessionStatus.READY) Text("计划尚未开始", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
                 else Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Figure("${workout.completedExerciseCount}", "动作")
-                    Figure("${workout.completedSetCount}/${workout.plannedSetCount}", "组")
-                    Figure("${workout.elapsedDuration(Instant.now()).toMinutes()}", "分钟")
+                    HistoryFigure("${workout.completedExerciseCount}", "动作")
+                    HistoryFigure("${workout.completedSetCount}/${workout.plannedSetCount}", "组")
+                    HistoryFigure("${workout.elapsedDuration(Instant.now()).toMinutes()}", "分钟")
                 }
                 if (mix.isNotEmpty()) CompositionBar(mix, Modifier.fillMaxWidth().height(6.dp))
                 workout.session.feedback?.let { feeling ->
@@ -231,7 +234,7 @@ private fun SessionCard(workout: Workout, catalog: List<Exercise>, unit: WeightU
 }
 
 @Composable
-private fun Figure(value: String, label: String) {
+internal fun HistoryFigure(value: String, label: String) {
     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(value, style = pixelNumber(22.sp), color = MaterialTheme.colorScheme.onSurface, maxLines = 1, softWrap = false)
         Text(label, Modifier.padding(bottom = 2.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -292,7 +295,7 @@ private fun Workout.composition(catalog: List<Exercise>): List<GroupShare> {
 }
 
 @Composable
-private fun TrainingCalendar(year: Int, days: Map<LocalDate, TrainingDay>, selected: LocalDate, onSelect: (LocalDate) -> Unit) {
+internal fun TrainingCalendar(year: Int, days: Map<LocalDate, TrainingDay>, selected: LocalDate, onSelect: (LocalDate) -> Unit) {
     val first = LocalDate.of(year, 1, 1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     val weeks = ((java.time.temporal.ChronoUnit.DAYS.between(first, LocalDate.of(year, 12, 31)) / 7) + 1).toInt()
     val scroll = rememberScrollState()
@@ -333,7 +336,7 @@ internal fun trainingColor(count: Int): androidx.compose.ui.graphics.Color {
 }
 
 @Composable
-private fun TrainingColorLegend() {
+internal fun TrainingColorLegend() {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         listOf(0 to "0", 1 to "1～3", 4 to "4～8", 9 to "9～15", 16 to "16+").forEach { (count, label) ->
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {

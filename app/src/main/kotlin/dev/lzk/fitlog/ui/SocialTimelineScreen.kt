@@ -11,6 +11,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -22,15 +23,11 @@ import java.util.UUID
 
 @Composable
 fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:String?=null,
-    friend:Friend?=null,onBack:()->Unit,onPerson:(String)->Unit,
-    onNote:(String)->Unit={},onRemove:()->Unit={},onBlock:()->Unit={}) {
+    onBack:()->Unit,onPerson:(String)->Unit,embedded:Boolean=false) {
     val scope=rememberCoroutineScope()
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     var posts by remember {mutableStateOf<List<SocialPost>>(emptyList())}
-    var person by remember {mutableStateOf<SocialPerson?>(null)}
-    var history by remember {mutableStateOf<List<SharedWorkout>>(emptyList())}
     var morePosts by remember {mutableStateOf(true)}
-    var moreHistory by remember {mutableStateOf(true)}
     var busy by remember {mutableStateOf(false)}
     var error by remember {mutableStateOf<String?>(null)}
     var composing by rememberSaveable {mutableStateOf(false)}
@@ -47,8 +44,6 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
         if(owner==null){unread=repository.unreadReplies();notices=repository.replyNotices();moreNotices=notices.size==20}
     }
     var commentPost by remember {mutableStateOf<SocialPost?>(null)}
-    var note by rememberSaveable(friend?.profile?.id) {mutableStateOf(friend?.note.orEmpty())}
-    var confirm by remember {mutableStateOf<String?>(null)}
     var deletePost by remember {mutableStateOf<SocialPost?>(null)}
     fun launch(block:suspend ()->Unit) {
         if(busy) return
@@ -62,25 +57,20 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
     suspend fun refresh() {
         refreshInbox()
         posts=repository.feed(owner);morePosts=posts.size==20
-        if(owner!=null) {
-            person=repository.person(owner)
-            history=repository.sharedHistory(owner);moreHistory=history.size==20
-        }
     }
     LaunchedEffect(repository,me.id,owner,lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             try {
                 refresh()
-                if(owner!=null) while(isActive) {delay(15_000);person=repository.person(owner)}
-                else while(isActive) {delay(15_000);try {refreshInbox()} catch(e:CancellationException){throw e} catch(_:Exception){}}
+                if(owner==null) while(isActive) {delay(15_000);try {refreshInbox()} catch(e:CancellationException){throw e} catch(_:Exception){}}
             } catch(e:CancellationException){throw e}
             catch(e:Exception){error=e.message ?: "加载失败，请刷新"}
-            finally {posts=emptyList();history=emptyList();person=null;commentPost=null;notices=emptyList();focusContext=null}
+            finally {posts=emptyList();commentPost=null;notices=emptyList();focusContext=null}
         }
     }
     DisposableEffect(lifecycle) {
         val observer=androidx.lifecycle.LifecycleEventObserver {_,event->
-            if(event==Lifecycle.Event.ON_STOP) {scope.coroutineContext.cancelChildren();posts=emptyList();history=emptyList();person=null;commentPost=null;notices=emptyList();focusContext=null}
+            if(event==Lifecycle.Event.ON_STOP) {scope.coroutineContext.cancelChildren();posts=emptyList();commentPost=null;notices=emptyList();focusContext=null}
         }
         lifecycle.addObserver(observer)
         onDispose {lifecycle.removeObserver(observer)}
@@ -108,57 +98,22 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
     }
     Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background,contentColor=MaterialTheme.colorScheme.onBackground) {
     Column(Modifier.fillMaxSize().padding(horizontal=16.dp)) {
-        SocialHeader(if(detailPost!=null)"动态详情" else if(owner==null) "好友动态" else "个人主页",::back) {
+        val canPost=detailPost==null && (owner==null || owner==me.id)
+        if(!embedded || detailPost!=null) SocialHeader(if(detailPost!=null)"动态详情" else if(owner==null) "好友动态" else "动态",::back) {
             if(detailPost==null) TextButton(onClick={launch {refresh()}},enabled=!busy){Text("↻",modifier=Modifier.semanticsLabel("刷新动态"))}
-            if(detailPost==null && (owner==null || owner==me.id)) TextButton(onClick={composing=true}){Text("＋",modifier=Modifier.semanticsLabel("发表动态"))}
+            if(canPost) PixelKey(onClick={composing=true},minHeight=34.dp,modifier=Modifier.padding(start=4.dp).testTag("compose-post")) {
+                LineIcon(Symbol.PLUS,Modifier.size(12.dp),LocalContentColor.current);Text("发动态",maxLines=1)
+            }
+        } else if(canPost) Row(Modifier.fillMaxWidth().padding(top=10.dp),horizontalArrangement=Arrangement.End) {
+            PixelKey(onClick={composing=true},minHeight=34.dp,modifier=Modifier.testTag("compose-post")) {
+                LineIcon(Symbol.PLUS,Modifier.size(12.dp),LocalContentColor.current);Text("发动态",maxLines=1)
+            }
         }
         if(owner==null && detailPost==null) ReplyInboxBar(repository,unread,notices,onOpen={inbox=true},onSelect=::openNotice)
         error?.let {Text(it,color=MaterialTheme.colorScheme.error)}
         if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(vertical=12.dp)) {
-            person?.takeIf{detailPost==null}?.let {current->
-                item {
-                    SoftCard {
-                        Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                            SocialAvatar(repository,current.profile){}
-                            Column(Modifier.weight(1f)) {
-                                OneLineText(current.profile.nickname,style=MaterialTheme.typography.titleLarge)
-                                FitLogIdentityRow(current.profile.fitlogId)
-                                Text(current.status.label,color=MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                        if(current.profile.bio.isNotBlank()) Text(current.profile.bio)
-                        current.live?.let {live-> LiveTrainingCard(live,current.status)}
-                        if(friend!=null) {
-                            OutlinedTextField(note,{note=it.take(40)},label={Text("备注（仅自己可见）")},singleLine=true,modifier=Modifier.fillMaxWidth())
-                            Row {
-                                TextButton(onClick={onNote(note)}){Text("保存备注")}
-                                TextButton(onClick={confirm="remove"}){Text("删除好友")}
-                                TextButton(onClick={confirm="block"}){Text("拉黑")}
-                            }
-                        }
-                    }
-                }
-                item {Text("训练历史",style=MaterialTheme.typography.titleMedium)}
-                if(history.isEmpty()) item {Text(if(current.sharing.history) "暂无共享训练" else "尚未开启训练历史共享",style=MaterialTheme.typography.bodySmall)}
-                items(history,key={"history:"+it.id}) {workout->
-                    SoftCard {
-                        OneLineText(workout.label+" · "+workout.status)
-                        Text(workout.startedAt.socialTime()+" · "+workout.durationSeconds/60+" 分钟",style=MaterialTheme.typography.bodySmall)
-                        Text("${workout.completedSets} / ${workout.totalSets} 组")
-                        workout.exercises.forEach {Text(it,style=MaterialTheme.typography.bodySmall)}
-                    }
-                }
-                if(moreHistory) item {
-                    TextButton(onClick={launch {
-                        val last=history.lastOrNull()
-                        val page=repository.sharedHistory(requireNotNull(owner),last?.let {SocialCursor(it.startedAt,it.id)})
-                        history=(history+page).distinctBy {it.id}.takeLast(60);moreHistory=page.size==20
-                    }},enabled=!busy){Text("更早训练")}
-                }
-                item {Text("动态",style=MaterialTheme.typography.titleMedium)}
-            }
-            if(posts.isEmpty() && detailPost==null) item {Text("还没有动态，记录今天的小小进步。",color=MaterialTheme.colorScheme.onSurfaceVariant)}
+            if(posts.isEmpty() && detailPost==null) item {Text("还没有动态",color=MaterialTheme.colorScheme.onSurfaceVariant)}
             items(detailPost?.let{listOf(it)} ?: posts,key={it.id}) {post->
                 ActivityCard {
                     Row(horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -221,12 +176,6 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
             confirmButton={TextButton(onClick={launch {repository.deletePost(post.id);posts=posts.filterNot {it.id==post.id};deletePost=null}}){Text("删除")}},
             dismissButton={TextButton(onClick={deletePost=null}){Text("取消")}})
     }
-    confirm?.let {action->
-        AlertDialog(onDismissRequest={confirm=null},title={Text(if(action=="block") "拉黑好友？" else "删除好友？")},
-            text={Text("停止后续共享与新消息。")},
-            confirmButton={TextButton(onClick={confirm=null;if(action=="block")onBlock() else onRemove()}){Text("确认")}},
-            dismissButton={TextButton(onClick={confirm=null}){Text("取消")}})
-    }
 }
 
 /** Uploaded images are kept locally, so the preview shows exactly what will be published. */
@@ -246,18 +195,5 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
             }
             repeat(3-row.size){Spacer(Modifier.weight(1f))}
         }
-    }
-}
-
-@Composable private fun LiveTrainingCard(live:LiveTraining,status:PresenceStatus) {
-    var now by remember {mutableStateOf(Instant.now())}
-    LaunchedEffect(live.restEndsAt) {while(isActive){now=Instant.now();delay(1_000)}}
-    HorizontalDivider()
-    OneLineText(live.label+" · "+status.label,style=MaterialTheme.typography.titleMedium)
-    Text(live.exercise)
-    Text((if(live.recordMetric==RecordMetric.SECONDS) "${live.reps} 秒" else "${live.weightGrams/1000.0} kg × ${live.reps} 次")+" · ${live.done}/${live.total} 组")
-    if(status==PresenceStatus.REST) {
-        val remaining=live.restEndsAt?.epochSecond?.minus(now.epochSecond)?.coerceAtLeast(0) ?: 0
-        Text("休息 %02d:%02d".format(remaining/60,remaining%60),color=MaterialTheme.colorScheme.primary)
     }
 }
