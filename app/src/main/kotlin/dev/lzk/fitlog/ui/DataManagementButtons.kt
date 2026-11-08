@@ -12,14 +12,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /** Each removal states what goes and what stays, so the consequence reads at a glance in the confirmation. */
-private enum class DataRemoval(val label: String, val symbol: Symbol, val note: String, val removes: List<String>, val keeps: List<String>, val extra: String? = null) {
-    TRAINING("清空训练记录", Symbol.LIST, "保留模板、计划、自定义动作和偏好",
+private enum class DataRemoval(val label: String, val symbol: Symbol, val removes: List<String>, val keeps: List<String>, val extra: String? = null) {
+    TRAINING("清空训练记录", Symbol.LIST,
         listOf("本机全部训练历史", "进行中的训练，并停止计时"),
         listOf("模板、计划与自定义动作", "收藏、偏好与聊天", "云端已共享训练和云端备份")),
-    CHAT("清空聊天记录", Symbol.CHAT, "当前账号的聊天和图片；保留好友与动态",
+    CHAT("清空聊天记录", Symbol.CHAT,
         listOf("当前账号在本机的聊天内容", "待发送消息与聊天图片"),
         listOf("好友、动态与动态图片", "对方的记录与云端待送达消息", "旧备份")),
-    ACCOUNT("注销账号", Symbol.PERSON, "需联网；删除云端账号与社交数据",
+    ACCOUNT("注销账号", Symbol.PERSON,
         listOf("云端账号与好友关系", "动态、评论、点赞与共享训练", "云端图片与云端备份", "本机该账号的聊天与社交图片"),
         listOf("本机训练历史、模板、计划", "自定义动作与偏好"),
         "可用原邮箱注册新账号；已导出的文件及他人设备上的副本无法一并删除。"),
@@ -32,7 +32,7 @@ internal fun DataManagementButtons(loggedIn: Boolean, busy: Boolean, onTraining:
     Column {
         DataRemoval.entries.forEach { action ->
             val available = action == DataRemoval.TRAINING || loggedIn
-            ListRow(action.symbol, action.label, if (available) action.note else "登录后可用", tone = RowTone.DANGER, enabled = !busy && available) {
+            ListRow(action.symbol, action.label, if (available) null else "登录后可用", tone = RowTone.DANGER, enabled = !busy && available) {
                 selected = action; confirmation = ""
             }
             HorizontalDivider(color = lerp(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.outlineVariant, .8f))

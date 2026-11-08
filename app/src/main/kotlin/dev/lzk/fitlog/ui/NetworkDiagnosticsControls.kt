@@ -21,10 +21,8 @@ fun NetworkDiagnosticsControls(busy: Boolean, onExport: (Context, Uri) -> Unit, 
         if(uri != null) onExport(context, uri)
     }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        ListRow(Symbol.SETTINGS, "网络调试日志", "连接重置、超时等请求错误保存在本机：最近 7 天、最多 200 条，不自动上传", onClick = null)
-        Text("导出包含设备型号、系统版本、网络类型、DNS 服务器和错误阶段；不含验证码、令牌、邮箱及聊天或训练内容。",
-            Modifier.padding(start = 60.dp, end = 14.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(Modifier.padding(start = 60.dp, end = 14.dp, top = 6.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ListRow(Symbol.SETTINGS, "网络调试日志", "仅存本机，不含聊天或训练内容", onClick = null)
+        Row(Modifier.padding(start = 60.dp, end = 14.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             PixelOutlineKey(onClick = { exporter.launch("FitLog-network-${LocalDate.now()}.json") }, enabled = !busy, minHeight = 34.dp,
                 modifier = Modifier.testTag("export-network-logs")) {
                 LineIcon(Symbol.EXPORT, Modifier.size(13.dp), MaterialTheme.colorScheme.onSurfaceVariant); Text("导出日志", maxLines = 1)

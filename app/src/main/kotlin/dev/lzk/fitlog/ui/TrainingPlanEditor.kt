@@ -37,7 +37,6 @@ fun TrainingPlanEditor(initial: TrainingPlan, templates: List<WorkoutTemplate>, 
         })
         LazyColumn(Modifier.testTag("plan-editor"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
-                Text("每一天可安排一个模板，也可以留作休息。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 ChoiceChips(listOf(7, 14), { length == it.toString() }, { if (it == 7) "一周" else "两周" }) { resize(it.toString()) }
                 OutlinedTextField(length, ::resize, label = { Text("周期天数（1～14）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

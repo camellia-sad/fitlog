@@ -127,15 +127,13 @@ fun PerformanceChart(points: List<PerformancePoint>, unit: WeightUnit,
                     drawIntoCanvas { it.nativeCanvas.drawText(label, labelX, bottom + paint.textSize + 8.dp.toPx(), paint) }
                 }
             }
-            Text("双指缩放日期，左右拖动查看；同一天取最高值。", style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
             val visible = points.filter { it.recordMetric == metric && it.date >= viewport.fromDate && it.date <= viewport.toDate }
             if(visible.isEmpty()) Text("这个时间范围没有完成记录。", style = MaterialTheme.typography.bodySmall)
             visible.takeLast(15).reversed().forEach { point ->
                 Text("${point.date} · " + if(timed) "${point.reps} 秒" else "${WeightUnits.format(point.weightGrams, unit)} ${unit.label} × ${point.reps}",
                     style = MaterialTheme.typography.bodySmall)
             }
-            if(visible.size > 15) Text("下方显示此范围最近 15 组，完整记录见日期详情。", style = MaterialTheme.typography.labelSmall)
+            if(visible.size > 15) Text("仅列出最近 15 组", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

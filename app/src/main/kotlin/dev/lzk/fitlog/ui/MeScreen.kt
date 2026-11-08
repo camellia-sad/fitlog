@@ -67,7 +67,6 @@ fun MeScreen(model:FriendsViewModel,social:SocialRepository?=null,syncHistory:su
                     if(current==null) {
                         PixelPuppy(Modifier.size(64.dp))
                         OneLineText("记录每一次进步",style=MaterialTheme.typography.titleLarge)
-                        Text("未登录也可使用全部离线训练功能。",style=MaterialTheme.typography.bodySmall)
                     }else Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                         SocialAvatar(social,current){editing=true}
                         Column(Modifier.weight(1f)) {

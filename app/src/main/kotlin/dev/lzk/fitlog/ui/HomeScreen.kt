@@ -133,8 +133,6 @@ fun HomeScreen(state: WorkoutUiState, onStart: () -> Unit, onContinue: () -> Uni
                     Text("${workout.completedSetCount} / ${workout.plannedSetCount} 组", style = pixelNumber(16.sp), color = MaterialTheme.colorScheme.primary)
                 }
                 PixelProgress(workout.completedSetCount, workout.plannedSetCount, Modifier.fillMaxWidth())
-                Text("已经完成 ${workout.completedExerciseCount} 个动作，按自己的节奏继续。",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             }
         }
 

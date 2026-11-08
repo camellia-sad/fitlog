@@ -196,7 +196,6 @@ internal fun TemplateEditor(draft: TemplateDraft, templates: List<WorkoutTemplat
                                     color = MaterialTheme.colorScheme.primary)
                             }
                         }
-                        Text("只修改模板目标，不会改动已开始的训练。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -408,7 +407,7 @@ private fun TargetAdjuster(item: TemplateExercise, exercise: Exercise?, metric: 
             }
             Box(Modifier.fillMaxWidth().heightIn(min = 40.dp), contentAlignment = Alignment.CenterStart) {
                 if (item.useExerciseWeight) Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("开始训练时读取动作重量，当前", Modifier.padding(bottom = 1.dp), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    Text("动作当前", Modifier.padding(bottom = 1.dp), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                     exercise?.defaultWeightGrams?.let {
                         Text(WeightUnits.format(it, unit), style = pixelNumber(18.sp), color = scheme.onSurface)
                         Text(unit.label, Modifier.padding(bottom = 1.dp), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)

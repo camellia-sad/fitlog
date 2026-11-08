@@ -71,13 +71,11 @@ fun BackupScreen(container:AppContainer,onBack:()->Unit,onLogin:()->Unit) {
     BackHandler(enabled=!busy,onBack=onBack)
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         SocialHeader("备份与恢复",if(busy) ({}) else onBack)
-        Text("本地 JSON 包含训练、设置、草稿及独立聊天数据区，图片只保存引用。云端备份会同时保存本机图片，可在另一台手机恢复。",
-            color=MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
             Text("云端备份包含聊天",Modifier.weight(1f).padding(top=12.dp))
             Switch(includeChat,{includeChat=it},enabled=!busy && owner!=null)
         }
-        Text("本地 JSON 不含图片，导入前建议先导出当前数据。云端备份最大 50 MB，不包含登录凭据，不会开启训练共享。",style=MaterialTheme.typography.bodySmall)
+        Text("本地 JSON 不含图片",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedButton(onClick={exporter.launch("FitLog-"+java.time.LocalDate.now()+".json")},enabled=!busy,modifier=Modifier.fillMaxWidth()) {Text("导出本地 JSON")}
         OutlinedButton(onClick={importer.launch(arrayOf("application/json","text/plain","application/octet-stream"))},enabled=!busy,modifier=Modifier.fillMaxWidth()) {Text("导入本地 JSON")}
         HorizontalDivider()
@@ -87,7 +85,7 @@ fun BackupScreen(container:AppContainer,onBack:()->Unit,onLogin:()->Unit) {
             Button(onClick=onLogin) {Text("前往登录")}
         } else {
             OneLineText("备份账号："+profile!!.nickname,style=MaterialTheme.typography.titleSmall)
-            Text("仅本人账号可访问，保留最近三份。恢复将合并记录，并采用备份中的偏好；相同 ID 内容冲突时停止导入。",style=MaterialTheme.typography.bodySmall)
+            Text("仅本人可访问，保留最近三份",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             Button(onClick={task {
                 container.social.prepareOwnMedia(owner)
                 val bytes=container.portableBackups.export(includeChat)
@@ -116,7 +114,6 @@ fun BackupScreen(container:AppContainer,onBack:()->Unit,onLogin:()->Unit) {
         }
         if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         message?.let {Text(it,color=MaterialTheme.colorScheme.primary)}
-        Text("备份是当前时刻的快照。删除聊天后，如需同时移除旧快照中的内容，请删除对应云端备份。",style=MaterialTheme.typography.bodySmall)
     }
     preview?.let {item->
         AlertDialog(onDismissRequest={if(!busy) preview=null},title={Text("恢复这份备份？")},text={

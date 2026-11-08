@@ -99,18 +99,18 @@ fun SettingsScreen(model: SettingsViewModel, onBack: (() -> Unit)? = null, onBac
             verticalArrangement = Arrangement.spacedBy(18.dp)) {
             ProfileCard(local) { row -> rowGroup[row]?.let(::jump); flash = row to ((flash?.second ?: 0) + 1) }
 
-            SettingsGroupBlock(SettingsGroup.TRAINING, "用于动作推荐与筛选", { groupTops[SettingsGroup.TRAINING] = it }) {
-                SettingRow("常用器械", "可多选；动作库默认按这些器械筛选") { EquipmentTiles(local.equipment) { change(local.copy(equipment = local.equipment.toggle(it))) } }
+            SettingsGroupBlock(SettingsGroup.TRAINING, { groupTops[SettingsGroup.TRAINING] = it }) {
+                SettingRow("常用器械") { EquipmentTiles(local.equipment) { change(local.copy(equipment = local.equipment.toggle(it))) } }
                 SettingRow("训练方式") {
                     PixelSegmented(SplitType.entries.map { it.label() }, SplitType.entries.indexOf(local.split)) { change(local.copy(split = SplitType.entries[it])) }
                 }
-                SettingRow("偏好部位", "可多选") { MuscleChoiceChips(local.muscles) { change(local.copy(muscles = local.muscles.toggle(it))) } }
+                SettingRow("偏好部位") { MuscleChoiceChips(local.muscles) { change(local.copy(muscles = local.muscles.toggle(it))) } }
                 SettingRow("每次训练时长", flash = flash.forRow(SettingsRow.MINUTES), trailing = {
                     PixelStepper(local.workoutMinutes.toLong(), 5, 360, 5, "训练时长", unit = "分钟", tag = "settings-minutes") { change(local.copy(workoutMinutes = it.toInt())) }
                 }) { Presets(listOf(30, 45, 60, 90), local.workoutMinutes, "分钟") { change(local.copy(workoutMinutes = it)) } }
                 val unit = local.weightUnit
                 val stepUnit = WeightUnits.parse(if (unit == WeightUnit.KG) "0.25" else "0.5", unit)
-                SettingRow("重量单位与步长", "步长用于 ± 调整重量", flash = flash.forRow(SettingsRow.STEP), trailing = {
+                SettingRow("重量单位与步长", flash =flash.forRow(SettingsRow.STEP), trailing = {
                     PixelStepper(local.weightStepGrams, stepUnit, WeightUnits.parse("20", unit), stepUnit, "重量步长", valueWidth = 58.dp,
                         format = { WeightUnits.format(it, unit) }, unit = unit.label, tag = "settings-step") { change(local.copy(weightStepGrams = it)) }
                 }) {
@@ -124,40 +124,30 @@ fun SettingsScreen(model: SettingsViewModel, onBack: (() -> Unit)? = null, onBac
                 }
             }
 
-            SettingsGroupBlock(SettingsGroup.REST, null, { groupTops[SettingsGroup.REST] = it }) {
-                SettingRow("完成一组后自动休息", "倒计时固定在训练动作栏下方", flash = flash.forRow(SettingsRow.REST), trailing = {
+            SettingsGroupBlock(SettingsGroup.REST, { groupTops[SettingsGroup.REST] = it }) {
+                SettingRow("完成一组后自动休息", flash = flash.forRow(SettingsRow.REST), trailing = {
                     PixelSwitch(local.restEnabled, "完成一组后自动休息", Modifier.testTag("settings-rest-switch")) { change(local.copy(restEnabled = it)) }
                 })
-                if (local.restEnabled) SettingRow("默认休息时长", "模板未单独设置时使用", trailing = {
+                if (local.restEnabled) SettingRow("默认休息时长", trailing = {
                     PixelStepper(local.restSeconds.toLong(), 0, 3600, 15, "休息时长", valueWidth = 58.dp, unit = "秒", tag = "settings-rest") { change(local.copy(restSeconds = it.toInt())) }
-                }) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Presets(listOf(60, 90, 120, 180), local.restSeconds, "秒") { change(local.copy(restSeconds = it)) }
-                            Text("右侧休息环按 5 分钟满格预览", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        PixelRing(local.restSeconds / 300f, Modifier.size(48.dp))
-                    }
-                }
-                SettingRow("操作震动", "按下按钮、完成一组、休息结束和刷新纪录时轻震", trailing = {
+                }) { Presets(listOf(60, 90, 120, 180), local.restSeconds, "秒") { change(local.copy(restSeconds = it)) } }
+                SettingRow("操作震动", "按键、休息结束和新纪录时轻震", trailing = {
                     PixelSwitch(local.hapticsEnabled, "操作震动", Modifier.testTag("settings-haptics-switch")) { change(local.copy(hapticsEnabled = it)) }
                 })
             }
 
-            SettingsGroupBlock(SettingsGroup.LOOK, "换色 0.6 秒淡入", { groupTops[SettingsGroup.LOOK] = it }) {
+            SettingsGroupBlock(SettingsGroup.LOOK, { groupTops[SettingsGroup.LOOK] = it }) {
                 SettingRow("主题") { ThemeCards(local.theme) { change(local.copy(theme = it)) } }
             }
 
-            SettingsGroupBlock(SettingsGroup.BACKUP, null, { groupTops[SettingsGroup.BACKUP] = it }) {
-                if (onBackups != null) ListRow(Symbol.CLOUD, "云端备份与恢复", "私有 ZIP，保留最近三份，最大 50 MB", tone = RowTone.HERO, enabled = !busy, onClick = onBackups)
-                ListRow(Symbol.EXPORT, "导出 JSON 备份", "训练、动作、模板、计划、偏好、草稿和聊天数据区", enabled = !busy) {
-                    exporter.launch("FitLog-${java.time.LocalDate.now()}.json")
-                }
-                ListRow(Symbol.IMPORT, "导入 JSON 备份", "合并到本机，同 ID 的不同记录会取消整批导入", enabled = !busy) { confirmImport = true }
+            SettingsGroupBlock(SettingsGroup.BACKUP, { groupTops[SettingsGroup.BACKUP] = it }) {
+                if (onBackups != null) ListRow(Symbol.CLOUD, "云端备份与恢复", tone = RowTone.HERO, enabled = !busy, onClick = onBackups)
+                ListRow(Symbol.EXPORT, "导出 JSON 备份", enabled = !busy) { exporter.launch("FitLog-${java.time.LocalDate.now()}.json") }
+                ListRow(Symbol.IMPORT, "导入 JSON 备份", enabled = !busy) { confirmImport = true }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp))
             }
 
-            SettingsGroupBlock(SettingsGroup.DATA, "操作前都会确认", { groupTops[SettingsGroup.DATA] = it }) {
+            SettingsGroupBlock(SettingsGroup.DATA, { groupTops[SettingsGroup.DATA] = it }) {
                 DataManagementButtons(profile != null, busy, model::clearTraining, { model.clearChats { onChatCleared() } },
                     { model.deleteAccount { AvatarImages.clear(); onChatCleared() } })
                 NetworkDiagnosticsControls(busy, model::exportNetworkLogs, model::clearNetworkLogs)
@@ -169,13 +159,12 @@ fun SettingsScreen(model: SettingsViewModel, onBack: (() -> Unit)? = null, onBac
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("版本", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(BuildConfig.VERSION_NAME, style = pixelNumber(15.sp), color = MaterialTheme.colorScheme.onSurface)
-                    Text("· 训练离线可用", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
     }
     if (confirmImport) AlertDialog(onDismissRequest = { confirmImport = false }, title = { Text("合并备份数据？") },
-        text = { Text("相同记录不会重复导入，同 ID 的不同训练、模板或计划会取消整批导入。动作收藏、归档及偏好采用备份值，旧版备份不改变偏好。建议先导出本机备份。") },
+        text = { Text("相同记录不会重复导入；同 ID 的不同记录会取消整批导入。收藏、归档和偏好采用备份值。") },
         confirmButton = { TextButton(onClick = { confirmImport = false; importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }) { Text("选择备份") } },
         dismissButton = { TextButton(onClick = { confirmImport = false }) { Text("取消") } })
 }
@@ -216,6 +205,7 @@ private fun JumpStrip(onJump: (SettingsGroup) -> Unit) {
 }
 
 /** What the settings will do at the next workout: three pixel figures, the kit, the split and the theme. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProfileCard(value: UserPreferences, onJump: (SettingsRow) -> Unit) {
     val scheme = MaterialTheme.colorScheme
@@ -224,26 +214,25 @@ private fun ProfileCard(value: UserPreferences, onJump: (SettingsRow) -> Unit) {
         .testTag("settings-profile")) {
         Row(Modifier.fillMaxWidth().height(6.dp)) { groups.forEach { Box(Modifier.weight(1f).fillMaxHeight().background(it)) } }
         Column(Modifier.padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text("我的训练配置", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold), maxLines = 1)
-                Text("开始训练时按这些值预填", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, maxLines = 1)
-            }
+            Text("我的训练配置", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold), maxLines = 1)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 ProfileFigure("${value.workoutMinutes}", "分钟", "每次训练", Modifier.weight(1f)) { onJump(SettingsRow.MINUTES) }
                 ProfileFigure(if (value.restEnabled) "${value.restSeconds}" else "关", if (value.restEnabled) "秒" else "", "组间休息", Modifier.weight(1f)) { onJump(SettingsRow.REST) }
                 ProfileFigure(WeightUnits.format(value.weightStepGrams, value.weightUnit), value.weightUnit.label, "重量步长", Modifier.weight(1f)) { onJump(SettingsRow.STEP) }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                     EquipmentOrder.forEach { type ->
-                        Box(Modifier.size(26.dp).alpha(if (type in value.equipment) 1f else .28f).background(scheme.surfaceVariant, PixelShapeSmall)
+                        Box(Modifier.size(24.dp).alpha(if (type in value.equipment) 1f else .28f).background(scheme.surfaceVariant, PixelShapeSmall)
                             .semantics { contentDescription = type.label() + if (type in value.equipment) "：常用" else "" }, contentAlignment = Alignment.Center) {
-                            LineIcon(type.symbol(), Modifier.size(15.dp), scheme.onSurface)
+                            LineIcon(type.symbol(), Modifier.size(14.dp), scheme.onSurface)
                         }
                     }
                 }
-                Spacer(Modifier.weight(1f))
-                ProfileTag(value.split.label()); ProfileTag(value.theme.label())
+                // The two tags wrap under each other rather than clipping when the row runs short.
+                FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    ProfileTag(value.split.label()); ProfileTag(value.theme.label())
+                }
             }
         }
     }
@@ -272,7 +261,7 @@ private fun ProfileTag(text: String) {
 
 /** Group heading with a pixel icon tile, then one rounded card holding the group's rows (dashed and error-tinted for data removal). */
 @Composable
-private fun SettingsGroupBlock(group: SettingsGroup, note: String?, onTop: (Int) -> Unit, content: @Composable ColumnScope.() -> Unit) {
+private fun SettingsGroupBlock(group: SettingsGroup, onTop: (Int) -> Unit, content: @Composable ColumnScope.() -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val accent = if (group.danger) scheme.error else scheme.primary
     Column(Modifier.onGloballyPositioned { onTop(it.positionInParent().y.toInt()) }.testTag("settings-group-${group.name.lowercase()}"),
@@ -282,7 +271,6 @@ private fun SettingsGroupBlock(group: SettingsGroup, note: String?, onTop: (Int)
                 LineIcon(group.symbol, Modifier.size(15.dp), accent)
             }
             Text(group.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold), maxLines = 1)
-            note?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, maxLines = 1) }
         }
         val shape = RoundedCornerShape(16.dp)
         val card = if (group.danger) {
@@ -413,10 +401,10 @@ private fun ThemeCards(selected: ThemeMode, onPick: (ThemeMode) -> Unit) {
     val period = DayPeriod.at(LocalTime.now())
     val periodName = when (period) { DayPeriod.DAWN -> "清晨"; DayPeriod.DAY -> "白天"; DayPeriod.DUSK -> "傍晚"; DayPeriod.NIGHT -> "夜晚" }
     val cards = listOf(
-        Triple(ThemeMode.TIME, "按时间切换四套配色，现在是$periodName", PeriodSwatches),
-        Triple(ThemeMode.SYSTEM, "随手机的深浅色设置", listOf(Color(0xFFEEF1F6), Color(0xFF1A2029))),
-        Triple(ThemeMode.LIGHT, "始终浅色，天空仍随时段", listOf(Color(0xFFF5F7FA), Color(0xFFDCF1EE))),
-        Triple(ThemeMode.DARK, "始终深色", listOf(Color(0xFF12161D), Color(0xFF242B36))),
+        Triple(ThemeMode.TIME, "现在是$periodName", PeriodSwatches),
+        Triple(ThemeMode.SYSTEM, null, listOf(Color(0xFFEEF1F6), Color(0xFF1A2029))),
+        Triple(ThemeMode.LIGHT, null, listOf(Color(0xFFF5F7FA), Color(0xFFDCF1EE))),
+        Triple(ThemeMode.DARK, null, listOf(Color(0xFF12161D), Color(0xFF242B36))),
     )
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         cards.chunked(2).forEach { pair ->
@@ -430,7 +418,7 @@ private fun ThemeCards(selected: ThemeMode, onPick: (ThemeMode) -> Unit) {
 }
 
 @Composable
-private fun ThemeCard(mode: ThemeMode, note: String, sky: List<Color>, mark: Int?, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun ThemeCard(mode: ThemeMode, note: String?, sky: List<Color>, mark: Int?, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Surface(onClick = onClick, modifier = modifier.testTag("theme-${mode.name.lowercase()}").semantics { selected = on }, shape = RoundedCornerShape(12.dp),
         color = scheme.surface, border = BorderStroke(if (on) 1.5.dp else 1.dp, if (on) scheme.primary else scheme.outlineVariant)) {
@@ -446,7 +434,7 @@ private fun ThemeCard(mode: ThemeMode, note: String, sky: List<Color>, mark: Int
                     }
                 }
                 Text(mode.label(), style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), maxLines = 1)
-                Text(note, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                note?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, maxLines = 1) }
             }
             if (on) CornerCheck(Modifier.align(Alignment.TopEnd).padding(12.dp))
         }
@@ -455,9 +443,9 @@ private fun ThemeCard(mode: ThemeMode, note: String, sky: List<Color>, mark: Int
 
 internal enum class RowTone { PLAIN, HERO, DANGER }
 
-/** Icon tile, title and one-line note, chevron on the right: backup and data-removal entries. */
+/** Icon tile, title and an optional one-line note, chevron on the right: backup and data-removal entries. */
 @Composable
-internal fun ListRow(symbol: Symbol, title: String, note: String, tone: RowTone = RowTone.PLAIN, enabled: Boolean = true, chevron: Boolean = true,
+internal fun ListRow(symbol: Symbol, title: String, note: String? = null, tone: RowTone = RowTone.PLAIN, enabled: Boolean = true, chevron: Boolean = true,
     modifier: Modifier = Modifier, onClick: (() -> Unit)?) {
     val scheme = MaterialTheme.colorScheme
     val tile = when (tone) { RowTone.HERO -> scheme.primary; RowTone.DANGER -> scheme.errorContainer; RowTone.PLAIN -> scheme.surfaceVariant }
@@ -471,7 +459,7 @@ internal fun ListRow(symbol: Symbol, title: String, note: String, tone: RowTone 
             }
             Column(Modifier.weight(1f)) {
                 Text(title, Modifier.alpha(if (enabled) 1f else .45f), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = ink, maxLines = 1)
-                Text(note, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant) }
             }
             if (chevron && onClick != null) LineIcon(Symbol.ARROW, Modifier.size(12.dp).alpha(if (enabled) 1f else .45f), scheme.onSurfaceVariant)
         }

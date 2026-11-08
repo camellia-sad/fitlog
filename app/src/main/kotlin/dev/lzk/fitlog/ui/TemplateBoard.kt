@@ -137,7 +137,6 @@ internal fun PlanTimetable(plan: TrainingPlan?, templates: List<WorkoutTemplate>
                 }
             }
             if (plan == null) Column(Modifier.padding(horizontal = 14.dp).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("按天选择自己的模板，支持最多两周的循环。", style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
                 PixelButton(onClick = onEdit, enabled = templates.isNotEmpty(), minHeight = 44.dp, modifier = Modifier.fillMaxWidth()) {
                     LineIcon(Symbol.CLOCK, Modifier.size(14.dp), LocalContentColor.current); Text("设置健身计划")
                 }

@@ -72,7 +72,6 @@ fun FriendsScreen(model:FriendsViewModel,social:SocialRepository?=null,
         if(profile==null) item {
             SoftCard {
                 Text("登录后，和好友一起进步",style=MaterialTheme.typography.titleMedium)
-                Text("账号与个人资料已移至「我的」。",style=MaterialTheme.typography.bodySmall)
                 Button(onClick=onLogin){Text("去登录")}
             }
         } else if(selected!=null) item {

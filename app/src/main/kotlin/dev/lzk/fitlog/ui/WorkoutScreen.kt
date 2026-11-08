@@ -112,8 +112,6 @@ fun WorkoutScreen(state: WorkoutUiState, model: WorkoutViewModel, onBack: () -> 
                 PixelPuppy(Modifier.size(110.dp), if (canEdit) PuppyPose.IDLE else PuppyPose.SLEEP)
                 Spacer(Modifier.height(20.dp))
                 Text(if (workout == null) "准备好就开始吧" else "先选一个动作吧", style = MaterialTheme.typography.titleLarge)
-                Spacer(Modifier.height(8.dp))
-                Text("每一组进步，从一个动作开始。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(24.dp))
                 PixelButton(onClick = onAdd, enabled = workout != null && canEdit, modifier = Modifier.widthIn(min = 180.dp)) { Text("选择动作") }
             }
@@ -261,10 +259,7 @@ private fun RestBand(rest: Long, planned: Long, onSkip: () -> Unit) {
                     Text(if (rest >= 60) "${rest / 60}:${(rest % 60).toString().padStart(2, '0')}" else rest.toString(),
                         style = pixelNumber(if (rest >= 60) 14.sp else 18.sp, FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
                 }
-                Column(Modifier.weight(1f)) {
-                    OneLineText("组间休息", style = MaterialTheme.typography.titleSmall)
-                    OneLineText("喝口水，下一组马上开始", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                OneLineText("组间休息", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                 TextButton(onClick = onSkip) { OneLineText("跳过休息") }
             }
         }

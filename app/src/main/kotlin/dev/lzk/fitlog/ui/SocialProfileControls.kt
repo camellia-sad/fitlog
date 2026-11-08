@@ -45,7 +45,7 @@ import kotlinx.coroutines.*
     }
     HorizontalDivider()
     Text("训练共享",style=MaterialTheme.typography.titleMedium)
-    Text("仅已接受的好友可见；两个开关互相独立。",style=MaterialTheme.typography.bodySmall)
+    Text("仅好友可见",style=MaterialTheme.typography.bodySmall)
     Row {
         Text("训练历史",androidx.compose.ui.Modifier.weight(1f))
         Switch(privacy.history,{change(privacy.copy(history=it))},enabled=!busy)

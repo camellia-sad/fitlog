@@ -56,8 +56,6 @@ fun ExerciseWeightControl(exercise: Exercise, unit: WeightUnit, step: Long = Wor
             WeightStep(Symbol.PLUS, "增加默认重量", enabled = true) { haptics.tick(); onSave((value ?: 0L) + step) }
         }
         if (exercise.hasManualWeight) TextButton(onClick = { onSave(null) }, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("恢复跟随历史最高") }
-        Text(if (exercise.hasManualWeight) "完成更高重量后会自动改用新的最高值。" else "下次添加这个动作时使用；不改动当前训练和模板的固定重量。",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     if (editing) {
         var text by remember { mutableStateOf(exercise.defaultWeightGrams?.let { WeightUnits.format(it, unit, editing = true) } ?: "") }
@@ -69,7 +67,6 @@ fun ExerciseWeightControl(exercise: Exercise, unit: WeightUnit, step: Long = Wor
                         textStyle = pixelNumber(20.sp), isError = error != null,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth().testTag("exercise-default-weight"))
-                    Text("用于下次添加动作；不会修改当前训练或模板的固定重量。", style = MaterialTheme.typography.bodySmall)
                     TextButton(onClick = { onSave(null); editing = false }) { Text("跟随最高重量") }
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 }
