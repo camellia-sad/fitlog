@@ -34,6 +34,24 @@ class PolishFlowTest {
     private val models=ViewModelStore()
     @After fun close(){compose.activityRule.scenario.close();models.clear();AvatarImages.clear()}
     private fun waitText(text:String)=compose.waitUntil(15_000){compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()}
+    @Test fun memberCardKeepsNicknameBelowBannerAndEditorSavesTheBanner() {
+        val model=FriendsViewModel(fake);models.put("me",model)
+        compose.setContent {FitLogTheme {MeScreen(model,fake,figures=listOf("3" to "今年训练天","4" to "次","1" to "好友"),
+            activity=ProfileActivity(streakWeeks=3,trainedToday=true,monthSessions=2))}}
+        compose.waitUntil(15_000){compose.onAllNodesWithTag("profile-banner").fetchSemanticsNodes().isNotEmpty()}
+        val banner=compose.onNodeWithTag("profile-banner").getUnclippedBoundsInRoot()
+        val nickname=compose.onNodeWithTag("profile-nickname").getUnclippedBoundsInRoot()
+        assertTrue("nickname must sit below the banner",nickname.top>=banner.bottom)
+        compose.onNodeWithTag("profile-streak").assertExists()
+        compose.onNodeWithTag("profile-puppy").assertExists()
+        compose.onNodeWithTag("profile-heat").assertExists()
+        compose.onNodeWithTag("open-edit-profile").performClick()
+        compose.waitUntil(10_000){compose.onAllNodesWithTag("edit-profile").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("banner-gym").performScrollTo().performClick()
+        compose.onNodeWithText("保存资料").performClick()
+        compose.waitUntil(10_000){fake.profile.value?.banner=="gym"}
+        compose.waitUntil(10_000){compose.onAllNodesWithTag("profile-hero").fetchSemanticsNodes().isNotEmpty()}
+    }
     @Test fun myPageShowsFullIdWithCopyKeyAndAvatarOnlyOpensForViewing() {
         val model=FriendsViewModel(fake);models.put("me",model)
         compose.setContent {FitLogTheme {MeScreen(model,fake)}}

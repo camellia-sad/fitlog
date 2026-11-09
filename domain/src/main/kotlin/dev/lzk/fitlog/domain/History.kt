@@ -48,6 +48,16 @@ object TrainingHistory {
             TrainingDay(date, sessions.sumOf { it.completedSetCount }, sessions.size)
         }.sortedBy { it.date }
 
+    /** Consecutive Monday-start weeks with a recorded session, ending this week, or last week while this one has none yet. */
+    fun weekStreak(workouts: List<Workout>, today: LocalDate): Int {
+        val weeks = days(workouts).map { it.date.with(java.time.DayOfWeek.MONDAY) }.toSet()
+        var week = today.with(java.time.DayOfWeek.MONDAY)
+        if (week !in weeks) week = week.minusWeeks(1)
+        var count = 0
+        while (week in weeks) { count++; week = week.minusWeeks(1) }
+        return count
+    }
+
     fun performance(workouts: List<Workout>, exerciseId: String): List<PerformancePoint> = workouts
         .filter { it.isRecordedTraining() }
         .sortedBy { it.session.startedAtUtc }.flatMap { workout ->

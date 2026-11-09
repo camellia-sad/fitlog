@@ -386,6 +386,13 @@ class SupabaseSocialRepository(
         authorized("/rest/v1/social_profiles?id=eq.${requireProfileId()}","PATCH",JSONObject().put("avatar_path",path))
         refreshProfile()
     }
+    override suspend fun saveBanner(banner:String?) {
+        val owner=requireProfileId()
+        require(banner==null || banner in ProfileBanners.SCENES || banner.startsWith("$owner/")) {"主页背景无效"}
+        // The replaced image is queued for deletion by the server once nothing references it.
+        authorized("/rest/v1/social_profiles?id=eq.$owner","PATCH",JSONObject().put("banner",banner ?: JSONObject.NULL))
+        refreshProfile()
+    }
     override suspend fun heartbeat(deviceId:String,status:PresenceStatus,training:LiveTraining?) =
         heartbeatAs(requireProfileId(),deviceId,status,training)
     suspend fun heartbeatAs(owner:String,deviceId:String,status:PresenceStatus,training:LiveTraining?) {

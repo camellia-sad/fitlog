@@ -1,6 +1,7 @@
 package dev.lzk.fitlog.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +20,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
@@ -34,45 +36,94 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 
 /**
- * A person at the top of their page: a large ringed avatar beside a large nickname, a quieter bio and the FitLog ID
- * bar. The avatar only opens for viewing; on one's own page the nickname and bio edit in place.
+ * A person's member card: a pixel banner (sky, scene or their own image) with the FITLOG mark, an optional puppy that
+ * matches a real state and a [corner] control; a large ringed avatar overlapping the banner's lower edge with the
+ * nickname beside it, below the banner; a quieter bio; then a perforated stub holding the FitLog ID. The avatar only
+ * opens for viewing; on one's own page the nickname and bio edit in place.
  */
 @Composable
 internal fun ProfileHero(repository: SocialRepository?, profile: SocialProfile, editable: Boolean,
-    status: String? = null, onNickname: (String) -> Unit = {}, onBio: (String) -> Unit = {},
-    action: (@Composable () -> Unit)? = null, extra: @Composable ColumnScope.() -> Unit = {}) {
+    onNickname: (String) -> Unit = {}, onBio: (String) -> Unit = {}, corner: (@Composable () -> Unit)? = null,
+    puppy: PuppyPose? = null, streakWeeks: Int = 0, pendingBanner: ImageBitmap? = null, tag: String = "profile-hero",
+    extra: @Composable ColumnScope.() -> Unit = {}) {
     val scheme = MaterialTheme.colorScheme
     var viewing by remember { mutableStateOf(false) }
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
     val shape = RoundedCornerShape(20.dp)
-    Column(Modifier.fillMaxWidth().clip(shape).background(scheme.surface).border(1.dp, scheme.outlineVariant, shape)
-        .padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 14.dp).testTag("profile-hero"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(Modifier.size(92.dp).border(2.dp, scheme.primary, CircleShape).padding(4.dp)) {
-                SocialAvatar(repository, profile, size = 84.dp, modifier = Modifier.testTag("profile-avatar")) { viewing = true }
+    Column(Modifier.fillMaxWidth().clip(shape).background(scheme.surface).border(1.dp, scheme.outlineVariant, shape).testTag(tag)) {
+        Box(Modifier.fillMaxWidth()) {
+            Box(Modifier.fillMaxWidth().height(BANNER_HEIGHT).testTag("profile-banner")) {
+                ProfileBannerArt(repository, profile.banner, Modifier.fillMaxSize(), pending = pendingBanner)
+                Text("FITLOG", Modifier.padding(start = 12.dp, top = 8.dp), style = pixelNumber(17.sp).copy(letterSpacing = 1.4.sp,
+                    shadow = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = .2f), androidx.compose.ui.geometry.Offset(2f, 2f))),
+                    color = Color.White.copy(alpha = .88f))
+                puppy?.let { PixelPuppy(Modifier.align(Alignment.BottomEnd).padding(end = 14.dp).size(52.dp).testTag("profile-puppy"), it) }
+                corner?.let { Box(Modifier.align(Alignment.TopEnd).padding(10.dp)) { it() } }
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (editing == "nickname") InlineEditor(profile.nickname, 40, singleLine = true, label = "昵称", tag = "edit-nickname",
-                    onCancel = { editing = null }) { onNickname(it); editing = null }
-                else Text(profile.nickname, Modifier.fillMaxWidth().then(if (editable) Modifier.clickable { editing = "nickname" } else Modifier)
-                    .testTag("profile-nickname"), style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                status?.let { StatusTag(it) }
+            // The avatar overlaps the banner's lower edge; the nickname starts below the banner so the sky never covers it.
+            Row(Modifier.padding(start = 16.dp, end = 16.dp, top = BANNER_HEIGHT - AVATAR_OVERLAP), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.size(98.dp).background(scheme.surface, CircleShape).padding(3.dp).border(2.5.dp, scheme.primary, CircleShape).padding(4.dp)) {
+                    SocialAvatar(repository, profile, size = 82.dp, modifier = Modifier.testTag("profile-avatar")) { viewing = true }
+                }
+                Column(Modifier.weight(1f).padding(top = AVATAR_OVERLAP + 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    if (editing == "nickname") InlineEditor(profile.nickname, 40, singleLine = true, label = "昵称", tag = "edit-nickname",
+                        onCancel = { editing = null }) { onNickname(it); editing = null }
+                    else Text(profile.nickname, Modifier.fillMaxWidth().then(if (editable) Modifier.clickable { editing = "nickname" } else Modifier)
+                        .testTag("profile-nickname"), style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
+                        color = scheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (streakWeeks >= 2) StreakTag(streakWeeks)
+                }
             }
         }
-        if (editing == "bio") InlineEditor(profile.bio, 300, singleLine = false, label = "简介", tag = "edit-bio",
-            onCancel = { editing = null }) { onBio(it); editing = null }
-        else if (profile.bio.isNotBlank() || editable) Text(profile.bio.ifBlank { "写一句简介" },
-            Modifier.fillMaxWidth().then(if (editable) Modifier.clickable { editing = "bio" } else Modifier).testTag("profile-bio"),
-            style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant.copy(alpha = if (profile.bio.isBlank()) .7f else 1f),
-            maxLines = 2, overflow = TextOverflow.Ellipsis)
-        FitLogIdBar(profile.fitlogId)
-        extra()
-        action?.invoke()
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (editing == "bio") InlineEditor(profile.bio, 300, singleLine = false, label = "简介", tag = "edit-bio",
+                onCancel = { editing = null }) { onBio(it); editing = null }
+            else if (profile.bio.isNotBlank() || editable) Text(profile.bio.ifBlank { "写一句简介" },
+                Modifier.fillMaxWidth().then(if (editable) Modifier.clickable { editing = "bio" } else Modifier).testTag("profile-bio"),
+                style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant.copy(alpha = if (profile.bio.isBlank()) .7f else 1f),
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+            extra()
+        }
+        Perforation(Modifier.padding(top = 12.dp))
+        FitLogIdLine(profile.fitlogId, Modifier.padding(start = 16.dp, end = 12.dp, bottom = 12.dp, top = 2.dp))
     }
     if (viewing) AvatarViewer(repository, profile) { viewing = false }
+}
+
+private val BANNER_HEIGHT = 104.dp
+private val AVATAR_OVERLAP = 40.dp
+
+/** Achievement-orange tag for consecutive training weeks. */
+@Composable
+private fun StreakTag(weeks: Int) {
+    val fit = fitColors
+    Row(Modifier.background(fit.cream, PixelShapeSmall).padding(horizontal = 7.dp, vertical = 1.dp).testTag("profile-streak"),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        LineIcon(Symbol.MEDAL, Modifier.size(11.dp), fit.orangeDeep)
+        Text("连续", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold), color = fit.orangeDeep)
+        Text("$weeks", style = pixelNumber(17.sp), color = fit.orangeDeep)
+        Text("周", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold), color = fit.orangeDeep)
+    }
+}
+
+/** A dashed tear line with a half-round notch punched from each edge of the card. */
+@Composable
+private fun Perforation(modifier: Modifier = Modifier) {
+    val line = MaterialTheme.colorScheme.outline
+    val hole = MaterialTheme.colorScheme.background
+    val rim = MaterialTheme.colorScheme.outlineVariant
+    Canvas(modifier.fillMaxWidth().height(20.dp)) {
+        val r = 9.dp.toPx(); val y = size.height / 2
+        drawLine(line, androidx.compose.ui.geometry.Offset(16.dp.toPx(), y), androidx.compose.ui.geometry.Offset(size.width - 16.dp.toPx(), y),
+            strokeWidth = 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())))
+        listOf(0f, size.width).forEach { x ->
+            drawCircle(hole, r, androidx.compose.ui.geometry.Offset(x, y))
+            drawCircle(rim, r, androidx.compose.ui.geometry.Offset(x, y), style = Stroke(1.dp.toPx()))
+        }
+    }
 }
 
 /** Small square-cut presence tag with a dot. */
@@ -86,17 +137,17 @@ internal fun StatusTag(text: String) {
     }
 }
 
-/** The FitLog ID in pixel digits on a tonal bar, with a copy key that flips to “已复制” for a moment. */
+/** “FitLog ID” in bold, the ID itself in plain type a step quieter, and a copy key that flips to “已复制” for a moment. */
 @Composable
-internal fun FitLogIdBar(id: String) {
+internal fun FitLogIdLine(id: String, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     val clipboard = androidx.compose.ui.platform.LocalClipboard.current
     val scope = rememberCoroutineScope()
     var copied by remember(id) { mutableStateOf(false) }
-    Row(Modifier.fillMaxWidth().heightIn(min = 38.dp).background(scheme.surfaceVariant, PixelShapeSmall).padding(start = 10.dp, end = 4.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("FitLog ID", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = scheme.onSurfaceVariant)
-        Text(id, Modifier.weight(1f).testTag("profile-fitlog-id"), style = pixelNumber(20.sp), color = scheme.onSurface, maxLines = 1)
+    // The label and copy key share the first line so the full 32-character ID gets the second line to itself.
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("FitLog ID", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black), color = scheme.onSurface, maxLines = 1)
         val label = if (copied) "已复制" else "复制"
         val copy: () -> Unit = {
             scope.launch {
@@ -110,6 +161,9 @@ internal fun FitLogIdBar(id: String) {
             contentPadding = PaddingValues(horizontal = 8.dp), modifier = Modifier.semanticsLabel("复制 FitLog ID")) {
             LineIcon(Symbol.EXPORT, Modifier.size(11.dp), LocalContentColor.current); Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
         }
+    }
+    Text(id, Modifier.fillMaxWidth().testTag("profile-fitlog-id"), style = MaterialTheme.typography.bodyMedium.copy(letterSpacing = .6.sp),
+        color = scheme.onSurfaceVariant, maxLines = 2)
     }
 }
 
@@ -211,10 +265,84 @@ internal fun ProfileEntries(content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxWidth().clip(shape).background(scheme.surface).border(1.dp, scheme.outlineVariant, shape), content = content)
 }
 
-/** Three pixel figures under the profile: year days, sessions and friends. Read only. */
+/** This year at a glance on one's own page; every part is read only. */
+data class ProfileActivity(
+    /** Completed sets per day, for the last [ProfileActivity.WEEKS] weeks. */
+    val sets: Map<LocalDate, Int> = emptyMap(),
+    /** This year's completed sets per muscle group, as shares. */
+    val parts: List<Pair<MuscleGroup, Float>> = emptyList(),
+    val streakWeeks: Int = 0,
+    val trainedToday: Boolean = false,
+    val monthSessions: Int = 0,
+) { companion object { const val WEEKS = 16 } }
+
+/** Builds the panel from recorded sessions; only completed sets count, as everywhere else in history. */
+internal fun profileActivity(workouts: List<Workout>, catalog: List<Exercise>, today: LocalDate): ProfileActivity {
+    val days = TrainingHistory.days(workouts)
+    val gridStart = today.with(java.time.DayOfWeek.MONDAY).minusWeeks(ProfileActivity.WEEKS - 1L)
+    val recorded = workouts.filter { it.isRecordedTraining() && it.completedSetCount > 0 }
+    val groups = LinkedHashMap<MuscleGroup, Int>()
+    recorded.filter { !it.session.localWorkoutDate.isBefore(today.withDayOfYear(1)) }.forEach { workout ->
+        workout.exercises.forEach { exercise ->
+            val done = exercise.sets.count { it.status == SetStatus.COMPLETED }
+            if (done > 0) catalog.find { it.id == exercise.exerciseId }?.primaryMuscles?.firstOrNull()?.group?.let { groups[it] = (groups[it] ?: 0) + done }
+        }
+    }
+    val total = groups.values.sum().toFloat()
+    return ProfileActivity(
+        sets = days.filter { !it.date.isBefore(gridStart) }.associate { it.date to it.completedSets },
+        parts = if (total > 0) groups.entries.sortedByDescending { it.value }.map { it.key to it.value / total } else emptyList(),
+        streakWeeks = TrainingHistory.weekStreak(workouts, today),
+        trainedToday = days.any { it.date == today },
+        monthSessions = recorded.count { !it.session.localWorkoutDate.isBefore(today.withDayOfMonth(1)) },
+    )
+}
+
+/** Three pixel figures in one row, the last 16 weeks as a day grid (today outlined orange) and this year's muscle mix. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun ProfileFigures(figures: List<Pair<String, String>>) {
-    Row(Modifier.fillMaxWidth().testTag("profile-figures"), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        figures.forEach { (value, label) -> StatTile(value, label, Modifier.weight(1f)) }
+internal fun YearPanel(figures: List<Pair<String, String>>, activity: ProfileActivity, today: LocalDate = LocalDate.now()) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(18.dp)
+    Column(Modifier.fillMaxWidth().clip(shape).background(scheme.surface).border(1.dp, scheme.outlineVariant, shape)
+        .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 14.dp).testTag("profile-figures"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            figures.forEachIndexed { i, (value, label) ->
+                if (i > 0) Box(Modifier.padding(end = 10.dp).width(1.5.dp).fillMaxHeight().background(scheme.outlineVariant))
+                Column(Modifier.weight(1f)) {
+                    Text(value, style = pixelNumber(34.sp), color = scheme.onSurface, maxLines = 1)
+                    Text(label, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, maxLines = 1)
+                }
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text("近 ${ProfileActivity.WEEKS} 周", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+            val start = today.with(java.time.DayOfWeek.MONDAY).minusWeeks(ProfileActivity.WEEKS - 1L)
+            val orange = fitColors.orange
+            Row(Modifier.fillMaxWidth().testTag("profile-heat"), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                repeat(ProfileActivity.WEEKS) { week ->
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        repeat(7) { day ->
+                            val date = start.plusWeeks(week.toLong()).plusDays(day.toLong())
+                            Box(Modifier.fillMaxWidth().aspectRatio(1f).then(if (date.isAfter(today)) Modifier else Modifier.background(trainingColor(activity.sets[date] ?: 0)))
+                                .then(if (date == today) Modifier.border(1.5.dp, orange) else Modifier))
+                        }
+                    }
+                }
+            }
+        }
+        if (activity.parts.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth().height(10.dp).testTag("profile-parts"), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                activity.parts.forEach { (group, share) -> Box(Modifier.weight(share.coerceAtLeast(.001f)).fillMaxHeight().background(group.color())) }
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                activity.parts.forEach { (group, _) ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(Modifier.size(8.dp).background(group.color()))
+                        Text(group.label, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
     }
 }

@@ -77,6 +77,7 @@ internal class FakeSocial:FriendsRepository,SocialRepository {
     override suspend fun uploadImage(jpeg:ByteArray)="image"
     override suspend fun image(path:String):ByteArray {imageReads++;return imageBytes}
     override suspend fun saveAvatar(path:String){}
+    override suspend fun saveBanner(banner:String?){profile.value=profile.value?.copy(banner=banner)}
     override suspend fun heartbeat(deviceId:String,status:PresenceStatus,training:LiveTraining?){}
     override suspend fun uploadWorkout(workout:Workout){}
     override suspend fun pending(peerId:String)=queue

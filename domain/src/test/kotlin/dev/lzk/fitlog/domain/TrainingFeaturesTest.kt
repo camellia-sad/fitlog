@@ -17,6 +17,18 @@ class TrainingFeaturesTest {
         assertThrows(WorkoutException::class.java) { WeightUnits.parse("-1", WeightUnit.LB) }
     }
 
+    @Test fun weekStreakCountsBackFromThisWeekOrLastWhileThisOneIsEmpty() {
+        val now = Instant.parse("2026-11-01T01:00:00Z")
+        fun trained(date: String) = Workout(WorkoutSession(date, now, LocalDate.parse(date), SessionStatus.FINISHED, endedAtUtc = now),
+            listOf(SessionExercise("e-$date", date, "x", 0, "动作", 1, 8, 12, listOf(SetRecord("s-$date", "e-$date", 1, 0, 10, SetStatus.COMPLETED, now)))))
+        // Weeks of 10-19, 10-26 and 11-02 (Mondays); 10-05 is separated by an empty week.
+        val records = listOf(trained("2026-10-05"), trained("2026-10-19"), trained("2026-10-25"), trained("2026-10-27"), trained("2026-11-03"))
+        assertEquals(3, TrainingHistory.weekStreak(records, LocalDate.parse("2026-11-08")))
+        assertEquals(2, TrainingHistory.weekStreak(records.dropLast(1), LocalDate.parse("2026-11-08")))
+        assertEquals(0, TrainingHistory.weekStreak(records.dropLast(1), LocalDate.parse("2026-11-12")))
+        assertEquals(0, TrainingHistory.weekStreak(emptyList(), LocalDate.parse("2026-11-08")))
+    }
+
     @Test fun pausesAndClockChangesCannotProduceNegativeDurationOrRest() {
         val start = Instant.parse("2026-10-28T01:00:00Z")
         val session = WorkoutSession("s", start, LocalDate.parse("2026-10-28"), SessionStatus.PAUSED,

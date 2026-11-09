@@ -44,7 +44,7 @@ internal object AvatarImages {
 }
 
 @Composable internal fun SocialImage(repository:SocialRepository,path:String,modifier:Modifier=Modifier,avatar:Boolean=false,previewEnabled:Boolean=true,gallery:List<String> = listOf(path),fullSize:Boolean=false,onLongClick:(()->Unit)?=null,
-    fallback:@Composable ()->Unit={Text("…",style=MaterialTheme.typography.labelSmall)}) {
+    contentScale:ContentScale?=null,fallback:@Composable ()->Unit={Text("…",style=MaterialTheme.typography.labelSmall)}) {
     var preview by remember(path){mutableStateOf(false)}
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     val profileFlow=remember(repository) {
@@ -80,7 +80,7 @@ internal object AvatarImages {
         // A stopped navigation destination can remain visible during its exit animation.
         // Its loader has released bitmap, so draw the account-scoped thumbnail directly.
         val displayed=bitmap ?: if(avatar) AvatarImages.get(cacheKey) else null
-        if(displayed!=null) Image(displayed.asImageBitmap(),contentDescription="图片",modifier=Modifier.fillMaxSize(),contentScale=if(avatar)ContentScale.Crop else ContentScale.Fit)
+        if(displayed!=null) Image(displayed.asImageBitmap(),contentDescription="图片",modifier=Modifier.fillMaxSize(),contentScale=contentScale ?: if(avatar)ContentScale.Crop else ContentScale.Fit)
         else if(avatar) {if(failed) fallback()}
         else if(!failed) fallback() else Text("图片暂不可用",style=MaterialTheme.typography.labelSmall)
     }

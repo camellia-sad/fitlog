@@ -38,6 +38,8 @@ class SocialFlowTest {
         waitText("个人主页")
         // A friend's page is read only apart from the note.
         compose.onNodeWithTag("profile-nickname").assertHasNoClickAction()
+        // Online but not training: no puppy on a friend's banner.
+        compose.onNodeWithTag("profile-puppy").assertDoesNotExist()
         compose.onNodeWithTag("friend-note").assertExists()
         compose.onNodeWithTag("person-timeline").performScrollTo().performClick()
         waitText("未开启训练历史共享")

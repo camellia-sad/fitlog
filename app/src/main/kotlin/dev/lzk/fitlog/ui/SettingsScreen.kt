@@ -451,7 +451,7 @@ internal enum class RowTone { PLAIN, HERO, DANGER }
 /** Icon tile, title and an optional one-line note, chevron on the right: backup and data-removal entries. */
 @Composable
 internal fun ListRow(symbol: Symbol, title: String, note: String? = null, tone: RowTone = RowTone.PLAIN, enabled: Boolean = true, chevron: Boolean = true,
-    modifier: Modifier = Modifier, onClick: (() -> Unit)?) {
+    modifier: Modifier = Modifier, figure: String? = null, onClick: (() -> Unit)?) {
     val scheme = MaterialTheme.colorScheme
     val tile = when (tone) { RowTone.HERO -> scheme.primary; RowTone.DANGER -> scheme.errorContainer; RowTone.PLAIN -> scheme.surfaceVariant }
     val glyph = when (tone) { RowTone.HERO -> scheme.onPrimary; RowTone.DANGER -> scheme.error; RowTone.PLAIN -> scheme.onSurface }
@@ -466,6 +466,7 @@ internal fun ListRow(symbol: Symbol, title: String, note: String? = null, tone: 
                 Text(title, Modifier.alpha(if (enabled) 1f else .45f), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = ink, maxLines = 1)
                 note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant) }
             }
+            figure?.let { Text(it, style = pixelNumber(19.sp), color = scheme.onSurfaceVariant, maxLines = 1) }
             if (chevron && onClick != null) LineIcon(Symbol.ARROW, Modifier.size(12.dp).alpha(if (enabled) 1f else .45f), scheme.onSurfaceVariant)
         }
     }

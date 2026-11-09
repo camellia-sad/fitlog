@@ -21,6 +21,8 @@ import dev.lzk.fitlog.domain.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.asImageBitmap
 
 /**
  * Someone else's page, laid out like one's own: avatar, nickname, bio and FitLog ID, read only. A friend's page adds
@@ -56,7 +58,10 @@ fun PersonScreen(repository: SocialRepository, me: SocialProfile, personId: Stri
             error?.let { Text(it, color = scheme.error, style = MaterialTheme.typography.bodySmall) }
             if (profile == null) { LinearProgressIndicator(Modifier.fillMaxWidth()); return@Column }
             val current = person
-            ProfileHero(repository, profile, editable = false, status = current?.status?.label, extra = {
+            // The puppy mirrors what the friend is doing right now and stays away otherwise.
+            val puppy = when (current?.status) { PresenceStatus.TRAINING -> PuppyPose.LIFT; PresenceStatus.REST -> PuppyPose.REST; else -> null }
+            ProfileHero(repository, profile, editable = false, puppy = puppy,
+                corner = current?.status?.label?.let { label -> { StatusTag(label) } }, extra = {
                 current?.live?.let { LiveTrainingCard(it, current.status) }
             })
             if (friend != null && friend.accepted) {
@@ -100,7 +105,8 @@ fun ProfileTimelineScreen(repository: SocialRepository, me: SocialProfile, owner
             SocialAvatar(repository, owner, size = 40.dp) {}
             Column(Modifier.weight(1f)) {
                 Text(owner.nickname, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(owner.fitlogId, style = pixelNumber(14.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                Text(owner.fitlogId, style = MaterialTheme.typography.bodySmall.copy(letterSpacing = 1.sp), color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         PixelSegmented(listOf("训练历史", "动态"), tab, Modifier.padding(horizontal = 16.dp), tags = listOf("timeline-tab-history", "timeline-tab-posts")) { tab = it }
@@ -112,43 +118,75 @@ fun ProfileTimelineScreen(repository: SocialRepository, me: SocialProfile, owner
     }
 }
 
-/** Full profile editing: the editor header used by templates, a large avatar to replace, nickname and bio with counts. */
+/**
+ * Full profile editing: the editor header used by templates, the member card as a live preview, a key to replace the
+ * avatar, nickname and bio with counts, and the banner choice. The banner (and a picked photo, uploaded only then) is
+ * saved with the rest; the avatar still uploads as soon as it is picked.
+ */
 @Composable
 fun EditProfileScreen(repository: SocialRepository?, profile: SocialProfile, busy: Boolean, onClose: () -> Unit, onSave: (String, String) -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    val scope = rememberCoroutineScope()
     var name by rememberSaveable(profile.id) { mutableStateOf(profile.nickname) }
     var bio by rememberSaveable(profile.id) { mutableStateOf(profile.bio) }
+    val savedBanner = profile.banner?.let { if (ProfileBanners.isImage(it)) BANNER_PHOTO else ProfileBanners.scene(it) }.orEmpty()
+    var banner by rememberSaveable(profile.id) { mutableStateOf(savedBanner) }
+    var photo by remember { mutableStateOf<ByteArray?>(null) }
+    val photoPreview = remember(photo) { photo?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() } }
     var uploading by remember { mutableStateOf(false) }
+    var preparing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var leaving by remember { mutableStateOf(false) }
-    var viewing by remember { mutableStateOf(false) }
-    val dirty = name.trim() != profile.nickname || bio.trim() != profile.bio
+    val bannerChanged = banner != savedBanner || (banner == BANNER_PHOTO && photo != null)
+    val dirty = name.trim() != profile.nickname || bio.trim() != profile.bio || bannerChanged
     val cancel = { if (dirty) leaving = true else onClose() }
     BackHandler { cancel() }
-    val picker = if (repository != null) rememberImagePicker(onImage = { bytes ->
+    val avatarPicker = if (repository != null) rememberImagePicker(onImage = { bytes ->
         uploading = true
         try { repository.saveAvatar(repository.uploadImage(bytes)) } finally { uploading = false }
     }, onError = { error = it }) else ({})
-    Column(Modifier.fillMaxSize().testTag("edit-profile")) {
-        EditorHeader("修改资料", "保存资料", dirty, busy, onCancel = cancel) { onSave(name.trim(), bio.trim()) }
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Column(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.size(120.dp).padding(4.dp)) { SocialAvatar(repository, profile, size = 112.dp) { viewing = true } }
-                PixelOutlineKey(onClick = picker, enabled = !uploading && repository != null, minHeight = 34.dp, modifier = Modifier.testTag("change-avatar")) {
-                    LineIcon(Symbol.IMAGE, Modifier.size(13.dp), LocalContentColor.current); Text(if (uploading) "上传中…" else "更换头像", maxLines = 1)
+    val bannerPicker = if (repository != null) rememberImagePicker(onImage = { bytes ->
+        preparing = true
+        try { photo = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { bannerJpeg(bytes) }; banner = BANNER_PHOTO } finally { preparing = false }
+    }, onError = { error = it }) else ({})
+    val save: () -> Unit = {
+        scope.launch {
+            uploading = true; error = null
+            try {
+                if (bannerChanged && repository != null) {
+                    val target = when (banner) {
+                        BANNER_PHOTO -> photo?.let { repository.uploadImage(it) } ?: profile.banner
+                        "" -> null
+                        else -> banner
+                    }
+                    repository.saveBanner(target)
                 }
-                error?.let { Text(it, color = scheme.error, style = MaterialTheme.typography.bodySmall) }
-            }
+                onSave(name.trim(), bio.trim())
+            } catch (e: CancellationException) { throw e } catch (e: Exception) { error = e.message ?: "保存失败，请重试" }
+            finally { uploading = false }
+        }
+    }
+    val preview = profile.copy(nickname = name.trim().ifEmpty { profile.nickname }, bio = bio.trim(),
+        banner = when (banner) { BANNER_PHOTO -> profile.banner?.takeIf { ProfileBanners.isImage(it) }; "" -> null; else -> banner })
+    Column(Modifier.fillMaxSize().testTag("edit-profile")) {
+        EditorHeader("修改资料", "保存资料", dirty, busy || uploading, onCancel = cancel, onSave = save)
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            ProfileHero(repository, preview, editable = false, pendingBanner = if (banner == BANNER_PHOTO) photoPreview else null, tag = "edit-preview",
+                corner = { PixelOutlineKey(onClick = avatarPicker, enabled = !uploading && repository != null, minHeight = 30.dp,
+                    modifier = Modifier.testTag("change-avatar")) {
+                    LineIcon(Symbol.IMAGE, Modifier.size(12.dp), LocalContentColor.current); Text(if (uploading) "上传中…" else "更换头像", maxLines = 1)
+                } })
+            error?.let { Text(it, color = scheme.error, style = MaterialTheme.typography.bodySmall) }
             CountedField("昵称", name, 40, singleLine = true, tag = "profile-name") { name = it }
             CountedField("简介", bio, 300, singleLine = false, tag = "profile-bio-field") { bio = it }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("FitLog ID", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
-                FitLogIdBar(profile.fitlogId)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("主页背景", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+                BannerPicker(repository, banner, profile.banner?.takeIf { ProfileBanners.isImage(it) }, photoPreview, preparing,
+                    onChoose = { banner = it }, onAlbum = bannerPicker)
             }
         }
     }
-    if (viewing) AvatarViewer(repository, profile) { viewing = false }
     if (leaving) AlertDialog(onDismissRequest = { leaving = false }, title = { Text("放弃这次修改？") },
         confirmButton = { TextButton(onClick = { leaving = false; onClose() }) { Text("放弃") } },
         dismissButton = { TextButton(onClick = { leaving = false }) { Text("继续编辑") } })

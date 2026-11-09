@@ -121,7 +121,8 @@ open class SupabaseFriendsRepository(context: Context, private val baseUrl: Stri
     }
     private suspend fun loadProfile() {
         val id = requireNotNull(session).getJSONObject("user").getString("id")
-        val array = JSONArray(call("/rest/v1/social_profiles?id=eq.$id&select=id,fitlog_id,nickname,bio,avatar_path",
+        // select=* so the profile still loads before a newer column (such as banner) is deployed.
+        val array = JSONArray(call("/rest/v1/social_profiles?id=eq.$id&select=*",
             token = requireNotNull(session).getString("access_token")))
         require(array.length() == 1) { "云端好友表尚未初始化，请先部署数据库" }
         val value = array.getJSONObject(0)
@@ -133,7 +134,7 @@ open class SupabaseFriendsRepository(context: Context, private val baseUrl: Stri
         store.write(value.toString()); session = value
     }
     private fun decodeProfile(value: JSONObject) = SocialProfile(value.getString("id"), value.getString("fitlog_id"),
-        value.getString("nickname"), value.optString("bio"), value.optString("avatar_path").takeIf { it.isNotBlank() && it!="null" })
+        value.getString("nickname"), value.optString("bio"), value.optional("avatar_path"), value.optional("banner"))
 
     protected suspend fun authorizedBinary(path:String,method:String="GET",payload:ByteArray?=null,mime:String="image/jpeg",
         expectedOwner:String=requireProfileId(),maxBytes:Int=4_000_000):ByteArray {

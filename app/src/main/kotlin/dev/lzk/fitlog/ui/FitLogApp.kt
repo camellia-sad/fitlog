@@ -226,12 +226,17 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             }
             composable("me") {
                 val friendList by friendsModel.friends.collectAsStateWithLifecycle()
-                val yearStart = remember { LocalDate.now().withDayOfYear(1) }
-                val yearFlow = remember(container, yearStart) { container.training.observeHistory(yearStart, LocalDate.now()).catch { emit(emptyList()) } }
-                val year by yearFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+                val today = remember { LocalDate.now() }
+                val yearStart = today.withDayOfYear(1)
+                // Two years back so the week streak and the 16-week grid are not cut at New Year.
+                val recentFlow = remember(container, today) { container.training.observeHistory(minOf(yearStart, today.minusWeeks(104)), today).catch { emit(emptyList()) } }
+                val recent by recentFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+                val year = remember(recent) { recent.filter { !it.session.localWorkoutDate.isBefore(yearStart) } }
                 val stats = remember(year) { TrainingHistory.statistics(year) }
+                val activity = remember(recent, templateState.exercises) { profileActivity(recent, templateState.exercises, today) }
                 MeScreen(friendsModel, container.social, onSettings = { nav.navigate("settings") }, onSubpage = { socialSubpage = it },
                     figures = listOf("${stats.days}" to "今年训练天", "${stats.sessions}" to "次", "${friendList.count { it.accepted }}" to "好友"),
+                    activity = activity,
                     ownHistory = {
                         LaunchedEffect(Unit) { history.selectDate(LocalDate.now()) }
                         HistoryScreen(history, state.preferences.weightUnit, templateState.exercises, onBack = {}, onShare = { sharingWorkout = it },

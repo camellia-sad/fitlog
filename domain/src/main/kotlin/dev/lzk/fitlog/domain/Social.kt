@@ -76,6 +76,8 @@ interface SocialRepository {
     suspend fun uploadImage(jpeg:ByteArray):String
     suspend fun image(path:String):ByteArray
     suspend fun saveAvatar(path:String)
+    /** null restores the sky; otherwise a [ProfileBanners] scene or an image path from [uploadImage]. */
+    suspend fun saveBanner(banner:String?) {}
     suspend fun heartbeat(deviceId:String,status:PresenceStatus,training:LiveTraining?)
     suspend fun uploadWorkout(workout:Workout)
     suspend fun pending(peerId:String):List<MessageDraft>

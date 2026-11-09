@@ -19,7 +19,7 @@ internal fun JSONObject.post()=SocialPost(getString("id"),getString("owner_id"),
     optional("avatar_path"),optString("body"),(optJSONArray("media_paths")?:JSONArray()).strings(),
     requireNotNull(getString("created_at").toSocialInstant()),optInt("like_count"),optBoolean("liked"),optInt("comment_count"),optString("fitlog_id"))
 internal fun JSONObject.socialProfile()=SocialProfile(getString("id"),getString("fitlog_id"),getString("nickname"),
-    optString("bio"),optional("avatar_path"))
+    optString("bio"),optional("avatar_path"),optional("banner"))
 internal fun LiveTraining.toJson()=JSONObject().put("session_id",sessionId).put("label",label).put("exercise",exercise)
     .put("weight_grams",weightGrams).put("reps",reps).put("set_index",setIndex).put("done",done).put("total",total)
     .put("rest_ends_at",restEndsAt?.toString()).put("record_metric",recordMetric.name)

@@ -19,12 +19,12 @@ import dev.lzk.fitlog.domain.*
 import dev.lzk.fitlog.features.FriendsViewModel
 
 /**
- * “我的”: the person first — a large avatar and nickname that edit in place, a quieter bio and the FitLog ID bar — then
- * three read-only figures and two entries. Sharing, the block list and signing out live in settings.
+ * “我的”: the person first — the member card with a large avatar and nickname that edit in place, a quieter bio and the
+ * FitLog ID stub — then this year's read-only panel and two entries. Sharing, the block list and signing out live in settings.
  */
 @Composable
 fun MeScreen(model: FriendsViewModel, social: SocialRepository? = null, onSettings: () -> Unit = {}, onSubpage: (Boolean) -> Unit = {},
-    figures: List<Pair<String, String>> = emptyList(), ownHistory: (@Composable () -> Unit)? = null) {
+    figures: List<Pair<String, String>> = emptyList(), activity: ProfileActivity = ProfileActivity(), ownHistory: (@Composable () -> Unit)? = null) {
     val profile by model.profile.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
     val message by model.message.collectAsStateWithLifecycle()
@@ -57,18 +57,18 @@ fun MeScreen(model: FriendsViewModel, social: SocialRepository? = null, onSettin
             ProfileHero(social, current, editable = true,
                 onNickname = { if (it.isNotBlank() && it != current.nickname) model.saveProfile(it, current.bio) },
                 onBio = { if (it != current.bio) model.saveProfile(current.nickname, it) },
-                action = {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        PixelOutlineKey(onClick = { page = "edit" }, minHeight = 32.dp, contentColor = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.testTag("open-edit-profile")) {
-                            LineIcon(Symbol.EDIT, Modifier.size(12.dp), LocalContentColor.current); Text("编辑资料", maxLines = 1)
-                        }
+                puppy = if (activity.trainedToday) PuppyPose.CELEBRATE else PuppyPose.IDLE, streakWeeks = activity.streakWeeks,
+                corner = {
+                    PixelOutlineKey(onClick = { page = "edit" }, minHeight = 30.dp, contentColor = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.testTag("open-edit-profile")) {
+                        LineIcon(Symbol.EDIT, Modifier.size(12.dp), LocalContentColor.current); Text("编辑资料", maxLines = 1)
                     }
                 })
-            if (figures.isNotEmpty()) ProfileFigures(figures)
+            if (figures.isNotEmpty()) YearPanel(figures, activity)
             ProfileEntries {
                 if (social != null) {
-                    ListRow(Symbol.LIST, "动态与训练历史", tone = RowTone.HERO, modifier = Modifier.testTag("open-my-timeline")) { page = "timeline" }
+                    ListRow(Symbol.LIST, "动态与训练历史", tone = RowTone.HERO, modifier = Modifier.testTag("open-my-timeline"),
+                        figure = activity.monthSessions.takeIf { it > 0 }?.toString()) { page = "timeline" }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
                 ListRow(Symbol.SETTINGS, "设置", modifier = Modifier.testTag("open-settings"), onClick = onSettings)
