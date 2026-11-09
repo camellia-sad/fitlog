@@ -145,10 +145,22 @@ fun EditProfileScreen(repository: SocialRepository?, profile: SocialProfile, bus
         uploading = true
         try { repository.saveAvatar(repository.uploadImage(bytes)) } finally { uploading = false }
     }, onError = { error = it }) else ({})
-    val bannerPicker = if (repository != null) rememberImagePicker(onImage = { bytes ->
-        preparing = true
-        try { photo = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { bannerJpeg(bytes) }; banner = BANNER_PHOTO } finally { preparing = false }
-    }, onError = { error = it }) else ({})
+    // A picked photo goes to the framing page first; only the framed area is kept.
+    var framing by remember { mutableStateOf<ByteArray?>(null) }
+    val framingImage = remember(framing) { framing?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() } }
+    val bannerPicker = if (repository != null) rememberImagePicker(onImage = { bytes -> framing = bytes }, onError = { error = it }) else ({})
+    framingImage?.let { image ->
+        BannerCropper(image, onCancel = { framing = null }) { area ->
+            val source = framing ?: return@BannerCropper
+            framing = null
+            scope.launch {
+                preparing = true
+                try { photo = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { bannerCrop(source, area) }; banner = BANNER_PHOTO }
+                catch (e: CancellationException) { throw e } catch (e: Exception) { error = e.message ?: "图片处理失败" }
+                finally { preparing = false }
+            }
+        }
+    }
     val save: () -> Unit = {
         scope.launch {
             uploading = true; error = null

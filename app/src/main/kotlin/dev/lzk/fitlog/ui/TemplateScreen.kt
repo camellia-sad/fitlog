@@ -14,6 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.lzk.fitlog.domain.*
 import dev.lzk.fitlog.features.TemplateViewModel
 import java.time.LocalDate
+import kotlinx.coroutines.launch
 
 /** Template page: the plan timetable taped on top, templates as sticky notes pinned to the board below. */
 @Composable
@@ -31,11 +32,32 @@ fun TemplateScreen(model: TemplateViewModel, canStart: Boolean, onBack: () -> Un
         return
     }
     var deleting by remember { mutableStateOf<WorkoutTemplate?>(null) }
+    val pending by model.pendingExercises.collectAsStateWithLifecycle()
+    val importNotice by model.importNotice.collectAsStateWithLifecycle()
+    val imports by model.imports.collectAsStateWithLifecycle()
     editingDraft?.let { draft ->
         BackHandler(onBack = onExitEditor)
-        TemplateEditor(draft, state.templates, state.exercises, state.preferences, dirty = model.hasUnsavedChanges, saving = saving, message = message,
-            onBack = onExitEditor, onChange = model::updateDraft, onAddExercises = onPickExercises) { model.save(it) }
+        // Exercises an import still has to create are shown from their definitions until the template is kept.
+        val catalog = remember(state.exercises, pending) {
+            state.exercises + pending.map { (id, d) ->
+                Exercise(id, d.name, d.nameEn, d.equipment, d.primaryMuscles, d.secondaryMuscles, isCustom = true, recordMetric = d.recordMetric)
+            }
+        }
+        key(imports) {
+            TemplateEditor(draft, state.templates, catalog, state.preferences, dirty = model.hasUnsavedChanges, saving = saving, message = message,
+                onBack = onExitEditor, onChange = model::updateDraft, onAddExercises = onPickExercises, pending = pending.keys,
+                notice = importNotice, onImport = model::importTemplate) { model.save(it) }
+        }
         return
+    }
+    val clipboard = androidx.compose.ui.platform.LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val copy: (WorkoutTemplate) -> Unit = { template ->
+        scope.launch {
+            clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(
+                android.content.ClipData.newPlainText(TemplateTransfer.CLIP_LABEL, model.shareText(template))))
+            model.message.value = "已复制“${template.name}”"
+        }
     }
     val shortNames = remember(state.templates) { state.templates.shortNames() }
     val plannedId = plan?.templateOn(LocalDate.now())
@@ -66,7 +88,7 @@ fun TemplateScreen(model: TemplateViewModel, canStart: Boolean, onBack: () -> Un
                     state.templates.forEach { template ->
                         StickyNote(template, state.exercises, shortNames[template.id] ?: "?", planned = template.id == plannedId,
                             canStart = canStart, busy = saving, onStart = { onStart(template.id) }, onEdit = { model.edit(template) },
-                            onDelete = { deleting = template }, modifier = Modifier.staggered(slot++))
+                            onDelete = { deleting = template }, modifier = Modifier.staggered(slot++), onCopy = { copy(template) })
                     }
                     if (state.templates.isEmpty()) EmptyBoard(saving, model::create)
                 }

@@ -87,6 +87,7 @@ private fun String.takeCodePoints(count: Int): String =
 @Composable
 internal fun TemplateEditor(draft: TemplateDraft, templates: List<WorkoutTemplate>, exercises: List<Exercise>, preferences: UserPreferences,
     dirty: Boolean, saving: Boolean, message: String?, onBack: () -> Unit, onChange: (TemplateDraft) -> Unit, onAddExercises: () -> Unit,
+    pending: Set<String> = emptySet(), notice: String? = null, onImport: ((String) -> Unit)? = null,
     onSave: (TemplateDraft) -> Unit) {
     val latest by rememberUpdatedState(draft)
     val focus = LocalFocusManager.current
@@ -154,6 +155,8 @@ internal fun TemplateEditor(draft: TemplateDraft, templates: List<WorkoutTemplat
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item(key = "fields") {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (draft.id == null && onImport != null) ClipboardImport(empty = draft.name.isBlank() && draft.exercises.isEmpty(), saving, onImport)
+                        notice?.let { Text(it, Modifier.testTag("import-notice"), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium) }
                         OutlinedTextField(name, { name = it; onChange(latest.copy(name = it.text)) }, label = { Text("模板名称") },
                             singleLine = true, enabled = !saving, isError = nameClash != null,
                             supportingText = nameClash?.let { { Text("已有同名模板“${it.name}”") } },
@@ -175,7 +178,7 @@ internal fun TemplateEditor(draft: TemplateDraft, templates: List<WorkoutTemplat
                 items(draft.exercises, key = { it.id }) { item ->
                     val index = draft.exercises.indexOf(item)
                     val exercise = exercises.find { it.id == item.exerciseId }
-                    EditorCard(index, draft.exercises.size, item, exercise, preferences, open = openId == item.id,
+                    EditorCard(index, draft.exercises.size, item, exercise, preferences, open = openId == item.id, pending = item.exerciseId in pending,
                         modifier = Modifier.animateItem(fadeInSpec = tween(180, easing = StepEasing(3)), placementSpec = tween(180, easing = StepEasing(3)),
                             fadeOutSpec = tween(150, easing = StepEasing(3))),
                         onToggle = { haptics.tick(); openId = if (openId == item.id) null else item.id },
@@ -238,7 +241,7 @@ private fun ShortNameField(value: TextFieldValue, error: String?, custom: Boolea
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun EditorCard(index: Int, count: Int, item: TemplateExercise, exercise: Exercise?, preferences: UserPreferences, open: Boolean,
-    modifier: Modifier, onToggle: () -> Unit, onMove: (Int) -> Unit, onRemove: () -> Unit, onChange: (TemplateExercise) -> Unit) {
+    modifier: Modifier, onToggle: () -> Unit, onMove: (Int) -> Unit, onRemove: () -> Unit, onChange: (TemplateExercise) -> Unit, pending: Boolean = false) {
     val scheme = MaterialTheme.colorScheme
     val group = exercise?.primaryMuscles?.firstOrNull()?.group
     val hue = group?.color() ?: scheme.outline
@@ -261,8 +264,13 @@ private fun EditorCard(index: Int, count: Int, item: TemplateExercise, exercise:
                     Modifier.size(52.dp).align(Alignment.CenterVertically), corner = 10.dp)
                 Column(Modifier.weight(1f).align(Alignment.CenterVertically).clickable(onClickLabel = "调整目标", onClick = onToggle),
                     verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(exercise?.nameZh ?: "已归档动作", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 15.sp),
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(exercise?.nameZh ?: "已归档动作", Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 15.sp),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // An imported exercise this device lacks; it joins the library when the template is saved.
+                        if (pending) Text("待创建", Modifier.border(1.dp, scheme.primary, PixelShapeSmall).padding(horizontal = 5.dp).testTag("pending-exercise-$index"),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = scheme.primary, maxLines = 1)
+                    }
                     TargetChips(item, metric, preferences.weightUnit, hue, tint)
                 }
                 Column(Modifier.align(Alignment.CenterVertically), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -485,6 +493,52 @@ private fun ExactWeightDialog(grams: Long, unit: WeightUnit, onDismiss: () -> Un
             try { val value = WeightUnits.parse(text, unit); WorkoutRules.draft(value, 0); onSave(value) } catch (e: Exception) { error = e.message ?: "重量格式无效" }
         }) { Text("确定") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
+}
+
+/**
+ * New templates only. When the clipboard holds a template copied from FitLog (recognised by its label, which can be
+ * checked without reading the contents) and the editor is still empty, a strip offers it for import; otherwise a key
+ * pastes whatever the clipboard holds, for templates that came through another app and lost the label.
+ */
+@Composable
+private fun ClipboardImport(empty: Boolean, saving: Boolean, onImport: (String) -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val manager = remember(context) { context.getSystemService(android.content.ClipboardManager::class.java) }
+    // Android 10+ only lets the focused window read the clipboard, so check whenever focus returns.
+    val focused = androidx.compose.ui.platform.LocalWindowInfo.current.isWindowFocused
+    var found by remember { mutableStateOf<Pair<String, SharedTemplate>?>(null) }
+    LaunchedEffect(focused, empty) {
+        if (!focused || !empty) return@LaunchedEffect
+        found = runCatching {
+            if (manager?.primaryClipDescription?.label != TemplateTransfer.CLIP_LABEL) null
+            else manager.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
+                ?.let { text -> text to dev.lzk.fitlog.data.TemplateJson.decode(text) }
+        }.getOrNull()
+    }
+    val offer = found?.takeIf { empty }
+    if (offer != null) Surface(Modifier.fillMaxWidth().testTag("clipboard-template"), shape = RoundedCornerShape(14.dp),
+        color = scheme.primaryContainer.copy(alpha = .7f)) {
+        Row(Modifier.padding(start = 12.dp, end = 10.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            LineIcon(Symbol.IMPORT, Modifier.size(16.dp), scheme.primary)
+            Column(Modifier.weight(1f)) {
+                Text("剪贴板中有模板", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, maxLines = 1)
+                Text("「${offer.second.name}」· ${offer.second.exercises.size} 个动作", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            PixelKey(onClick = { onImport(offer.first) }, enabled = !saving, minHeight = 34.dp, modifier = Modifier.testTag("clipboard-import")) {
+                Text("导入", maxLines = 1)
+            }
+        }
+    } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        PixelOutlineKey(onClick = {
+            val text = runCatching { manager?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString() }.getOrNull()
+            onImport(text.orEmpty())
+        }, enabled = !saving, minHeight = 32.dp, modifier = Modifier.testTag("paste-template")) {
+            LineIcon(Symbol.IMPORT, Modifier.size(12.dp), LocalContentColor.current); Text("粘贴导入", maxLines = 1)
+        }
+    }
 }
 
 private fun <T> List<T>.moved(from: Int, to: Int): List<T> =

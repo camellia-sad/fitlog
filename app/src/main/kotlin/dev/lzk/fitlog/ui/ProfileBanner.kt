@@ -7,6 +7,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -203,19 +209,79 @@ internal fun BannerPicker(repository: SocialRepository?, choice: String, imagePa
     }
 }
 
-/** Centre-crops a picked photo to the banner's proportions and re-encodes it at most 1200 px wide. */
-internal fun bannerJpeg(source: ByteArray): ByteArray {
+/** Width : height of the profile banner on a typical phone card (328 × 104 dp); the crop frame uses the same shape. */
+internal const val BANNER_RATIO = 3.15f
+
+/** Cuts [area] (source pixels) out of a picked photo and re-encodes it at most 1200 px wide. */
+internal fun bannerCrop(source: ByteArray, area: androidx.compose.ui.geometry.Rect): ByteArray {
     val bitmap = BitmapFactory.decodeByteArray(source, 0, source.size) ?: error("无法读取这张图片")
     try {
-        val ratio = 3.4f
-        val width = minOf(bitmap.width, (bitmap.height * ratio).toInt())
-        val height = (width / ratio).toInt().coerceIn(1, bitmap.height)
-        val cropped = Bitmap.createBitmap(bitmap, (bitmap.width - width) / 2, (bitmap.height - height) / 2, width, height)
-        val scaled = if (width > 1200) Bitmap.createScaledBitmap(cropped, 1200, (1200 / ratio).toInt(), true) else cropped
+        val left = area.left.roundToInt().coerceIn(0, bitmap.width - 1)
+        val top = area.top.roundToInt().coerceIn(0, bitmap.height - 1)
+        val width = area.width.roundToInt().coerceIn(1, bitmap.width - left)
+        val height = area.height.roundToInt().coerceIn(1, bitmap.height - top)
+        val cropped = Bitmap.createBitmap(bitmap, left, top, width, height)
+        val scaled = if (width > 1200) Bitmap.createScaledBitmap(cropped, 1200, (1200f * height / width).roundToInt().coerceAtLeast(1), true) else cropped
         val output = ByteArrayOutputStream()
         scaled.compress(Bitmap.CompressFormat.JPEG, 85, output)
         if (scaled !== cropped) scaled.recycle()
         if (cropped !== bitmap) cropped.recycle()
         return output.toByteArray()
     } finally { bitmap.recycle() }
+}
+
+/**
+ * Full-screen framing for a banner photo: a fixed [BANNER_RATIO] frame in the middle, the photo dragged and pinched
+ * beneath it. The photo always covers the frame. [onConfirm] receives the framed area in source pixels.
+ */
+@Composable
+internal fun BannerCropper(source: ImageBitmap, onCancel: () -> Unit, onConfirm: (androidx.compose.ui.geometry.Rect) -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onCancel, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xF2080B10)).systemBarsPadding().clipToBounds().testTag("banner-cropper")) {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val areaW = constraints.maxWidth.toFloat(); val areaH = constraints.maxHeight.toFloat()
+            val frameW = areaW - with(density) { 32.dp.toPx() }
+            val frameH = frameW / BANNER_RATIO
+            val frame = Offset((areaW - frameW) / 2, (areaH - frameH) / 2)
+            val iw = source.width.toFloat(); val ih = source.height.toFloat()
+            val minScale = maxOf(frameW / iw, frameH / ih)
+            var scale by remember(source, frameW) { mutableFloatStateOf(minScale) }
+            var offset by remember(source, frameW) { mutableStateOf(Offset((frameW - iw * minScale) / 2, (frameH - ih * minScale) / 2)) }
+            fun clamp(o: Offset, s: Float) = Offset(o.x.coerceIn(frameW - iw * s, 0f), o.y.coerceIn(frameH - ih * s, 0f))
+            Canvas(Modifier.fillMaxSize().pointerInput(source, frameW) {
+                detectTransformGestures { centroid, pan, zoom, _ ->
+                    val next = (scale * zoom).coerceIn(minScale, minScale * 6)
+                    val c = centroid - frame
+                    offset = clamp((offset - c) * (next / scale) + c + pan, next)
+                    scale = next
+                }
+            }) {
+                drawImage(source, IntOffset.Zero, IntSize(source.width, source.height),
+                    dstOffset = IntOffset((frame.x + offset.x).roundToInt(), (frame.y + offset.y).roundToInt()),
+                    dstSize = IntSize((iw * scale).roundToInt(), (ih * scale).roundToInt()), filterQuality = FilterQuality.Medium)
+                val shade = Color.Black.copy(alpha = .6f)
+                drawRect(shade, Offset.Zero, Size(size.width, frame.y))
+                drawRect(shade, Offset(0f, frame.y + frameH), Size(size.width, size.height - frame.y - frameH))
+                drawRect(shade, Offset(0f, frame.y), Size(frame.x, frameH))
+                drawRect(shade, Offset(frame.x + frameW, frame.y), Size(size.width - frame.x - frameW, frameH))
+                drawRect(Color.White, frame, Size(frameW, frameH), style = Stroke(2.dp.toPx()))
+                // Pixel corner ticks mark the frame as the thing to aim with.
+                val t = 4.dp.toPx(); val l = 16.dp.toPx()
+                listOf(frame, Offset(frame.x + frameW, frame.y), Offset(frame.x, frame.y + frameH), Offset(frame.x + frameW, frame.y + frameH)).forEach { p ->
+                    val right = p.x > frame.x; val bottom = p.y > frame.y
+                    drawRect(Color.White, Offset(if (right) p.x - l else p.x, if (bottom) p.y - t else p.y), Size(l, t))
+                    drawRect(Color.White, Offset(if (right) p.x - t else p.x, if (bottom) p.y - l else p.y), Size(t, l))
+                }
+            }
+            Row(Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                PixelOutlineKey(onClick = onCancel, minHeight = 36.dp) { Text("取消", maxLines = 1) }
+                Text("选择背景区域", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 1)
+                PixelKey(onClick = {
+                    onConfirm(androidx.compose.ui.geometry.Rect(-offset.x / scale, -offset.y / scale, (frameW - offset.x) / scale, (frameH - offset.y) / scale))
+                }, minHeight = 36.dp, modifier = Modifier.testTag("banner-crop-use")) { Text("使用", maxLines = 1) }
+            }
+        }
+    }
 }

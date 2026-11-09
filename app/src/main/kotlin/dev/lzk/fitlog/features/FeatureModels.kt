@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.*
 import dev.lzk.fitlog.AppContainer
 import dev.lzk.fitlog.data.JsonBackupRepository
+import dev.lzk.fitlog.data.TemplateJson
 import dev.lzk.fitlog.domain.*
 import java.io.ByteArrayOutputStream
 import java.time.LocalDate
@@ -82,6 +83,43 @@ class TemplateViewModel(container: AppContainer) : FeatureModel(container) {
         } finally { saving.value = false }
     }
 
+    /** Exercises an imported template needs that this device lacks; created only when the template or its draft is kept. */
+    val pendingExercises = MutableStateFlow<Map<String, CustomExerciseDraft>>(emptyMap())
+    /** What the last import did, shown in the editor until it closes. */
+    val importNotice = MutableStateFlow<String?>(null)
+    /** Bumped on each import so the editor rebuilds its text fields from the new draft. */
+    val imports = MutableStateFlow(0)
+
+    /** The clipboard text for a template, in [TemplateJson] form. */
+    fun shareText(template: WorkoutTemplate): String = TemplateJson.encode(TemplateTransfer.share(template, state.value.exercises))
+
+    /**
+     * Fills the open new-template editor (or opens one) from clipboard text. Nothing is saved; a short reason is shown
+     * when the text is not a valid template.
+     */
+    fun importTemplate(text: String) = execute {
+        if (saving.value) return@execute
+        val current = editor.value
+        if (current != null && current.id != null) return@execute
+        val imported = TemplateTransfer.toDraft(TemplateJson.decode(text), container.workouts.observeExercises().first(),
+            container.training.observeTemplates().first())
+        if (current == null) { original = TemplateDraft() }
+        editor.value = imported.draft
+        pendingExercises.value = imported.pending
+        imports.value++
+        message.value = null
+        importNotice.value = if (imported.skipped.isEmpty()) "已导入，保存后生效" else "已导入，本机没有的 ${imported.skipped.size} 个动作已跳过：" + imported.skipped.joinToString("、")
+    }
+
+    /** Creates the pending exercises a draft still uses and points the draft at their new ids. */
+    private suspend fun withCreatedExercises(draft: TemplateDraft): TemplateDraft {
+        val used = draft.exercises.map { it.exerciseId }.filter(TemplateTransfer::isPending).distinct()
+        if (used.isEmpty()) return draft
+        val created = used.associateWith { id -> container.training.createCustomExercise(requireNotNull(pendingExercises.value[id]) { "导入的动作已失效，请重新导入" }) }
+        pendingExercises.value = emptyMap()
+        return draft.copy(exercises = draft.exercises.map { item -> created[item.exerciseId]?.let { item.copy(exerciseId = it) } ?: item })
+    }
+
     fun create() = execute { openEditor(TemplateDraft()) }
     fun edit(template: WorkoutTemplate) = execute {
         openEditor(template.toDraft())
@@ -96,14 +134,14 @@ class TemplateViewModel(container: AppContainer) : FeatureModel(container) {
     fun updateDraft(value: TemplateDraft) {
         if (!saving.value && editor.value != null) editor.value = value
     }
-    fun closeEditor() { if (!saving.value) editor.value = null }
+    fun closeEditor() { if (!saving.value) { editor.value = null; pendingExercises.value = emptyMap(); importNotice.value = null } }
     fun keepDraft() = execute {
         val value = editor.value ?: return@execute
         if (saving.value) return@execute
         saving.value = true
         try {
-            container.training.saveTemplateDraft(value)
-            editor.value = null
+            container.training.saveTemplateDraft(withCreatedExercises(value))
+            editor.value = null; importNotice.value = null
             message.value = "草稿已保留"
         } finally { saving.value = false }
     }
@@ -114,6 +152,7 @@ class TemplateViewModel(container: AppContainer) : FeatureModel(container) {
         try {
             container.training.deleteTemplateDraft(value.id)
             editor.value = null
+            pendingExercises.value = emptyMap(); importNotice.value = null
             message.value = null
         } finally { saving.value = false }
     }
@@ -121,8 +160,10 @@ class TemplateViewModel(container: AppContainer) : FeatureModel(container) {
         if (saving.value || editor.value == null) return@execute
         saving.value = true
         try {
-            SaveTemplateUseCase(container.training)(draft)
-            editor.value = null
+            // Check everything first so a template that cannot be saved does not leave new exercises behind.
+            draft.validate()
+            SaveTemplateUseCase(container.training)(withCreatedExercises(draft))
+            editor.value = null; pendingExercises.value = emptyMap(); importNotice.value = null
             message.value = "模板已保存"
         } finally { saving.value = false }
     }

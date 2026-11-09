@@ -403,7 +403,7 @@ internal fun Modifier.staggered(index: Int) = padding(start = if (index % 2 == 1
 
 @Composable
 internal fun StickyNote(template: WorkoutTemplate, catalog: List<Exercise>, short: String, planned: Boolean, canStart: Boolean, busy: Boolean,
-    onStart: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
+    onStart: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier, onCopy: (() -> Unit)? = null) {
     val scheme = MaterialTheme.colorScheme
     val mix = remember(template, catalog) { template.composition(catalog) }
     val group = mix.firstOrNull()?.group
@@ -442,6 +442,7 @@ internal fun StickyNote(template: WorkoutTemplate, catalog: List<Exercise>, shor
                 PixelButton(onClick = onStart, enabled = canStart, minHeight = 40.dp, modifier = Modifier.weight(1f).testTag("start-template-${template.id}")) {
                     LineIcon(Symbol.PLAY, Modifier.size(13.dp), LocalContentColor.current); Text("开始训练", maxLines = 1)
                 }
+                onCopy?.let { NoteKey(Symbol.COPY, "复制${template.name}", hue, tag = "copy-template-${template.id}", onClick = it) }
                 NoteKey(Symbol.EDIT, "编辑${template.name}", hue, enabled = !busy, tag = "edit-template-${template.id}", onClick = onEdit)
                 NoteKey(Symbol.TRASH, "删除${template.name}", hue, tag = "delete-template-${template.id}", onClick = onDelete)
             }
