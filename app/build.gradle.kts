@@ -16,8 +16,8 @@ android {
         applicationId = "dev.lzk.fitlog"
         minSdk = 26
         targetSdk = 36
-        versionCode = 37
-        versionName = "0.9.8-dev"
+        versionCode = 38
+        versionName = "0.9.9-dev"
         val updateUrl=socialConfig.getProperty("UPDATE_MANIFEST_URL")
             ?: (socialConfig.getProperty("SUPABASE_URL","").trimEnd('/')+"/storage/v1/object/public/fitlog-updates/latest.json")
         buildConfigField("String","UPDATE_MANIFEST_URL","\""+updateUrl.replace("\\","\\\\").replace("\"","\\\"")+"\"")
