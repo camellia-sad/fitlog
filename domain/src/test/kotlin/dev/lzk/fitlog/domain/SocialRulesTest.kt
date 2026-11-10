@@ -15,6 +15,18 @@ class SocialRulesTest {
         org.junit.Assert.assertTrue(ChatTimes.separated(at(9, 9, 0), at(9, 9, 5)))
         org.junit.Assert.assertFalse(ChatTimes.separated(at(9, 9, 0), at(9, 9, 4)))
     }
+    @org.junit.Test fun chatImageFramesFollowTheShapeAndClampExtremes() {
+        fun check(r: Float, w: Float, h: Float) {
+            val (width, height) = ChatImageFrame.size(r, 240f, 320f)
+            org.junit.Assert.assertEquals(w, width, .01f); org.junit.Assert.assertEquals(h, height, .01f)
+        }
+        check(9f / 16f, 180f, 320f)    // portrait: full height, narrow
+        check(4f / 3f, 240f, 180f)     // landscape: full width
+        check(1f, 240f, 240f)
+        check(1f / 10f, 144f, 320f)    // long screenshot: its middle part
+        check(6f, 240f, 100f)          // panorama: its middle part
+        check(Float.NaN, 240f, 240f)
+    }
     @org.junit.Test fun statusLineNamesTheExerciseOnlyWhileTraining() {
         val profile = SocialProfile("p", "f", "阿杰")
         val live = LiveTraining(exercise = "杠铃卧推", weightGrams = 60_000, reps = 8, done = 2, total = 4)

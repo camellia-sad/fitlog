@@ -106,6 +106,21 @@ object ChatTimes {
     fun separated(earlier: Instant, later: Instant) = java.time.Duration.between(earlier, later) >= GAP
 }
 
+/**
+ * The frame a chat picture gets: the picture's own shape, so the bubble hugs it, within a maximum width and height.
+ * Very tall or very wide pictures are held to [MIN_RATIO]..[MAX_RATIO] and show their middle part.
+ */
+object ChatImageFrame {
+    const val MIN_RATIO = 9f / 20f
+    const val MAX_RATIO = 2.4f
+    /** Width and height in the caller's units for a picture of [ratio] (width / height). */
+    fun size(ratio: Float, maxWidth: Float, maxHeight: Float): Pair<Float, Float> {
+        val r = if (ratio.isFinite() && ratio > 0f) ratio.coerceIn(MIN_RATIO, MAX_RATIO) else 1f
+        val width = minOf(maxWidth, maxHeight * r)
+        return width to width / r
+    }
+}
+
 /** What a friend is doing, for the chat header: status alone, or status with the current exercise, set and progress. */
 fun SocialPerson.statusLine(): String {
     val training = live?.takeIf { status in setOf(PresenceStatus.TRAINING, PresenceStatus.REST, PresenceStatus.PAUSED) && it.exercise.isNotBlank() }

@@ -54,7 +54,7 @@ internal object KeptImages {
 }
 
 @Composable internal fun SocialImage(repository:SocialRepository,path:String,modifier:Modifier=Modifier,avatar:Boolean=false,previewEnabled:Boolean=true,gallery:List<String> = listOf(path),fullSize:Boolean=false,onLongClick:(()->Unit)?=null,
-    contentScale:ContentScale?=null,keep:Boolean=false,fallback:@Composable ()->Unit={Text("…",style=MaterialTheme.typography.labelSmall)}) {
+    contentScale:ContentScale?=null,keep:Boolean=false,onAspect:((Float)->Unit)?=null,fallback:@Composable ()->Unit={Text("…",style=MaterialTheme.typography.labelSmall)}) {
     // Avatars and kept images (banners) are cached so a page's exit animation never falls back to a placeholder.
     fun cached(key:String)=if(avatar) AvatarImages.get(key) else if(keep) KeptImages.get(key) else null
     var preview by remember(path){mutableStateOf(false)}
@@ -67,6 +67,8 @@ internal object KeptImages {
     val cacheKey=System.identityHashCode(repository).toString()+":"+account+":"+path
     var bitmap by remember(cacheKey) { mutableStateOf(cached(cacheKey)) }
     var failed by remember(cacheKey) { mutableStateOf(false) }
+    // Width / height once known, so a chat bubble can take the picture's shape.
+    val aspect by rememberUpdatedState(onAspect)
     LaunchedEffect(repository,path,lifecycle,cacheKey) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             try {
@@ -82,6 +84,7 @@ internal object KeptImages {
                     BitmapFactory.decodeByteArray(bytes,0,bytes.size,options)
                 }
                 bitmap?.let {if(avatar) AvatarImages.put(cacheKey,it) else if(keep) KeptImages.put(cacheKey,it)}
+                bitmap?.let {if(it.height>0) aspect?.invoke(it.width.toFloat()/it.height)}
                 awaitCancellation()
             } catch(e:CancellationException) {throw e}
             catch(_:Exception) { failed=true }

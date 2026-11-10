@@ -76,6 +76,29 @@ class MediaSharingFlowTest {
         compose.waitUntil(15_000){compose.onAllNodesWithContentDescription("图片").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("图片").performClick();waitText("关闭大图")
     }
+    @Test fun chatPicturesTakeTheirOwnShapeAndLongOnesShowTheirMiddle() {
+        var current by mutableStateOf("")
+        compose.setContent {FitLogTheme {key(current){if(current.isNotEmpty()) ChatScreen(fake,fake.me,Friend(fake.peer,"",true,false),emptyList(),{},{})}}}
+        fun frame(path:String):androidx.compose.ui.unit.DpRect {
+            fake.rows=listOf(ChatMessage(path,fake.peer.id,fake.me.id,"",Instant.now(),mediaPath=path))
+            compose.runOnIdle {current=path}
+            // The frame starts square and takes the picture's shape once it has loaded.
+            compose.waitUntil(15_000){compose.onAllNodesWithTag("chat-picture").fetchSemanticsNodes().singleOrNull()
+                ?.let{node->with(compose.density){(node.boundsInRoot.height.toDp()-320.dp).value}>-1f} ?: false}
+            return compose.onNodeWithTag("chat-picture").getUnclippedBoundsInRoot()
+        }
+        val portrait=Bitmap.createBitmap(90,160,Bitmap.Config.ARGB_8888).apply{eraseColor(android.graphics.Color.GREEN)}
+        fake.imageBytes=ByteArrayOutputStream().also{portrait.compress(Bitmap.CompressFormat.PNG,100,it)}.toByteArray()
+        val tall=frame("portrait")
+        assertEquals(180f,(tall.right-tall.left).value,2f);assertEquals(320f,(tall.bottom-tall.top).value,2f)
+        // 40 × 120 is longer than 9:20, so it is held to that shape and its middle is shown.
+        picture()
+        val long=frame("long")
+        assertEquals(144f,(long.right-long.left).value,2f);assertEquals(320f,(long.bottom-long.top).value,2f)
+        val pixels=compose.onNodeWithTag("chat-picture").captureToImage().toPixelMap()
+        val middle=pixels[pixels.width/2,pixels.height/2]
+        assertTrue(middle.green>0.9f && middle.red<0.1f)
+    }
     @Test fun workoutSharingRequiresExplicitPublishAndDoesNotEnableHistorySharing() {
         var visible by mutableStateOf(true)
         var published=false

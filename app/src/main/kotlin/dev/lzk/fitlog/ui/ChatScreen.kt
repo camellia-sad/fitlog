@@ -196,7 +196,7 @@ fun ChatScreen(repository:SocialRepository,me:SocialProfile,friend:Friend,friend
                                             if(selecting) toggle() else shownTime=if(shownTime==message.id) null else message.id
                                         },onLongClick={if(!selecting) menu=message}).testTag("bubble-${message.id}"),
                                         image=message.mediaPath!=null && message.body.isBlank() && message.replyId==null && message.forwarded.isEmpty()) {
-                                        MessageContent(repository,message,mine,messages,onLocate={locate=it},onMenu={menu=message})
+                                        MessageContent(repository,message,mine,messages,widest,onLocate={locate=it},onMenu={menu=message})
                                     }
                                     if(menu?.id==message.id) MessageActions(mine,message,onDismiss={menu=null},onAction={action->
                                         menu=null
@@ -276,11 +276,12 @@ private val BubbleText @Composable get()=MaterialTheme.typography.bodyLarge.copy
         else RoundedCornerShape(if(top)big else small,big,big,if(bottom)big else small)
     Column(Modifier.widthIn(max=widest).clip(shape).background(if(mine)scheme.primary else scheme.surface)
         .then(if(highlight) Modifier.border(2.dp,fitColors.orange,shape) else if(!mine) Modifier.border(1.dp,scheme.outlineVariant,shape) else Modifier)
-        .then(modifier).padding(if(image) PaddingValues(4.dp) else PaddingValues(horizontal=13.dp,vertical=9.dp)),
+        .then(modifier).padding(if(image) PaddingValues(0.dp) else PaddingValues(horizontal=13.dp,vertical=9.dp)),
         verticalArrangement=Arrangement.spacedBy(6.dp),content=content)
 }
 
-@Composable private fun MessageContent(repository:SocialRepository,message:ChatMessage,mine:Boolean,messages:List<ChatMessage>,onLocate:(String)->Unit,onMenu:()->Unit) {
+@Composable private fun MessageContent(repository:SocialRepository,message:ChatMessage,mine:Boolean,messages:List<ChatMessage>,widest:androidx.compose.ui.unit.Dp,
+    onLocate:(String)->Unit,onMenu:()->Unit) {
     val scheme=MaterialTheme.colorScheme
     val ink=if(mine)scheme.onPrimary else scheme.onSurface
     message.replyId?.let {original->
@@ -293,7 +294,8 @@ private val BubbleText @Composable get()=MaterialTheme.typography.bodyLarge.copy
         }
     }
     if(message.body.isNotBlank()) Text(message.body,style=BubbleText,color=ink)
-    message.mediaPath?.let {SocialImage(repository,it,Modifier.widthIn(max=230.dp).fillMaxWidth().height(160.dp).clip(RoundedCornerShape(16.dp)),onLongClick=onMenu)}
+    val alone=message.body.isBlank() && message.replyId==null && message.forwarded.isEmpty()
+    message.mediaPath?.let {ChatPicture(repository,it,alone,minOf(widest,240.dp),onMenu)}
     if(message.forwarded.isNotEmpty()) Column(Modifier.widthIn(min=180.dp),verticalArrangement=Arrangement.spacedBy(2.dp)) {
         Text("聊天记录",style=MaterialTheme.typography.titleSmall.copy(fontWeight=FontWeight.Bold),color=ink)
         message.forwarded.take(4).forEach {part->
@@ -303,6 +305,29 @@ private val BubbleText @Composable get()=MaterialTheme.typography.bodyLarge.copy
         HorizontalDivider(Modifier.padding(top=4.dp),color=ink.copy(alpha=.2f))
         Text("聊天记录 · ${message.forwarded.size} 条",style=MaterialTheme.typography.labelSmall,color=ink.copy(alpha=.65f))
     }
+}
+
+/** Picture shapes already seen, so a picture shown again gets its frame at once instead of after loading. */
+private object ChatImageRatios {
+    private val ratios=android.util.LruCache<String,Float>(500)
+    fun get(path:String):Float?=ratios.get(path)
+    fun put(path:String,ratio:Float){ratios.put(path,ratio)}
+}
+
+/**
+ * A picture framed to its own shape ([ChatImageFrame]): portrait pictures get a narrow, tall frame and landscape ones
+ * a wide, short one, so the bubble hugs the picture. Alone in a bubble it fills it edge to edge; beside text or a quote
+ * it has its own rounded corners. Until its shape is known it holds a square.
+ */
+@Composable private fun ChatPicture(repository:SocialRepository,path:String,alone:Boolean,maxWidth:androidx.compose.ui.unit.Dp,onMenu:()->Unit) {
+    var ratio by remember(path) {mutableStateOf(ChatImageRatios.get(path))}
+    val (width,height)=ChatImageFrame.size(ratio ?: 1f,maxWidth.value,320f)
+    SocialImage(repository,path,Modifier.size(width.dp,height.dp).then(if(alone) Modifier else Modifier.clip(RoundedCornerShape(16.dp)))
+        .background(MaterialTheme.colorScheme.surfaceVariant).testTag("chat-picture"),
+        contentScale=androidx.compose.ui.layout.ContentScale.Crop,onLongClick=onMenu,onAspect={value->
+            if(ChatImageRatios.get(path)!=value) ChatImageRatios.put(path,value)
+            ratio=value
+        })
 }
 
 /** A dark bar of actions just above the long-pressed bubble (below it when there is no room). */
