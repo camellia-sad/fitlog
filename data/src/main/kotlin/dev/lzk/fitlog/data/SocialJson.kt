@@ -17,7 +17,8 @@ internal fun JSONObject.chatMessage()=ChatMessage(getString("id"),getString("sen
     },optBoolean("withdrawn"))
 internal fun JSONObject.post()=SocialPost(getString("id"),getString("owner_id"),optString("nickname"),
     optional("avatar_path"),optString("body"),(optJSONArray("media_paths")?:JSONArray()).strings(),
-    requireNotNull(getString("created_at").toSocialInstant()),optInt("like_count"),optBoolean("liked"),optInt("comment_count"),optString("fitlog_id"))
+    requireNotNull(getString("created_at").toSocialInstant()),optInt("like_count"),optBoolean("liked"),optInt("comment_count"),optString("fitlog_id"),
+    PostWorkoutJson.decode(optJSONObject("workout")))
 internal fun JSONObject.socialProfile()=SocialProfile(getString("id"),getString("fitlog_id"),getString("nickname"),
     optString("bio"),optional("avatar_path"),optional("banner"))
 internal fun LiveTraining.toJson()=JSONObject().put("session_id",sessionId).put("label",label).put("exercise",exercise)

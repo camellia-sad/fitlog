@@ -250,7 +250,7 @@ class SupabaseSocialRepository(
         val old=cache.dao().posts(owner).associateBy {it.id}
         cache.dao().putPosts(posts.filter {it.ownerId==owner && old[it.id]?.hidden!=true}.map {p->
             LocalPostEntity(owner,p.id,JSONObject().put("id",p.id).put("body",p.body).put("created_at",p.createdAt.toString())
-                .put("media_paths",JSONArray(p.mediaPaths)).toString())
+                .put("media_paths",JSONArray(p.mediaPaths)).apply {p.workout?.let {put("workout",PostWorkoutJson.encode(it))}}.toString())
         })
         return posts
     }
@@ -265,7 +265,7 @@ class SupabaseSocialRepository(
             try {
                 val j=JSONObject(row.json)
                 SocialPost(j.getString("id"),me.id,me.nickname,me.avatarPath,j.optString("body"),(j.optJSONArray("media_paths")?:JSONArray()).strings(),
-                    Instant.parse(j.getString("created_at")),0,false,0,me.fitlogId)
+                    Instant.parse(j.getString("created_at")),0,false,0,me.fitlogId,PostWorkoutJson.decode(j.optJSONObject("workout")))
             } catch(_:Exception) {null}
         }.sortedWith(compareByDescending<SocialPost> {it.createdAt}.thenByDescending {it.id})
     }
@@ -299,8 +299,12 @@ class SupabaseSocialRepository(
         SocialRules.post(draft)
         val owner=requireProfileId()
         rpc("social_feed",JSONObject().put("p_action","publish").put("p_id",draft.id).put("p_body",draft.body).put("p_media",JSONArray(draft.mediaPaths)),owner)
+        // The training card rides on a second call so older servers and apps keep working with the text alone.
+        val card=draft.workout?.let(PostWorkoutJson::encode)
+        if(card!=null) try {rpc("social_post_workout",JSONObject().put("p_id",draft.id).put("p_workout",card),owner)}
+            catch(e:kotlinx.coroutines.CancellationException) {throw e} catch(_:Exception) {}
         cache.dao().putPosts(listOf(LocalPostEntity(owner,draft.id,JSONObject().put("id",draft.id).put("body",draft.body)
-            .put("created_at",Instant.now().toString()).put("media_paths",JSONArray(draft.mediaPaths)).toString())))
+            .put("created_at",Instant.now().toString()).put("media_paths",JSONArray(draft.mediaPaths)).apply {card?.let {put("workout",it)}}.toString())))
     }
     override suspend fun deletePost(id:String) = deleteOwnPost(id,inCloud=true)
     override suspend fun like(id:String,liked:Boolean) {rpc("social_feed",JSONObject().put("p_action",if(liked)"like" else "unlike").put("p_id",id))}

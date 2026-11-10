@@ -52,7 +52,7 @@ internal class FakeSocial:FriendsRepository,SocialRepository {
     override suspend fun markRead(peerId:String){}
     override suspend fun forward(peerId:String,ids:List<String>,requestId:String):ChatMessage {lastForward=ids;return send(peerId,MessageDraft(requestId,"转发"))}
     override suspend fun feed(ownerId:String?,before:SocialCursor?):List<SocialPost> {check(!offline){"网络暂不可用"};return posts}
-    override suspend fun publish(draft:PostDraft){posts=listOf(SocialPost(draft.id,me.id,me.nickname,null,draft.body,draft.mediaPaths,Instant.now(),0,false,0))+posts}
+    override suspend fun publish(draft:PostDraft){posts=listOf(SocialPost(draft.id,me.id,me.nickname,null,draft.body,draft.mediaPaths,Instant.now(),0,false,0,workout=draft.workout))+posts}
     override suspend fun deletePost(id:String){posts=posts.filterNot{it.id==id}}
     var archive=listOf<SocialPost>()
     var offline=false

@@ -24,6 +24,18 @@ class WorkoutSharingTest {
         assertFalse(text.contains("999"));assertFalse(text.contains("888"))
         assertTrue(text.contains("2 分钟"))
     }
+    @Test fun cardCarriesOnlyCompletedSetsTheMuscleAndRecords() {
+        val catalog=listOf(Exercise("bench","卧推","Bench",EquipmentType.BARBELL,setOf(Muscle.CHEST)))
+        val card=workout().postWorkout(catalog,mapOf("done" to 20_000L),WeightUnit.KG,caption="冲",feeling="不错")
+        val row=card.exercises.single()
+        assertEquals(listOf(PostSet(22500,10)),row.sets)
+        assertEquals(Muscle.CHEST,row.muscle)
+        assertEquals(20_000L,row.previousBest)
+        assertEquals(225_000L,card.volumeGrams)
+        assertEquals(1,card.completedSets);assertEquals(3,card.totalSets);assertFalse(card.finished)
+        assertEquals("自",card.stamp)
+        assertEquals("冲",card.caption);assertEquals("不错",card.feeling);assertEquals(2,card.minutes)
+    }
     @Test fun postIsBoundedAndActiveWorkoutCannotBeShared() {
         assertTrue(workout().socialPostText("很".repeat(8000)).length<=4000)
         val active=workout().copy(session=workout().session.copy(status=SessionStatus.ACTIVE))

@@ -297,7 +297,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
             onPublished={
                 sharingWorkout=null;model.dismissSummary()
                 shareScope.launch {snackbars.showSnackbar("已分享到动态")}
-            })
+            },catalog=templateState.exercises,loadRecords=model::recordsFor)
     }
     }
 }

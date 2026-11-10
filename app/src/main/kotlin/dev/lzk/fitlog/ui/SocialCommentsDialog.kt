@@ -17,6 +17,9 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import dev.lzk.fitlog.domain.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
@@ -110,65 +113,66 @@ private const val COMMENT_PAGE=50
     ModalBottomSheet(onDismissRequest=onClose,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),
         containerColor=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(topStart=28.dp,topEnd=28.dp)) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.88f).imePadding().padding(horizontal=16.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                Text("评论",Modifier.weight(1f),style=MaterialTheme.typography.headlineSmall)
-                Text(post.commentCount.toString()+" 条",color=ActivityAmber,style=MaterialTheme.typography.labelLarge)
-                IconButton(onClick=onClose){Text("×",Modifier.semanticsLabel("关闭评论"),style=MaterialTheme.typography.headlineSmall)}
+            Row(Modifier.padding(bottom=6.dp),verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                Text("评论",style=MaterialTheme.typography.titleLarge.copy(fontWeight=FontWeight.Black))
+                Text(post.commentCount.toString(),Modifier.weight(1f).padding(bottom=2.dp),style=pixelNumber(21.sp),color=MaterialTheme.colorScheme.onSurfaceVariant)
+                SquareKey(Symbol.CLOSE,"关闭评论",size=34.dp,onClick=onClose)
             }
+            HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
             error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
             if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
             LazyColumn(Modifier.weight(1f).testTag("activity-comments"),state=state,contentPadding=PaddingValues(vertical=12.dp)) {
-                if(comments.isEmpty() && !busy)item {Text("还没有评论，留下第一份鼓励吧。",color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                if(comments.isEmpty() && !busy)item {Text("还没有评论",Modifier.padding(8.dp),color=MaterialTheme.colorScheme.onSurfaceVariant)}
                 comments.forEach {comment->
                     item(key=comment.id) {
-                        CommentRow(repository,comment,me,busy,highlighted==comment.id,onPerson={onClose();onPerson(comment.ownerId)},
+                        CommentRow(repository,comment,me,busy,highlighted==comment.id,author=comment.ownerId==post.ownerId,onPerson={onClose();onPerson(comment.ownerId)},
                             onReply={target=comment;focus.requestFocus()},onDelete={deleting=comment})
                     }
                     if(comment.replyCount>0)item(key="toggle:"+comment.id) {
-                        TextButton(onClick={
+                        ThreadToggle(if(comment.id in expanded)"收起回复" else "展开 ${comment.replyCount} 条回复",!busy) {
                             if(comment.id in expanded)expanded=expanded-comment.id
                             else launch{loadReplies(comment.id);expanded=expanded+comment.id}
-                        },enabled=!busy,modifier=Modifier.padding(start=42.dp)) {
-                            Text(if(comment.id in expanded)"收起回复" else "展开 ${comment.replyCount} 条回复",style=MaterialTheme.typography.labelMedium)
                         }
                     }
                     if(comment.id in expanded) {
                         replies[comment.id].orEmpty().forEach {reply->
                             item(key=reply.id) {
-                                Row(Modifier.padding(start=32.dp)) {
-                                    Spacer(Modifier.width(2.dp).heightIn(min=80.dp).background(MaterialTheme.colorScheme.primary.copy(alpha=.5f)))
+                                Row(Modifier.padding(start=42.dp).height(IntrinsicSize.Min)) {
+                                    Box(Modifier.width(2.dp).fillMaxHeight().background(MaterialTheme.colorScheme.primaryContainer))
                                     CommentRow(repository,reply,me,busy,highlighted==reply.id,
-                                        Modifier.weight(1f).background(MaterialTheme.colorScheme.primary.copy(alpha=.05f)).padding(start=10.dp),
+                                        Modifier.weight(1f).padding(start=8.dp),author=reply.ownerId==post.ownerId,
                                         onPerson={onClose();onPerson(reply.ownerId)},onReply={target=reply;focus.requestFocus()},onDelete={deleting=reply})
                                 }
                             }
                         }
                         if(comment.id in moreReplies)item(key="more:"+comment.id) {
-                            TextButton(onClick={launch {
+                            ThreadToggle("更多回复",!busy) {launch {
                                 val page=repository.replies(post.id,comment.id,cursors[comment.id])
                                 replies=replies+(comment.id to (replies[comment.id].orEmpty()+page).distinctBy{it.id}.sortedWith(compareBy({it.createdAt},{it.id})).takeLast(150))
                                 cursors=cursors+(comment.id to page.lastOrNull()?.cursor)
                                 moreReplies=if(page.size==COMMENT_PAGE)moreReplies else moreReplies-comment.id
-                            }},enabled=!busy,modifier=Modifier.padding(start=42.dp)){Text("更多回复")}
+                            }}
                         }
                     }
                 }
-                if(more)item(key="older"){TextButton(onClick={launch {
+                if(more)item(key="older"){ThreadToggle("更早评论",!busy,start=0.dp){launch {
                     val page=repository.comments(post.id,comments.filter{it.id!=focusContext?.root?.id}.lastOrNull()?.cursor ?: comments.lastOrNull()?.cursor)
                     comments=(comments+page).distinctBy{it.id}.takeLast(100);more=page.size==COMMENT_PAGE
-                }},enabled=!busy){Text("更早评论")}}
+                }}}
             }
             HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
             target?.let{reply->
-                Row(verticalAlignment=Alignment.CenterVertically) {
-                    OneLineText("正在回复 @"+reply.nickname,Modifier.weight(1f),style=MaterialTheme.typography.labelMedium)
-                    TextButton(onClick={target=null}){Text("取消回复",style=MaterialTheme.typography.labelMedium)}
+                Row(Modifier.fillMaxWidth().padding(top=8.dp).background(MaterialTheme.colorScheme.surfaceVariant,RoundedCornerShape(12.dp))
+                    .padding(start=12.dp,end=4.dp,top=4.dp,bottom=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    LineIcon(Symbol.REPLY,Modifier.size(12.dp),MaterialTheme.colorScheme.primary)
+                    OneLineText("正在回复 @"+reply.nickname,Modifier.weight(1f),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    SquareKey(Symbol.CLOSE,"取消回复",size=28.dp){target=null}
                 }
             }
             Row(Modifier.padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(text,{text=it.take(1000)},placeholder={Text(if(target==null)"留下一点鼓励…" else "回复 @"+target!!.nickname)},
-                    maxLines=4,shape=RoundedCornerShape(14.dp),modifier=Modifier.weight(1f).focusRequester(focus))
-                FilledTonalButton(onClick={launch {
+                OutlinedTextField(text,{text=it.take(1000)},placeholder={Text(if(target==null)"写评论" else "回复 @"+target!!.nickname)},
+                    maxLines=4,shape=RoundedCornerShape(22.dp),modifier=Modifier.weight(1f).focusRequester(focus))
+                PixelKey(onClick={launch {
                     val reply=target
                     val sentId=id
                     val sentText=text.trim()
@@ -186,7 +190,8 @@ private const val COMMENT_PAGE=50
                         highlighted=sentId
                     }
                     onChanged(1)
-                }},enabled=!busy && text.isNotBlank(),contentPadding=PaddingValues(horizontal=14.dp)){Text("发送")}
+                }},enabled=!busy && text.isNotBlank(),minHeight=44.dp,minWidth=44.dp,contentPadding=PaddingValues(0.dp),
+                    modifier=Modifier.semanticsLabel("发送").testTag("comment-send")){LineIcon(Symbol.SEND,Modifier.size(15.dp),LocalContentColor.current)}
             }
         }
     }
@@ -197,31 +202,47 @@ private const val COMMENT_PAGE=50
 }
 
 @Composable private fun CommentRow(repository:SocialRepository,comment:SocialComment,me:SocialProfile,busy:Boolean,highlighted:Boolean,
-    modifier:Modifier=Modifier,onPerson:()->Unit,onReply:()->Unit,onDelete:()->Unit) {
+    modifier:Modifier=Modifier,author:Boolean=false,onPerson:()->Unit,onReply:()->Unit,onDelete:()->Unit) {
     val color=MaterialTheme.colorScheme
     Row(modifier.fillMaxWidth().background(if(highlighted)color.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
-        RoundedCornerShape(12.dp)).padding(vertical=10.dp,horizontal=4.dp),horizontalArrangement=Arrangement.spacedBy(9.dp)) {
-        Surface(onClick=onPerson,shape=androidx.compose.foundation.shape.CircleShape,color=color.primaryContainer,modifier=Modifier.size(if(comment.parentId==null)36.dp else 30.dp)) {
-            if(comment.avatarPath!=null)SocialImage(repository,requireNotNull(comment.avatarPath),Modifier.fillMaxSize(),avatar=true){Text(comment.nickname.take(1))}
-            else Box(contentAlignment=Alignment.Center){Text(comment.nickname.take(1))}
-        }
-        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-            Text(comment.nickname,Modifier.clickable(onClick=onPerson),style=MaterialTheme.typography.titleSmall,color=color.onSurface)
-            if(comment.fitlogId.isNotBlank())Text("ID · "+comment.fitlogId,style=MaterialTheme.typography.labelSmall,color=color.onSurfaceVariant)
+        RoundedCornerShape(14.dp)).padding(vertical=10.dp,horizontal=6.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+        SocialAvatar(repository,SocialProfile(comment.ownerId,comment.fitlogId,comment.nickname,avatarPath=comment.avatarPath),
+            size=if(comment.parentId==null)36.dp else 30.dp,onClick=onPerson)
+        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                Text(comment.nickname,Modifier.weight(1f,fill=false).clickable(onClick=onPerson),style=MaterialTheme.typography.titleSmall.copy(fontWeight=FontWeight.ExtraBold),
+                    color=color.onSurface,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                if(author)Text("作者",Modifier.background(color.primary,PixelShapeSmall).padding(horizontal=5.dp),
+                    style=MaterialTheme.typography.labelSmall.copy(fontWeight=FontWeight.ExtraBold),color=color.onPrimary,maxLines=1)
+                Spacer(Modifier.weight(1f))
+                Text(ChatTimes.label(comment.createdAt),style=MaterialTheme.typography.labelSmall,color=color.onSurfaceVariant.copy(alpha=.75f),maxLines=1)
+            }
             if(comment.deleted)Text("该评论已删除",style=MaterialTheme.typography.bodyMedium,color=color.onSurfaceVariant)
             else Text(buildAnnotatedString {
-                comment.replyToNickname?.let{withStyle(SpanStyle(color=ActivityLavender)){append("@$it ")}}
+                comment.replyToNickname?.let{withStyle(SpanStyle(color=color.primary,fontWeight=FontWeight.Bold)){append("@$it ")}}
                 append(comment.body)
-            },style=MaterialTheme.typography.bodyMedium)
-            if(!comment.deleted)FlowRow(horizontalArrangement=Arrangement.spacedBy(14.dp),verticalArrangement=Arrangement.Center) {
-                Text(comment.createdAt.socialTime(),style=MaterialTheme.typography.labelMedium,color=color.onSurfaceVariant,modifier=Modifier.padding(vertical=12.dp))
-                TextButton(onClick=onReply,enabled=!busy,contentPadding=PaddingValues(0.dp)){Text("回复",style=MaterialTheme.typography.labelMedium)}
-                if(comment.ownerId==me.id)TextButton(onClick=onDelete,enabled=!busy,contentPadding=PaddingValues(0.dp),
-                    colors=ButtonDefaults.textButtonColors(contentColor=if(color.surface.luminanceCompat()<.5f)ActivityCoral else color.error)) {
-                    Text("删除",style=MaterialTheme.typography.labelMedium)
-                }
+            },style=MaterialTheme.typography.bodyMedium.copy(fontSize=14.5.sp,lineHeight=22.sp))
+            if(!comment.deleted)Row(Modifier.padding(top=2.dp),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                CommentChip(Symbol.REPLY,"回复",color.surfaceVariant,color.onSurfaceVariant,!busy,onReply)
+                if(comment.ownerId==me.id)CommentChip(Symbol.TRASH,"删除",color.errorContainer.copy(alpha=.6f),color.error,!busy,onDelete)
             }
         }
     }
 }
-private fun androidx.compose.ui.graphics.Color.luminanceCompat()=(red+green+blue)/3
+
+@Composable private fun CommentChip(symbol:Symbol,label:String,fill:androidx.compose.ui.graphics.Color,ink:androidx.compose.ui.graphics.Color,enabled:Boolean,onClick:()->Unit) {
+    Row(Modifier.clip(RoundedCornerShape(14.dp)).background(fill).clickable(enabled=enabled,onClick=onClick).heightIn(min=28.dp).padding(horizontal=10.dp),
+        verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)) {
+        LineIcon(symbol,Modifier.size(11.dp),ink)
+        Text(label,style=MaterialTheme.typography.labelMedium.copy(fontWeight=FontWeight.Bold),color=ink)
+    }
+}
+
+/** “展开回复” and friends: a short teal lead line, then the label. */
+@Composable private fun ThreadToggle(label:String,enabled:Boolean,start:androidx.compose.ui.unit.Dp=52.dp,onClick:()->Unit) {
+    Row(Modifier.padding(start=start).clip(RoundedCornerShape(15.dp)).clickable(enabled=enabled,onClick=onClick).heightIn(min=32.dp).padding(horizontal=8.dp),
+        verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+        Box(Modifier.width(18.dp).height(2.dp).background(MaterialTheme.colorScheme.primary.copy(alpha=.5f)))
+        Text(label,style=MaterialTheme.typography.labelMedium.copy(fontWeight=FontWeight.ExtraBold),color=MaterialTheme.colorScheme.primary)
+    }
+}

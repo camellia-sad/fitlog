@@ -22,6 +22,8 @@ class ActivityV5FlowTest {
     private val reply=SocialComment("deep",fake.peer.id,"搭子","准确定位的旧回复",at.plusSeconds(70),parentId="root",replyToNickname="我")
     @After fun close(){compose.activityRule.scenario.close()}
     private fun waitText(text:String)=compose.waitUntil(15_000){compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()}
+    private fun inbox(count:Int)=hasTestTag("reply-inbox-head") and hasText("$count")
+    private fun waitInbox(count:Int)=compose.waitUntil(15_000){compose.onAllNodes(inbox(count)).fetchSemanticsNodes().isNotEmpty()}
     private fun seed(count:Int) {
         fake.posts=listOf(post)
         fake.notices=(0 until count).map{ReplyNotice(reply.copy(id=if(it==0)"deep" else "n$it"),post.id,post.body)}
@@ -32,9 +34,9 @@ class ActivityV5FlowTest {
     }
     private fun show(){compose.setContent{FitLogTheme(darkTheme=true){SocialTimelineScreen(fake,fake.me,onBack={},onPerson={})}}}
     @Test fun inlineLocatesOldReplyAndMarksReadOnlyAfterVisible() {
-        seed(1);show();waitText("1 条新回复")
+        seed(1);show();waitInbox(1)
         assertEquals(1,fake.notices.size)
-        compose.onNodeWithText("1 条新回复").performClick()
+        compose.onNode(inbox(1)).performClick()
         compose.onNodeWithText("准确定位的旧回复").performClick()
         waitText("@我 准确定位的旧回复")
         compose.onNodeWithText("@我 准确定位的旧回复").assertIsDisplayed()
@@ -42,28 +44,28 @@ class ActivityV5FlowTest {
         compose.onNodeWithContentDescription("关闭评论").performClick()
         compose.onNodeWithText("动态详情").assertExists()
         compose.onNodeWithContentDescription("返回").performClick()
-        compose.onNodeWithText("1 条新回复").assertDoesNotExist()
+        compose.onNodeWithTag("reply-inbox-head").assertDoesNotExist()
     }
     @Test fun fourUsesPageThenThreeUsesInline() {
-        seed(4);show();waitText("4 条新回复")
-        compose.onNodeWithText("4 条新回复").performClick()
+        seed(4);show();waitInbox(4)
+        compose.onNode(inbox(4)).performClick()
         waitText("回复消息")
         compose.onAllNodesWithText("准确定位的旧回复")[0].performClick()
         waitText("@我 准确定位的旧回复")
         compose.waitUntil(15_000){fake.notices.size==3}
         compose.onNodeWithContentDescription("关闭评论").performClick()
         compose.onNodeWithContentDescription("返回").performClick()
-        waitText("3 条新回复")
-        compose.onNodeWithText("3 条新回复").performClick()
+        waitInbox(3)
+        compose.onNode(inbox(3)).performClick()
         compose.onNodeWithText("回复消息").assertDoesNotExist()
         compose.onAllNodesWithText("准确定位的旧回复").assertCountEquals(3)
     }
     @Test fun unavailableTargetStaysUnreadAndLikeUsesRepository() {
-        seed(1);fake.contexts=emptyMap();show();waitText("1 条新回复")
+        seed(1);fake.contexts=emptyMap();show();waitInbox(1)
         compose.onNodeWithContentDescription("点赞").performClick()
         compose.waitUntil(15_000){fake.likedValue==true}
         compose.onNodeWithContentDescription("取消点赞").assertIsSelected()
-        compose.onNodeWithText("1 条新回复").performClick()
+        compose.onNode(inbox(1)).performClick()
         compose.onNodeWithText("准确定位的旧回复").performClick()
         waitText("原动态或回复已删除或不可访问")
         assertEquals(1,fake.notices.size)
@@ -85,27 +87,27 @@ class ActivityV5FlowTest {
     @Test fun previewAndKeyboardKeepComposerVisible() {
         seed(3);fake.commentRows=listOf(root.copy(replyCount=0))
         show();waitText(post.body)
-        compose.onNodeWithText("3 条新回复").performClick()
+        compose.onNode(inbox(3)).performClick()
         val image=compose.onRoot().captureToImage()
         val path=java.io.File(compose.activity.filesDir,"activity-v5-preview.png")
         java.io.FileOutputStream(path).use{image.asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
         compose.onNodeWithContentDescription("查看评论").performClick()
         waitText("原评论")
         compose.onNode(hasSetTextAction()).performClick().performTextInput("键盘下的评论")
-        compose.onNodeWithText("发送").assertIsDisplayed()
-        compose.onNodeWithText("发送").performClick()
+        compose.onNodeWithContentDescription("发送").assertIsDisplayed()
+        compose.onNodeWithContentDescription("发送").performClick()
         compose.waitUntil(15_000){fake.lastComment!=null}
         assertEquals("键盘下的评论",fake.lastComment!!.first)
     }
 
     @Test fun sendingIntoLongThreadShowsNewReplyWithoutLoadingEveryPage() {
-        seed(1);show();waitText("1 条新回复")
-        compose.onNodeWithText("1 条新回复").performClick()
+        seed(1);show();waitInbox(1)
+        compose.onNode(inbox(1)).performClick()
         compose.onNodeWithText("准确定位的旧回复").performClick()
         waitText("@我 准确定位的旧回复")
         compose.onAllNodesWithText("回复").onLast().performClick()
         compose.onNode(hasSetTextAction()).performTextInput("追加回复")
-        compose.onNodeWithText("发送").performClick()
+        compose.onNodeWithContentDescription("发送").performClick()
         waitText("@搭子 追加回复")
         compose.onNodeWithText("@搭子 追加回复").assertIsDisplayed()
         assertEquals("追加回复" to "deep",fake.lastComment)

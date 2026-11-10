@@ -77,8 +77,8 @@ class PolishFlowTest {
         waitText("今日动态")
         compose.onNodeWithContentDescription("查看评论").performClick()
         waitText("好友评论")
-        // One delete belongs to the post underneath; only one belongs to a comment.
-        compose.onAllNodesWithText("删除").assertCountEquals(2)
+        // The post's own delete sits in its menu; the only visible delete belongs to one's own comment.
+        compose.onAllNodesWithText("删除").assertCountEquals(1)
         compose.onAllNodesWithText("删除").onLast().performClick()
         waitText("删除这条评论？")
         compose.onAllNodesWithText("删除").onLast().performClick()
@@ -103,7 +103,7 @@ class PolishFlowTest {
         compose.onAllNodesWithText("回复").onLast().performClick()
         waitText("正在回复 @训练搭子")
         compose.onNode(hasSetTextAction()).performTextInput("收到")
-        compose.onNodeWithText("发送").performClick()
+        compose.onNodeWithContentDescription("发送").performClick()
         compose.waitUntil(15_000){fake.lastComment!=null}
         assertEquals("收到" to "r2",fake.lastComment)
         compose.onNodeWithTag("activity-comments").performScrollToNode(hasText("收起回复"))

@@ -16,6 +16,8 @@ data class MessageDraft(val id:String=UUID.randomUUID().toString(),val body:Stri
 data class SocialPost(
     val id:String,val ownerId:String,val nickname:String,val avatarPath:String?,val body:String,
     val mediaPaths:List<String>,val createdAt:Instant,val likeCount:Int,val liked:Boolean,val commentCount:Int,val fitlogId:String="",
+    /** Present on posts shared from a finished workout; [body] then holds the plain-text version for older apps. */
+    val workout:PostWorkout?=null,
 ) { val cursor get()=SocialCursor(createdAt,id) }
 /** Replies share their top-level comment as [parentId]; [replyToNickname] names the reply being answered. */
 data class SocialComment(val id:String,val ownerId:String,val nickname:String,val body:String,val createdAt:Instant,
@@ -24,7 +26,7 @@ data class SocialComment(val id:String,val ownerId:String,val nickname:String,va
 }
 data class ReplyNotice(val comment:SocialComment,val postId:String,val postPreview:String)
 data class CommentContext(val post:SocialPost,val root:SocialComment,val target:SocialComment)
-data class PostDraft(val id:String=UUID.randomUUID().toString(),val body:String="",val mediaPaths:List<String> = emptyList())
+data class PostDraft(val id:String=UUID.randomUUID().toString(),val body:String="",val mediaPaths:List<String> = emptyList(),val workout:PostWorkout?=null)
 enum class PresenceStatus(val label:String) {
     OFFLINE("离线"),ONLINE("在线"),TRAINING("锻炼中"),REST("组间休息"),PAUSED("训练已暂停");
     companion object {

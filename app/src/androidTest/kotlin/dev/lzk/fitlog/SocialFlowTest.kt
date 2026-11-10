@@ -126,7 +126,9 @@ class SocialFlowTest {
         compose.waitUntil(5_000){compose.onAllNodesWithTag("local-archive").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("30 天前 · 仅本机").assertExists()
         compose.onNodeWithTag("post-window-note").assertDoesNotExist()
-        compose.onNodeWithTag("delete-local-old").performScrollTo().performClick()
+        compose.onNodeWithTag("feed-list").performScrollToNode(hasTestTag("post-more-old"))
+        compose.onNodeWithTag("post-more-old").performClick()
+        compose.onNodeWithText("删除动态").performClick()
         waitText("删除这条动态？")
         compose.onAllNodesWithText("删除").onLast().performClick()
         compose.waitUntil(15_000){fake.localDeletes==listOf("old")}
@@ -146,6 +148,24 @@ class SocialFlowTest {
         waitText("只在本机的动态")
         compose.onNodeWithText("仅本机").assertExists()
     }
+    @Test fun trainingPostShowsItsCardAndDoubleTapLikes() {
+        val card=PostWorkout("推日",Instant.now().minusSeconds(3600),52,8,10,4_860_000,WeightUnit.KG,listOf(
+            PostWorkoutExercise("杠铃卧推",Muscle.CHEST,RecordMetric.REPETITIONS,listOf(PostSet(62_500,6),PostSet(60_000,8)),60_000),
+            PostWorkoutExercise("平板支撑",Muscle.CORE,RecordMetric.SECONDS,listOf(PostSet(0,60)))),"最后一组力竭","冲一冲")
+        fake.posts=listOf(SocialPost("card",fake.peer.id,"训练搭子",null,"文字版不该出现",emptyList(),Instant.now(),0,false,0,workout=card))
+        compose.setContent {FitLogTheme {SocialTimelineScreen(fake,fake.me,onBack={},onPerson={})}}
+        waitText("冲一冲")
+        compose.onNodeWithText("文字版不该出现").assertDoesNotExist()
+        compose.onNodeWithTag("workout-card").assertExists()
+        compose.onNodeWithText("完成 8/10 组").assertExists()
+        compose.onNodeWithText("新纪录 · 杠铃卧推").assertExists()
+        compose.onNodeWithText("60 秒").assertExists()
+        compose.onNodeWithText("最后一组力竭").assertExists()
+        // A double tap on the content likes the post; a second one does not take it back.
+        compose.onNodeWithText("冲一冲").performTouchInput{doubleClick()}
+        compose.waitUntil(15_000){fake.likedValue==true}
+        compose.onNodeWithContentDescription("取消点赞").assertIsSelected()
+    }
     @Test fun publishMomentAndDeleteOwnPost() {
         compose.setContent {FitLogTheme {SocialTimelineScreen(fake,fake.me,onBack={},onPerson={})}}
         waitText("发动态")
@@ -154,7 +174,8 @@ class SocialFlowTest {
         compose.onNodeWithText("今天有什么新进步？").performTextInput("完成了训练目标")
         compose.onAllNodesWithText("发表").onLast().performClick()
         waitText("完成了训练目标")
-        compose.onNodeWithText("删除").performScrollTo().performClick()
+        compose.onAllNodesWithContentDescription("更多操作").onFirst().performClick()
+        compose.onNodeWithText("删除动态").performClick()
         waitText("删除这条动态？")
         compose.onAllNodesWithText("删除").onLast().performClick()
         compose.waitUntil(15_000){fake.posts.isEmpty()}

@@ -21,6 +21,7 @@ import kotlinx.coroutines.*
 import java.time.Instant
 import java.util.UUID
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:String?=null,
     onBack:()->Unit,onPerson:(String)->Unit,embedded:Boolean=false) {
@@ -111,45 +112,61 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
             }},more=moreNotices,onSelect=::openNotice)
         return
     }
+    var refreshing by remember {mutableStateOf(false)}
+    val list=androidx.compose.foundation.lazy.rememberLazyListState()
+    fun like(post:SocialPost)=launch {
+        repository.like(post.id,!post.liked)
+        detailPost=detailPost?.let{it.copy(liked=!post.liked,likeCount=(post.likeCount+if(post.liked)-1 else 1).coerceAtLeast(0))}
+        posts=posts.map {if(it.id==post.id) it.copy(liked=!it.liked,likeCount=(it.likeCount+if(it.liked)-1 else 1).coerceAtLeast(0)) else it}
+    }
+    fun older()=launch {
+        val page=repository.feed(owner,posts.lastOrNull()?.cursor)
+        posts=(posts+page).distinctBy {it.id}.takeLast(60);morePosts=page.size==20
+        refreshArchive()
+    }
+    // Older posts follow on their own as the end of the list comes into view.
+    LaunchedEffect(list,morePosts,detailPost) {
+        snapshotFlow {list.layoutInfo.visibleItemsInfo.lastOrNull()?.index to list.layoutInfo.totalItemsCount}.collect {(last,total)->
+            if(last!=null && total>0 && last>=total-2 && morePosts && detailPost==null && posts.isNotEmpty() && !busy) older()
+        }
+    }
     Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background,contentColor=MaterialTheme.colorScheme.onBackground) {
-    Column(Modifier.fillMaxSize().padding(horizontal=16.dp)) {
+    Column(Modifier.fillMaxSize()) {
         val canPost=detailPost==null && (owner==null || owner==me.id)
-        if(!embedded || detailPost!=null) SocialHeader(if(detailPost!=null)"动态详情" else if(owner==null) "好友动态" else "动态",::back) {
-            if(detailPost==null) TextButton(onClick={launch {refresh()}},enabled=!busy){Text("↻",modifier=Modifier.semanticsLabel("刷新动态"))}
-            if(canPost) PixelKey(onClick={composing=true},minHeight=34.dp,modifier=Modifier.padding(start=4.dp).testTag("compose-post")) {
+        if(!embedded || detailPost!=null) Row(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+            SquareKey(Symbol.BACK,"返回",onClick=::back)
+            Text(if(detailPost!=null)"动态详情" else if(owner==null) "好友动态" else "动态",Modifier.weight(1f),
+                style=MaterialTheme.typography.titleLarge.copy(fontWeight=androidx.compose.ui.text.font.FontWeight.Black),maxLines=1)
+            if(canPost) PixelKey(onClick={composing=true},minHeight=38.dp,modifier=Modifier.testTag("compose-post")) {
                 LineIcon(Symbol.PLUS,Modifier.size(12.dp),LocalContentColor.current);Text("发动态",maxLines=1)
             }
-        } else if(canPost) Row(Modifier.fillMaxWidth().padding(top=10.dp),horizontalArrangement=Arrangement.End) {
+        } else if(canPost) Row(Modifier.fillMaxWidth().padding(horizontal=16.dp).padding(top=10.dp),horizontalArrangement=Arrangement.End) {
             PixelKey(onClick={composing=true},minHeight=34.dp,modifier=Modifier.testTag("compose-post")) {
                 LineIcon(Symbol.PLUS,Modifier.size(12.dp),LocalContentColor.current);Text("发动态",maxLines=1)
             }
         }
-        if(owner==null && detailPost==null) ReplyInboxBar(repository,unread,notices,onOpen={inbox=true},onSelect=::openNotice)
-        error?.let {Text(it,color=MaterialTheme.colorScheme.error)}
-        if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(vertical=12.dp)) {
-            if(!own && detailPost==null) item {
-                Text("只显示 ${SocialRules.POST_DAYS} 天内的动态",Modifier.testTag("post-window-note"),style=MaterialTheme.typography.labelSmall,
-                    color=MaterialTheme.colorScheme.onSurfaceVariant)
+        error?.let {Text(it,Modifier.padding(horizontal=16.dp),color=MaterialTheme.colorScheme.error)}
+        val pull=androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
+        androidx.compose.material3.pulltorefresh.PullToRefreshBox(refreshing,onRefresh={
+            if(!busy) scope.launch {refreshing=true;try {refresh();error=null} catch(e:CancellationException){throw e} catch(e:Exception){error=e.message} finally {refreshing=false}}
+        },Modifier.weight(1f).fillMaxWidth(),state=pull,indicator={
+            PixelRefresh(refreshing || pull.distanceFraction>0f,pull.distanceFraction,Modifier.align(Alignment.TopCenter))
+        }) {
+        LazyColumn(Modifier.fillMaxSize().testTag("feed-list"),state=list,verticalArrangement=Arrangement.spacedBy(12.dp),
+            contentPadding=PaddingValues(start=12.dp,end=12.dp,top=4.dp,bottom=20.dp)) {
+            if(owner==null && detailPost==null && unread>0) item(key="inbox") {ReplyInboxBar(repository,unread,notices,onOpen={inbox=true},onSelect=::openNotice)}
+            if(!own && detailPost==null) item(key="window") {
+                Text("只显示 ${SocialRules.POST_DAYS} 天内的动态",Modifier.padding(horizontal=4.dp).testTag("post-window-note"),style=MaterialTheme.typography.labelSmall,
+                    color=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.75f))
             }
-            if(posts.isEmpty() && archive.isEmpty() && detailPost==null) item {Text("还没有动态",color=MaterialTheme.colorScheme.onSurfaceVariant)}
+            if(posts.isEmpty() && archive.isEmpty() && detailPost==null && !busy) item {Text("还没有动态",Modifier.padding(4.dp),color=MaterialTheme.colorScheme.onSurfaceVariant)}
             items(detailPost?.let{listOf(it)} ?: posts,key={it.id}) {post->
-                ActivityCard {
-                    PostContent(repository,post,onPerson)
-                    PostReactions(post,!busy,onLike={launch {
-                        repository.like(post.id,!post.liked)
-                        detailPost=detailPost?.let{it.copy(liked=!post.liked,likeCount=(post.likeCount+if(post.liked)-1 else 1).coerceAtLeast(0))}
-                        posts=posts.map {if(it.id==post.id) it.copy(liked=!it.liked,likeCount=(it.likeCount+if(it.liked)-1 else 1).coerceAtLeast(0)) else it}
-                    }},onComments={focusContext=null;commentPost=post},
-                        onDelete=if(post.ownerId==me.id) ({deletePost=post}) else null)
-                }
+                PostCard(repository,post,me,!busy,onPerson,onLike={like(post)},onComments={focusContext=null;commentPost=post},
+                    onDelete=if(post.ownerId==me.id) ({deletePost=post}) else null)
             }
-            if(morePosts && detailPost==null) item {
-                TextButton(onClick={launch {
-                    val page=repository.feed(owner,posts.lastOrNull()?.cursor)
-                    posts=(posts+page).distinctBy {it.id}.takeLast(60);morePosts=page.size==20
-                    refreshArchive()
-                }},enabled=!busy){Text("加载更早动态")}
+            if(morePosts && detailPost==null && posts.isNotEmpty()) item(key="older") {
+                Box(Modifier.fillMaxWidth().padding(vertical=8.dp),contentAlignment=Alignment.Center) {PixelRefresh(true,1f)}
             }
             if(own && detailPost==null && !morePosts && archive.isNotEmpty()) {
                 item(key="archive-divider") {
@@ -162,34 +179,19 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
                     }
                 }
                 items(archive,key={"local:"+it.id}) {post->
-                    ActivityCard {
-                        PostContent(repository,post,onPerson)
-                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
-                            PixelOutlineKey(onClick={deletePost=post},minHeight=30.dp,modifier=Modifier.testTag("delete-local-${post.id}")) {
-                                LineIcon(Symbol.TRASH,Modifier.size(12.dp),LocalContentColor.current);Text("删除",maxLines=1)
-                            }
-                        }
-                    }
+                    PostCard(repository,post,me,!busy,onPerson,onLike=null,onComments=null,onDelete={deletePost=post})
                 }
             }
         }
-    }
-    }
-    if(composing) AlertDialog(onDismissRequest={if(!busy) composing=false},title={Text("分享动态")},text={
-        Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(body,{body=it.take(4000)},label={Text("今天有什么新进步？")},maxLines=6)
-            Text("${images.size} / 9 张图片")
-            PostImagePreviews(repository,images,!busy){path->images=images-path}
-            Row {
-                TextButton(onClick=picker,enabled=!busy && images.size<9){Text("添加图片")}
-                if(images.isNotEmpty()) TextButton(onClick={images=emptyList()},enabled=!busy){Text("全部移除")}
-            }
-            error?.let {Text(it,color=MaterialTheme.colorScheme.error)}
         }
-    },confirmButton={TextButton(onClick={launch {
-        repository.publish(PostDraft(draftId,body,images));body="";images=emptyList();draftId=UUID.randomUUID().toString();composing=false;refresh()
-    }},enabled=!busy && (body.isNotBlank() || images.isNotEmpty())){Text("发表")}},
-        dismissButton={TextButton(onClick={composing=false},enabled=!busy){Text("稍后")}})
+    }
+    }
+    if(composing) PostComposer(repository,images,body,busy,error,onBody={body=it.take(4000)},onPick=picker,
+        onRemove={path->images=images-path},onCancel={composing=false}) {
+        launch {
+            repository.publish(PostDraft(draftId,body,images));body="";images=emptyList();draftId=UUID.randomUUID().toString();composing=false;refresh()
+        }
+    }
     commentPost?.let {post-> CommentsDialog(repository,me,post,onPerson,onClose={commentPost=null;focusContext=null},focusContext=focusContext,onViewed={id->
         launch {repository.readReply(id);refreshInbox()}
     },onChanged={delta->
@@ -205,45 +207,5 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
                 posts=posts.filterNot {it.id==post.id};archive=archive.filterNot {it.id==post.id};deletePost=null
             }}){Text("删除")}},
             dismissButton={TextButton(onClick={deletePost=null}){Text("取消")}})
-    }
-}
-
-/** A post's author line, text and images. */
-@Composable private fun PostContent(repository:SocialRepository,post:SocialPost,onPerson:(String)->Unit) {
-    Row(horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically) {
-        SocialAvatar(repository,SocialProfile(post.ownerId,post.fitlogId,post.nickname,avatarPath=post.avatarPath)){onPerson(post.ownerId)}
-        Column(Modifier.weight(1f).clickable {onPerson(post.ownerId)}) {
-            OneLineText(post.nickname,style=MaterialTheme.typography.titleMedium)
-            if(post.fitlogId.isNotBlank()) Text("ID · "+post.fitlogId,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Text(post.createdAt.socialTime(),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    if(post.body.isNotBlank()) Text(post.body,style=MaterialTheme.typography.bodyLarge)
-    if(post.mediaPaths.size==1) SocialImage(repository,post.mediaPaths.single(),Modifier.fillMaxWidth().height(240.dp))
-    else post.mediaPaths.chunked(3).forEach {row->
-        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-            row.forEach {path->SocialImage(repository,path,Modifier.weight(1f).height(110.dp),gallery=post.mediaPaths)}
-            repeat(3-row.size){Spacer(Modifier.weight(1f))}
-        }
-    }
-}
-
-/** Uploaded images are kept locally, so the preview shows exactly what will be published. */
-@Composable private fun PostImagePreviews(repository:SocialRepository,images:List<String>,enabled:Boolean,onRemove:(String)->Unit) {
-    images.chunked(3).forEachIndexed {rowIndex,row->
-        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-            row.forEachIndexed {index,path->
-                Box(Modifier.weight(1f).height(96.dp)) {
-                    SocialImage(repository,path,Modifier.fillMaxSize(),gallery=images)
-                    Surface(onClick={onRemove(path)},enabled=enabled,shape=CircleShape,
-                        color=MaterialTheme.colorScheme.surface.copy(alpha=0.85f),
-                        modifier=Modifier.align(Alignment.TopEnd).padding(2.dp).size(28.dp)
-                            .semanticsLabel("移除第 ${rowIndex*3+index+1} 张图片")) {
-                        Box(contentAlignment=Alignment.Center){Text("×",style=MaterialTheme.typography.titleMedium)}
-                    }
-                }
-            }
-            repeat(3-row.size){Spacer(Modifier.weight(1f))}
-        }
     }
 }

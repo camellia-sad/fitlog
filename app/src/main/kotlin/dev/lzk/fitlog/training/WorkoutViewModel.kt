@@ -126,6 +126,9 @@ class WorkoutViewModel(private val container: AppContainer) : ViewModel() {
      * For each exercise, the heaviest completed set that beats the best from every other session; ties go to the first
      * such set. A first-ever session has nothing to beat, so it carries no medal.
      */
+    /** The same records for any finished workout, so a card shared from history carries its medals too. */
+    suspend fun recordsFor(workout: Workout): Map<String, Long> = records(workout)
+
     private suspend fun records(workout: Workout?): Map<String, Long> {
         workout ?: return emptyMap()
         val result = HashMap<String, Long>()

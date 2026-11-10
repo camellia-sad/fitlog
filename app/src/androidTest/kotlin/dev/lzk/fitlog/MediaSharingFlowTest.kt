@@ -82,20 +82,26 @@ class MediaSharingFlowTest {
         compose.setContent {FitLogTheme {
             if(visible)WorkoutShareDialog(workout(),fake,fake,{visible=false},{},{published=true;visible=false})
         }}
-        waitText("训练动态内容")
-        compose.onNodeWithTag("workout-post-body").assertTextContains("坚持就是进步",substring=true)
+        compose.waitUntil(15_000){compose.onAllNodesWithTag("workout-card").fetchSemanticsNodes().isNotEmpty()}
+        // The reflection is part of the card preview; the line above it is the publisher's own.
+        compose.onNodeWithText("坚持就是进步").assertExists()
+        compose.onNodeWithTag("workout-post-body").performTextInput("今天顺利")
         assertTrue(fake.posts.isEmpty())
         compose.onNodeWithText("发表").performClick()
         compose.waitUntil(15_000){published}
         assertEquals(1,fake.posts.size)
+        // Older apps get the text version; this one gets the card with the caption.
+        assertTrue(fake.posts.single().body.startsWith("今天顺利"))
         assertTrue(fake.posts.single().body.contains("坚持就是进步"))
+        assertEquals("今天顺利",fake.posts.single().workout?.caption)
+        assertEquals("坚持就是进步",fake.posts.single().workout?.feeling)
         assertEquals(SharingPreferences(),fake.preference)
         assertNull(fake.bound)
     }
     @Test fun cancelSharingDoesNotPublish() {
         var visible by mutableStateOf(true)
         compose.setContent {FitLogTheme {if(visible)WorkoutShareDialog(workout(),fake,fake,{visible=false},{},{})}}
-        waitText("训练动态内容")
+        compose.waitUntil(15_000){compose.onAllNodesWithTag("workout-card").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("取消").performClick()
         assertTrue(fake.posts.isEmpty())
     }

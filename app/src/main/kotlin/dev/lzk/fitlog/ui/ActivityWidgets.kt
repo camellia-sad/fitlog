@@ -4,6 +4,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -59,23 +64,6 @@ internal val ActivityAmber=Color(0xFFFFCF82)
     }
 }
 
-@Composable internal fun PostReactions(post:SocialPost,enabled:Boolean,onLike:()->Unit,onComments:()->Unit,onDelete:(()->Unit)?) {
-    val scale by animateFloatAsState(if(post.liked)1.08f else 1f,label="like")
-    HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
-    Row(verticalAlignment=Alignment.CenterVertically) {
-        TextButton(onClick=onLike,enabled=enabled,colors=ButtonDefaults.textButtonColors(contentColor=if(post.liked)ActivityLavender else MaterialTheme.colorScheme.onSurfaceVariant),
-            modifier=Modifier.semantics {contentDescription=if(post.liked)"取消点赞" else "点赞";selected=post.liked}) {
-            ActivityGlyph("like",post.liked,Modifier.graphicsLayer {scaleX=scale;scaleY=scale})
-            Spacer(Modifier.width(7.dp));Text(post.likeCount.toString())
-        }
-        TextButton(onClick=onComments,modifier=Modifier.semantics {contentDescription="查看评论"}) {
-            ActivityGlyph("comment");Spacer(Modifier.width(7.dp));Text(post.commentCount.toString(),color=MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Spacer(Modifier.weight(1f))
-        onDelete?.let {TextButton(onClick=it,colors=ButtonDefaults.textButtonColors(contentColor=MaterialTheme.colorScheme.error)){Text("删除")}}
-    }
-}
-
 @Composable internal fun ReplyNoticeRow(repository:SocialRepository,notice:ReplyNotice,onClick:()->Unit) {
     val c=notice.comment
     Row(Modifier.fillMaxWidth().clickable(onClick=onClick).padding(12.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -83,28 +71,37 @@ internal val ActivityAmber=Color(0xFFFFCF82)
         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Text(c.nickname,Modifier.weight(1f),maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.titleSmall)
-                Text(c.createdAt.socialTime(),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(ChatTimes.label(c.createdAt),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.75f))
             }
             Text(c.body,maxLines=2,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodyMedium)
             Text("来自动态 · "+notice.postPreview.ifBlank{"图片动态"},maxLines=1,overflow=TextOverflow.Ellipsis,
                 color=MaterialTheme.colorScheme.primary,style=MaterialTheme.typography.labelSmall)
         }
-        Text("•",color=ActivityAmber)
+        Box(Modifier.padding(top=6.dp).size(8.dp).background(MaterialTheme.colorScheme.primary))
     }
 }
 
+/** New replies: the latest repliers' avatars stacked, a count, and a key that unfolds up to three or opens them all. */
 @Composable internal fun ReplyInboxBar(repository:SocialRepository,count:Int,notices:List<ReplyNotice>,onOpen:()->Unit,onSelect:(ReplyNotice)->Unit) {
     var expanded by remember {mutableStateOf(false)}
     LaunchedEffect(count){if(count==0 || count>3)expanded=false}
     if(count<=0)return
-    Surface(shape=RoundedCornerShape(17.dp),color=MaterialTheme.colorScheme.secondaryContainer,
-        border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),modifier=Modifier.fillMaxWidth()) {
+    val scheme=MaterialTheme.colorScheme
+    Surface(shape=RoundedCornerShape(16.dp),color=scheme.primaryContainer,modifier=Modifier.fillMaxWidth().testTag("reply-inbox")) {
         Column {
-            Row(Modifier.fillMaxWidth().clickable {if(count>3)onOpen() else expanded=!expanded}.padding(14.dp),
+            Row(Modifier.fillMaxWidth().clickable {if(count>3)onOpen() else expanded=!expanded}.testTag("reply-inbox-head").padding(horizontal=12.dp,vertical=10.dp),
                 verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                ActivityGlyph("comment")
-                Text("$count 条新回复",Modifier.weight(1f),style=MaterialTheme.typography.titleSmall)
-                Text(if(count>3)"查看全部 ›" else if(expanded)"收起 ⌃" else "展开 ⌄",color=MaterialTheme.colorScheme.primary,style=MaterialTheme.typography.labelMedium)
+                Box(Modifier.width((28+18*(notices.take(3).size-1).coerceAtLeast(0)).dp).height(28.dp)) {
+                    notices.map{it.comment}.distinctBy{it.ownerId}.take(3).forEachIndexed {i,c->
+                        Box(Modifier.offset(x=(18*i).dp).size(28.dp).background(scheme.primaryContainer,CircleShape).padding(2.dp)) {
+                            SocialAvatar(repository,SocialProfile(c.ownerId,c.fitlogId,c.nickname,avatarPath=c.avatarPath),size=24.dp) {}
+                        }
+                    }
+                }
+                Text("新回复",style=MaterialTheme.typography.titleSmall.copy(fontWeight=FontWeight.Bold),color=scheme.onSurface)
+                Text("$count",Modifier.weight(1f),style=pixelNumber(19.sp),color=scheme.primary)
+                LineIcon(if(count>3)Symbol.ARROW else if(expanded)Symbol.UP else Symbol.DOWN,Modifier.size(12.dp).semanticsLabel(
+                    if(count>3)"查看全部回复" else if(expanded)"收起回复" else "展开回复"),scheme.primary)
             }
             if(expanded && count<=3)notices.forEach {n->key(n.comment.id){ReplyNoticeRow(repository,n){onSelect(n)}}}
         }
