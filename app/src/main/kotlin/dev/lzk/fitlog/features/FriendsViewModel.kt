@@ -58,9 +58,31 @@ class FriendsViewModel(private val repository: FriendsRepository) : ViewModel() 
         repository.verifyCode(email,code)
         friends.value=repository.friends(); codeSent.value=false
     }
-    fun search(id:String)=execute {
-        found.value=null; found.value=repository.find(id)
-        if(found.value==null) message.value="未找到这个 FitLog ID"
+    /** Result line for the add-friend sheet only; it never reaches the friends list. */
+    val searchMessage = MutableStateFlow<String?>(null)
+    fun search(id:String) {
+        val value=id.trim()
+        found.value=null
+        if(profile.value?.fitlogId.equals(value,ignoreCase=true)) {searchMessage.value="这是你自己的 FitLog ID";return}
+        sheetAction {
+            found.value=repository.find(value)
+            if(found.value==null) searchMessage.value="没有找到这个 FitLog ID"
+        }
+    }
+    fun request(id:String)=sheetAction {
+        repository.act(id,"request"); friends.value=repository.friends(); found.value=null
+    }
+    fun closeSearch() {found.value=null;searchMessage.value=null}
+    private fun sheetAction(action: suspend () -> Unit) {
+        if (busy.value) return
+        refreshJob?.cancel()
+        viewModelScope.launch {
+            busy.value=true; searchMessage.value=null
+            try { action() }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { searchMessage.value=e.message ?: "操作失败，请重试" }
+            finally { busy.value=false }
+        }
     }
     fun act(id:String,action:String)=execute {
         repository.act(id,action); found.value=null; friends.value=repository.friends(); message.value="操作已完成"

@@ -99,7 +99,11 @@ class FriendsFlowTest {
         compose.onNodeWithTag("add-friend").performClick()
         compose.waitUntil(15_000) { compose.onAllNodesWithTag("friend-search").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("我的 FitLog ID").assertExists()
-        compose.onNodeWithTag("friend-search").performTextInput(repository.peer.fitlogId)
+        // One's own ID is answered in the sheet without asking the server.
+        compose.onNodeWithTag("friend-search").performTextInput(repository.me.fitlogId)
+        compose.onNodeWithText("查找").performClick()
+        waitText("这是你自己的 FitLog ID")
+        compose.onNodeWithTag("friend-search").performTextReplacement(repository.peer.fitlogId)
         compose.onNodeWithText("查找").performClick()
         waitText("发送申请")
         repository.fail=true
@@ -111,6 +115,9 @@ class FriendsFlowTest {
         waitText("等待对方接受")
         // The sheet closes once the request is in the list.
         compose.waitUntil(15_000) { compose.onAllNodesWithTag("add-friend-sheet").fetchSemanticsNodes().isEmpty() }
+        // Nothing from the sheet stays behind on the list.
+        compose.onNodeWithText("网络暂不可用").assertDoesNotExist()
+        compose.onNodeWithText("这是你自己的 FitLog ID").assertDoesNotExist()
         assertEquals(1,repository.rows.size)
     }
     @Test fun newLoginWithFailedFriendLoadCannotShowPreviousAccountFriends() {

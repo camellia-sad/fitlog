@@ -84,6 +84,8 @@ fun FriendsScreen(model:FriendsViewModel,social:SocialRepository?=null,
     }
     val selected=friends.find{it.profile.id==selectedId}
     var confirming by remember {mutableStateOf<Pair<String,String>?>(null)}
+    // Results such as “操作已完成” are passing notes, not page furniture: they clear themselves.
+    LaunchedEffect(message) {val shown=message ?: return@LaunchedEffect;delay(4_000);if(model.message.value==shown)model.message.value=null}
     if(selectedId!=null) BackHandler{selectedId=null}
     // Without the social layer (tests, unconfigured builds) rows open a plain profile card instead of the chat.
     val open:(Friend)->Unit={if(social==null)selectedId=it.profile.id else chatPeer=it.profile.id}
@@ -247,7 +249,7 @@ internal val PresenceStatus.training get()=this==PresenceStatus.TRAINING || this
     val scheme=MaterialTheme.colorScheme
     val found by model.found.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
-    val message by model.message.collectAsStateWithLifecycle()
+    val message by model.searchMessage.collectAsStateWithLifecycle()
     val friends by model.friends.collectAsStateWithLifecycle()
     val clipboard=androidx.compose.ui.platform.LocalClipboard.current
     val scope=rememberCoroutineScope()
@@ -255,7 +257,7 @@ internal val PresenceStatus.training get()=this==PresenceStatus.TRAINING || this
     var requested by remember {mutableStateOf<String?>(null)}
     // Close once the request shows up in the list.
     LaunchedEffect(friends,requested) {if(requested!=null && friends.any{it.profile.id==requested}) {requested=null;onClose()}}
-    DisposableEffect(Unit){onDispose{model.found.value=null}}
+    DisposableEffect(Unit){onDispose{model.closeSearch()}}
     ModalBottomSheet(onDismissRequest=onClose,containerColor=scheme.surface) {
         Column(Modifier.fillMaxWidth().padding(start=16.dp,end=16.dp,bottom=24.dp).testTag("add-friend-sheet"),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             Text("添加好友",style=MaterialTheme.typography.titleLarge.copy(fontWeight=FontWeight.Black))
@@ -267,8 +269,9 @@ internal val PresenceStatus.training get()=this==PresenceStatus.TRAINING || this
                     }}){Text("粘贴")}})
                 PixelKey(onClick={model.search(search)},enabled=!busy && search.isNotBlank(),minHeight=48.dp) {Text("查找",maxLines=1)}
             }
-            message?.let{Text(it,color=if(found==null)scheme.error else scheme.primary,style=MaterialTheme.typography.bodyMedium)}
+            message?.let{Text(it,Modifier.testTag("search-message"),color=scheme.error,style=MaterialTheme.typography.bodyMedium)}
             found?.let{person->
+                val existing=friends.find{it.profile.id==person.id}
                 Row(Modifier.fillMaxWidth().background(scheme.surfaceVariant,RoundedCornerShape(14.dp)).padding(12.dp),
                     verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     SocialAvatar(social,person,size=44.dp){}
@@ -277,7 +280,10 @@ internal val PresenceStatus.training get()=this==PresenceStatus.TRAINING || this
                         Text(person.fitlogId,style=MaterialTheme.typography.labelSmall.copy(letterSpacing=.5.sp),color=scheme.onSurfaceVariant,
                             maxLines=1,overflow=TextOverflow.Ellipsis)
                     }
-                    PixelKey(onClick={requested=person.id;model.act(person.id,"request")},enabled=!busy,minHeight=38.dp) {Text("发送申请",maxLines=1)}
+                    // Someone already on the list, or with a request either way, gets a state instead of a second request.
+                    if(existing!=null) Text(if(existing.accepted)"已是好友" else if(existing.incoming)"对方已申请" else "已发送申请",
+                        style=MaterialTheme.typography.labelLarge.copy(fontWeight=FontWeight.Bold),color=scheme.onSurfaceVariant,maxLines=1)
+                    else PixelKey(onClick={requested=person.id;model.request(person.id)},enabled=!busy,minHeight=38.dp) {Text("发送申请",maxLines=1)}
                 }
             }
             HorizontalDivider(color=scheme.outlineVariant)

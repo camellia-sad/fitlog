@@ -64,7 +64,7 @@ internal fun ProfileBannerArt(repository: SocialRepository?, banner: String?, mo
             pending != null -> Image(pending, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             path != null && repository != null -> {
                 PixelScene(null, Modifier.fillMaxSize())
-                SocialImage(repository, path, Modifier.fillMaxSize(), previewEnabled = false, contentScale = ContentScale.Crop) {}
+                SocialImage(repository, path, Modifier.fillMaxSize(), previewEnabled = false, contentScale = ContentScale.Crop, keep = true) {}
             }
             else -> PixelScene(ProfileBanners.scene(banner), Modifier.fillMaxSize())
         }

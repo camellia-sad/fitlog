@@ -40,11 +40,23 @@ internal object AvatarImages {
     }
     fun get(key:String)=images.get(key)
     fun put(key:String,bitmap:android.graphics.Bitmap){images.put(key,bitmap)}
+    fun clear(){images.evictAll();KeptImages.clear()}
+}
+
+/** Larger images that must survive a page's exit animation (profile banners); bounded and released with the avatars. */
+internal object KeptImages {
+    private val images=object:android.util.LruCache<String,android.graphics.Bitmap>(8*1024*1024) {
+        override fun sizeOf(key:String,value:android.graphics.Bitmap)=value.allocationByteCount
+    }
+    fun get(key:String)=images.get(key)
+    fun put(key:String,bitmap:android.graphics.Bitmap){images.put(key,bitmap)}
     fun clear(){images.evictAll()}
 }
 
 @Composable internal fun SocialImage(repository:SocialRepository,path:String,modifier:Modifier=Modifier,avatar:Boolean=false,previewEnabled:Boolean=true,gallery:List<String> = listOf(path),fullSize:Boolean=false,onLongClick:(()->Unit)?=null,
-    contentScale:ContentScale?=null,fallback:@Composable ()->Unit={Text("…",style=MaterialTheme.typography.labelSmall)}) {
+    contentScale:ContentScale?=null,keep:Boolean=false,fallback:@Composable ()->Unit={Text("…",style=MaterialTheme.typography.labelSmall)}) {
+    // Avatars and kept images (banners) are cached so a page's exit animation never falls back to a placeholder.
+    fun cached(key:String)=if(avatar) AvatarImages.get(key) else if(keep) KeptImages.get(key) else null
     var preview by remember(path){mutableStateOf(false)}
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     val profileFlow=remember(repository) {
@@ -53,12 +65,12 @@ internal object AvatarImages {
     val currentProfile by profileFlow.collectAsStateWithLifecycle()
     val account=currentProfile?.id.orEmpty()
     val cacheKey=System.identityHashCode(repository).toString()+":"+account+":"+path
-    var bitmap by remember(cacheKey) { mutableStateOf(if(avatar) AvatarImages.get(cacheKey) else null) }
+    var bitmap by remember(cacheKey) { mutableStateOf(cached(cacheKey)) }
     var failed by remember(cacheKey) { mutableStateOf(false) }
     LaunchedEffect(repository,path,lifecycle,cacheKey) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             try {
-                bitmap=bitmap ?: (if(avatar) AvatarImages.get(cacheKey) else null) ?: withContext(Dispatchers.IO) {
+                bitmap=bitmap ?: cached(cacheKey) ?: withContext(Dispatchers.IO) {
                     val bytes=repository.image(path)
                     // Decode at thumbnail size; source is bounded to 2 MB and 1600 px by upload.
                     val bounds=BitmapFactory.Options().apply {inJustDecodeBounds=true}
@@ -69,7 +81,7 @@ internal object AvatarImages {
                     val options=BitmapFactory.Options().apply {inSampleSize=sample}
                     BitmapFactory.decodeByteArray(bytes,0,bytes.size,options)
                 }
-                if(avatar)bitmap?.let {AvatarImages.put(cacheKey,it)}
+                bitmap?.let {if(avatar) AvatarImages.put(cacheKey,it) else if(keep) KeptImages.put(cacheKey,it)}
                 awaitCancellation()
             } catch(e:CancellationException) {throw e}
             catch(_:Exception) { failed=true }
@@ -79,7 +91,7 @@ internal object AvatarImages {
     Box(modifier.then(if(!avatar && previewEnabled)Modifier.combinedClickable(onClickLabel="查看大图",onClick={preview=true},onLongClick=onLongClick) else Modifier),contentAlignment=Alignment.Center) {
         // A stopped navigation destination can remain visible during its exit animation.
         // Its loader has released bitmap, so draw the account-scoped thumbnail directly.
-        val displayed=bitmap ?: if(avatar) AvatarImages.get(cacheKey) else null
+        val displayed=bitmap ?: cached(cacheKey)
         if(displayed!=null) Image(displayed.asImageBitmap(),contentDescription="图片",modifier=Modifier.fillMaxSize(),contentScale=contentScale ?: if(avatar)ContentScale.Crop else ContentScale.Fit)
         else if(avatar) {if(failed) fallback()}
         else if(!failed) fallback() else Text("图片暂不可用",style=MaterialTheme.typography.labelSmall)
