@@ -67,7 +67,9 @@ class MediaSharingFlowTest {
         compose.onNodeWithContentDescription("图片").performClick();waitText("关闭大图")
         compose.onNodeWithText("关闭大图").performClick()
         compose.onNodeWithContentDescription("图片").performTouchInput{longClick()}
-        waitText("消息操作");compose.onNodeWithText("关闭").performClick()
+        compose.waitUntil(15_000){compose.onAllNodesWithTag("message-actions").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("引用").performClick()
+        compose.waitUntil(5_000){compose.onAllNodesWithTag("message-actions").fetchSemanticsNodes().isEmpty()}
         fake.posts=listOf(SocialPost("post",fake.peer.id,"搭子",null,"照片",listOf("one"),Instant.now(),0,false,0))
         compose.onNodeWithContentDescription("返回").performClick()
         waitText("照片")

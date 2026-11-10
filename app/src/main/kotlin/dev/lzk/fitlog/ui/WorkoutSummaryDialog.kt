@@ -96,7 +96,7 @@ private fun SummaryExercise(exercise: SessionExercise, definition: Exercise?, un
     val done = exercise.sets.filter { it.status == SetStatus.COMPLETED }
     val top = when {
         done.isEmpty() -> "—"
-        exercise.recordMetricSnapshot == RecordMetric.SECONDS -> "${done.maxOf { it.reps }}秒"
+        exercise.recordMetricSnapshot == RecordMetric.SECONDS -> "${done.maxOf { it.reps }} 秒"
         else -> done.maxOf { it.weightGrams }.let { if (it == 0L) "自重" else WeightUnits.format(it, unit) }
     }
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(end = 10.dp), verticalAlignment = Alignment.CenterVertically,

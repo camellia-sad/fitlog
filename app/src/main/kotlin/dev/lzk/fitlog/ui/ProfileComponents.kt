@@ -139,7 +139,7 @@ internal fun StatusTag(text: String) {
 
 /** “FitLog ID” in bold, the ID itself in plain type a step quieter, and a copy key that flips to “已复制” for a moment. */
 @Composable
-internal fun FitLogIdLine(id: String, modifier: Modifier = Modifier) {
+internal fun FitLogIdLine(id: String, modifier: Modifier = Modifier, label: String = "FitLog ID") {
     val scheme = MaterialTheme.colorScheme
     val clipboard = androidx.compose.ui.platform.LocalClipboard.current
     val scope = rememberCoroutineScope()
@@ -147,7 +147,7 @@ internal fun FitLogIdLine(id: String, modifier: Modifier = Modifier) {
     // The label and copy key share the first line so the full 32-character ID gets the second line to itself.
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
     Row(Modifier.fillMaxWidth().heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("FitLog ID", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black), color = scheme.onSurface, maxLines = 1)
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black), color = scheme.onSurface, maxLines = 1)
         val label = if (copied) "已复制" else "复制"
         val copy: () -> Unit = {
             scope.launch {

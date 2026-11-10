@@ -80,40 +80,44 @@ class FriendsFlowTest {
         show()
         waitText("接受")
         compose.onNodeWithText("接受").performScrollTo().performClick()
-        waitText("我的好友 · 1")
-        compose.onNodeWithTag("friends-list").performScrollToNode(hasText("查看个人主页"))
-        compose.onNodeWithText("查看个人主页").performClick()
+        waitCount(1)
+        compose.onNodeWithTag("friend-row-peer").performClick()
         waitText("好友备注（仅自己可见）")
         compose.onNodeWithText("好友备注（仅自己可见）").performTextInput("一起练")
         compose.onNodeWithText("保存备注").performScrollTo().performClick()
         waitText("备注已保存")
         assertEquals("一起练",repository.rows.single().note)
         compose.onNodeWithContentDescription("返回好友列表").performClick()
-        waitText("我的好友 · 1")
+        waitCount(1)
         compose.onNodeWithTag("friends-list").performScrollToNode(hasText("一起练"))
         compose.onNodeWithText("一起练").assertIsDisplayed()
     }
     @Test fun failedRequestKeepsSearchResultAndAllowsRetry() {
         repository.profile.value=repository.me
         show()
-        waitText("查找好友")
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("add-friend").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("add-friend").performClick()
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("friend-search").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("我的 FitLog ID").assertExists()
         compose.onNodeWithTag("friend-search").performTextInput(repository.peer.fitlogId)
-        compose.onNodeWithText("查找好友").performScrollTo().performClick()
-        waitText("发送好友申请")
+        compose.onNodeWithText("查找").performClick()
+        waitText("发送申请")
         repository.fail=true
-        compose.onNodeWithText("发送好友申请").performScrollTo().performClick()
+        compose.onNodeWithText("发送申请").performClick()
         waitText("网络暂不可用")
-        compose.onNodeWithText("发送好友申请").assertExists()
+        compose.onNodeWithText("发送申请").assertExists()
         repository.fail=false
-        compose.onNodeWithText("发送好友申请").performClick()
+        compose.onNodeWithText("发送申请").performClick()
         waitText("等待对方接受")
+        // The sheet closes once the request is in the list.
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("add-friend-sheet").fetchSemanticsNodes().isEmpty() }
         assertEquals(1,repository.rows.size)
     }
     @Test fun newLoginWithFailedFriendLoadCannotShowPreviousAccountFriends() {
         repository.profile.value=repository.me
         repository.rows=listOf(Friend(repository.peer,"旧账号好友",true,false))
         show()
-        waitText("我的好友 · 1")
+        waitCount(1)
         compose.runOnIdle { repository.profile.value=null; repository.failFriends=true }
         waitText("去登录")
         compose.onNodeWithText("去登录").performClick()
@@ -126,6 +130,9 @@ class FriendsFlowTest {
         compose.onNodeWithText("旧账号好友").assertDoesNotExist()
     }
 
+    private fun waitCount(count:Int)=compose.waitUntil(15_000) {
+        compose.onAllNodes(hasTestTag("friends-count") and hasText("$count")).fetchSemanticsNodes().isNotEmpty()
+    }
     private fun waitText(text:String)=compose.waitUntil(15_000) {
         compose.onAllNodesWithText(text,substring=false).fetchSemanticsNodes().isNotEmpty()
     }

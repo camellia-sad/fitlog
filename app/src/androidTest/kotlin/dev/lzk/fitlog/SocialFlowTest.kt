@@ -26,15 +26,17 @@ class SocialFlowTest {
     @Test fun friendRowOpensChatAndAvatarOpensProfile() {
         val model=FriendsViewModel(fake);models.put("friends",model)
         compose.setContent {FitLogTheme {FriendsScreen(model,fake)}}
-        waitText("我的好友 · 1")
-        compose.onNodeWithTag("friends-list").performScrollToNode(hasText("训练搭子"))
-        compose.onNodeWithText("训练搭子").performClick()
+        val row="friend-row-"+fake.peer.id
+        compose.waitUntil(15_000){compose.onAllNodesWithTag(row).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("friends-count").assertTextEquals("1")
+        // An online friend also sits in the strip above the list; tapping it opens the chat too.
+        compose.onNodeWithTag("active-"+fake.peer.id).assertExists()
+        compose.onNodeWithTag(row).performClick()
         waitText("发消息")
-        compose.onNodeWithText("清空").assertExists()
-        compose.onNodeWithContentDescription("返回").performClick()
-        waitText("我的好友 · 1")
-        compose.onNodeWithTag("friends-list").performScrollToNode(hasText("训练搭子"))
-        compose.onNodeWithContentDescription("训练搭子的头像").performClick()
+        compose.onNodeWithTag("chat-status").assertTextEquals("在线")
+        compose.onNodeWithTag("chat-more").performClick()
+        waitText("清空聊天记录")
+        compose.onNodeWithText("查看主页").performClick()
         waitText("个人主页")
         // A friend's page is read only apart from the note.
         compose.onNodeWithTag("profile-nickname").assertHasNoClickAction()
@@ -53,7 +55,7 @@ class SocialFlowTest {
         }}
         waitText("发消息")
         compose.onNodeWithText("发消息").performTextInput("今天练得不错")
-        compose.onNodeWithText("发送").performClick()
+        compose.onNodeWithContentDescription("发送").performClick()
         waitText("网络暂不可用")
         assertEquals(1,fake.queue.size)
         val id=fake.queue.single().id
@@ -62,10 +64,11 @@ class SocialFlowTest {
         compose.waitUntil(15_000){fake.queue.isEmpty() && fake.rows.size==1}
         assertEquals(id,fake.rows.single().id)
         compose.onNodeWithText("今天练得不错").performTouchInput{longClick()}
-        waitText("引用回复")
-        compose.onNodeWithText("引用回复").performClick()
+        waitText("引用")
+        compose.onNodeWithText("引用").performClick()
+        waitText("回复 自己：今天练得不错")
         compose.onNodeWithText("发消息").performTextInput("明天继续")
-        compose.onNodeWithText("发送").performClick()
+        compose.onNodeWithContentDescription("发送").performClick()
         compose.waitUntil(15_000){fake.rows.size==2}
         assertEquals(id,fake.lastReply)
     }
@@ -83,7 +86,7 @@ class SocialFlowTest {
         compose.waitUntil(15_000){fake.lastForward==listOf("original")}
         compose.waitUntil(15_000){compose.onAllNodesWithText("转发给好友").fetchSemanticsNodes().isEmpty()}
         compose.onNodeWithText("原始消息").performTouchInput{longClick()}
-        compose.onNodeWithText("仅从本机删除").performClick()
+        compose.onNodeWithText("删除").performClick()
         compose.waitUntil(15_000){fake.rows.none{it.id=="original"}}
     }
     @Test fun sharingRequiresExplicitBindingAndCanBeCancelled() {

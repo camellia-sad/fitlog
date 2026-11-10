@@ -88,6 +88,31 @@ interface SocialRepository {
     fun selectTrainingExercise(id:String?)
 }
 
+/** Chat and conversation-list times: always to the minute; older than yesterday also carries the full date. */
+object ChatTimes {
+    /** A time line is shown between two messages at least this far apart. */
+    val GAP: java.time.Duration = java.time.Duration.ofMinutes(5)
+    fun label(at: Instant, now: Instant = Instant.now(), zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): String {
+        val time = at.atZone(zone); val today = now.atZone(zone).toLocalDate()
+        val clock = String.format(java.util.Locale.ROOT, "%02d:%02d", time.hour, time.minute)
+        return when (time.toLocalDate()) {
+            today -> clock
+            today.minusDays(1) -> "昨天 $clock"
+            else -> String.format(java.util.Locale.ROOT, "%d/%02d/%02d %s", time.year, time.monthValue, time.dayOfMonth, clock)
+        }
+    }
+    fun separated(earlier: Instant, later: Instant) = java.time.Duration.between(earlier, later) >= GAP
+}
+
+/** What a friend is doing, for the chat header: status alone, or status with the current exercise, set and progress. */
+fun SocialPerson.statusLine(): String {
+    val training = live?.takeIf { status in setOf(PresenceStatus.TRAINING, PresenceStatus.REST, PresenceStatus.PAUSED) && it.exercise.isNotBlank() }
+        ?: return status.label
+    val value = if (training.recordMetric == RecordMetric.SECONDS) "${training.reps} 秒"
+        else "${WeightUnits.format(training.weightGrams, WeightUnit.KG)} kg × ${training.reps}"
+    return listOfNotNull(status.label, training.exercise, value, if (training.total > 0) "已完成 ${training.done}/${training.total} 组" else null).joinToString(" · ")
+}
+
 object SocialRules {
     const val MESSAGE_PAGE=50
     const val FEED_PAGE=20

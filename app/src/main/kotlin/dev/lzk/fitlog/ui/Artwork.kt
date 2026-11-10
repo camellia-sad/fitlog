@@ -11,7 +11,8 @@ import kotlin.math.floor
 
 enum class Symbol { HOME, DUMBBELL, BACK, PLUS, CHECK, SEARCH, ARROW, MINUS, CLOCK, LIST, SETTINGS, FRIENDS, PERSON, PLAY, SPARK, DOWN, CLOSE, PAUSE,
     STAR, STAR_FILLED, ARCHIVE, UNARCHIVE, EDIT, BARBELL, MACHINE, CABLE, SMITH, BODYWEIGHT, IMAGE, PIN, TRASH, UP, TUNE,
-    CLOUD, EXPORT, IMPORT, SUN, MOON, VIBRATE, CHAT, MEDAL, SWAP, COPY }
+    CLOUD, EXPORT, IMPORT, SUN, MOON, VIBRATE, CHAT, MEDAL, SWAP, COPY,
+    MORE, SEND, REPLY, FORWARD, SELECT, UNDO, FEED }
 
 /** Solid 12×12 pixel glyphs drawn to match the puppy's outline weight. `#` marks a filled cell. */
 private val Glyphs: Map<Symbol, List<String>> = mapOf(
@@ -39,6 +40,13 @@ private val Glyphs: Map<Symbol, List<String>> = mapOf(
     Symbol.VIBRATE to listOf("#..######..#", "#..#....#..#", ".#.#....#.#.", ".#.#....#.#.", "#..#....#..#", "#..#....#..#", "...######..."),
     Symbol.CHAT to listOf("############", "#..........#", "#.##.##.##.#", "#..........#", "############", "..##........", ".#.........."),
     // Record medal: a ribbon over a round medal with a square boss.
+    Symbol.MORE to listOf("##..##..##", "##..##..##"),
+    Symbol.SEND to listOf("##........", "####......", "######....", "########..", "##########", "########..", "######....", "####......", "##........"),
+    Symbol.REPLY to listOf("...#......", "..##......", ".#######..", "##......#.", ".#######.#", "..##.....#", "...#.....#", "........#."),
+    Symbol.FORWARD to listOf("......#...", "......##..", "..#######.", ".#......##", "#.#######.", "#.....##..", "#.....#...", ".#........"),
+    Symbol.SELECT to listOf("####..####", "#..#..#..#", "#..#..####", "####......", "..........", "####..####", "####..#..#", "####..####"),
+    Symbol.UNDO to listOf("..#.......", ".##.......", "#######...", ".##....##.", "..#.....##", "........##", "....######", "....#####."),
+    Symbol.FEED to listOf("##########", "#........#", "#.######.#", "#........#", "#.####...#", "#........#", "##########"),
     Symbol.COPY to listOf("...#######", "...#.....#", "#######..#", "#.....#..#", "#.....#..#", "#.....#..#", "#.....####", "#.....#...", "#.....#...", "#######..."),
     Symbol.SWAP to listOf("......#...", "......##..", "#########.", "......##..", "......#...", "...#......", "..##......", ".#########", "..##......", "...#......"),
     Symbol.MEDAL to listOf(".##....##.", "..##..##..", "...####...", "..######..", ".##....##.", ".#..##..#.", ".#..##..#.", ".##....##.", "..######..", "...####..."),
