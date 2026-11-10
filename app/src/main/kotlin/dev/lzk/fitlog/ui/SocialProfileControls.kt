@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import dev.lzk.fitlog.domain.*
 import dev.lzk.fitlog.features.FriendsViewModel
 import kotlinx.coroutines.*
@@ -52,6 +53,7 @@ internal fun SocialPrivacyRows(model: FriendsViewModel, repository: SocialReposi
         else launch { model.updateSharing(value); privacy = value }
     }
     if (repository != null) {
+    NotificationRow()
     SettingRow("共享训练历史", trailing = {
         PixelSwitch(privacy.history, "共享训练历史", Modifier.testTag("share-history-switch"), enabled = !busy) { change(privacy.copy(history = it)) }
     }) {
@@ -79,6 +81,23 @@ internal fun SocialPrivacyRows(model: FriendsViewModel, repository: SocialReposi
         text = { Text("本机训练、聊天记录和待发送消息会保留，按账号隔离。") },
         confirmButton = { TextButton(onClick = { logout = false; model.signOut() }) { Text("确认") } },
         dismissButton = { TextButton(onClick = { logout = false }) { Text("取消") } })
+}
+
+/** Whether friends' notifications can show; tapping opens the system's notification settings for FitLog. */
+@Composable
+private fun NotificationRow() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    val manager = remember(context) { context.getSystemService(android.app.NotificationManager::class.java) }
+    var enabled by remember { mutableStateOf(manager.areNotificationsEnabled()) }
+    // Re-read on returning from the system settings.
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) { enabled = manager.areNotificationsEnabled() }
+    }
+    ListRow(Symbol.BELL, "消息通知", note = if (enabled) "已开启" else "已关闭", modifier = Modifier.testTag("notification-settings")) {
+        context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName))
+    }
 }
 
 /** The block list folds into one row with a pixel count; opened, each person can be unblocked in place. */

@@ -12,7 +12,7 @@ import kotlin.math.floor
 enum class Symbol { HOME, DUMBBELL, BACK, PLUS, CHECK, SEARCH, ARROW, MINUS, CLOCK, LIST, SETTINGS, FRIENDS, PERSON, PLAY, SPARK, DOWN, CLOSE, PAUSE,
     STAR, STAR_FILLED, ARCHIVE, UNARCHIVE, EDIT, BARBELL, MACHINE, CABLE, SMITH, BODYWEIGHT, IMAGE, PIN, TRASH, UP, TUNE,
     CLOUD, EXPORT, IMPORT, SUN, MOON, VIBRATE, CHAT, MEDAL, SWAP, COPY,
-    MORE, SEND, REPLY, FORWARD, SELECT, UNDO, FEED }
+    MORE, SEND, REPLY, FORWARD, SELECT, UNDO, FEED, BELL }
 
 /** Solid 12×12 pixel glyphs drawn to match the puppy's outline weight. `#` marks a filled cell. */
 private val Glyphs: Map<Symbol, List<String>> = mapOf(
@@ -73,6 +73,8 @@ private val Glyphs: Map<Symbol, List<String>> = mapOf(
     Symbol.BODYWEIGHT to listOf("....##....", "....##....", "..........", ".########.", "#...##...#", "#...##...#", "....##....", "...#..#...", "...#..#...", "..#....#..", "..#....#.."),
     Symbol.IMAGE to listOf("############", "#..........#", "#.##.......#", "#.##.......#", "#......#...#", "#.....###..#", "#..#.#####.#", "#.##########", "############"),
     Symbol.SETTINGS to listOf("....##....", ".##.##.##.", ".########.", "..##..##..", "####..####", "####..####", "..##..##..", ".########.", ".##.##.##.", "....##...."),
+    // Notifications: a bell with its clapper.
+    Symbol.BELL to listOf(".....##.....", "....####....", "...#....#...", "..#......#..", "..#......#..", "..#......#..", ".#........#.", "############", ".....##....."),
 )
 
 /** Horizontal runs per glyph, centred in the 12-cell grid: (x, y, width). */

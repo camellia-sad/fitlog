@@ -32,6 +32,8 @@ internal interface SocialCacheDao {
     suspend fun read(owner:String,peer:String)
     @Query("SELECT COUNT(*) FROM cached_messages WHERE owner=:owner AND peer=:peer AND unread=1 AND hidden=0")
     suspend fun unread(owner:String,peer:String):Int
+    @Query("SELECT * FROM cached_messages WHERE owner=:owner AND unread=1 AND hidden=0 ORDER BY micros,id LIMIT 500")
+    suspend fun unreadAll(owner:String):List<CachedMessageEntity>
     @Query("SELECT * FROM message_outbox WHERE owner=:owner AND peer=:peer ORDER BY queuedAt,id")
     suspend fun pending(owner:String,peer:String):List<OutboxEntity>
     @Query("SELECT * FROM message_outbox WHERE owner=:owner ORDER BY queuedAt,id")

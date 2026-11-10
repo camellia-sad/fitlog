@@ -36,7 +36,7 @@ import kotlinx.coroutines.*
  */
 @Composable
 fun FriendsScreen(model:FriendsViewModel,social:SocialRepository?=null,
-    onLogin:()->Unit={},onSubpage:(Boolean)->Unit={}) {
+    onLogin:()->Unit={},open:String?=null,onOpened:()->Unit={},onSubpage:(Boolean)->Unit={}) {
     val profile by model.profile.collectAsStateWithLifecycle()
     val friends by model.friends.collectAsStateWithLifecycle()
     val busy by model.busy.collectAsStateWithLifecycle()
@@ -57,6 +57,15 @@ fun FriendsScreen(model:FriendsViewModel,social:SocialRepository?=null,
                 delay(15_000)
             }
         }
+    }
+    // From a tapped notification: "chat:<id>" opens that chat, "feed" the friends' feed, "friends" this list.
+    LaunchedEffect(open,profile?.id) {
+        val target=open ?: return@LaunchedEffect
+        if(profile==null) return@LaunchedEffect
+        selectedId=null;adding=false
+        chatPeer=target.removePrefix("chat:").takeIf {target.startsWith("chat:")}
+        timeline=target=="feed"
+        onOpened()
     }
     LaunchedEffect(selectedId,chatPeer,timeline){onSubpage(selectedId!=null || chatPeer!=null || timeline)}
     DisposableEffect(Unit){onDispose{onSubpage(false)}}
@@ -79,7 +88,7 @@ fun FriendsScreen(model:FriendsViewModel,social:SocialRepository?=null,
     }
     val chatting=friends.find{it.profile.id==chatPeer}
     if(social!=null && me!=null && chatting!=null) {
-        ChatScreen(social,me,chatting,friends,{chatPeer=null},{selectedId=it})
+        key(chatting.profile.id) {ChatScreen(social,me,chatting,friends,{chatPeer=null},{selectedId=it})}
         return
     }
     val selected=friends.find{it.profile.id==selectedId}

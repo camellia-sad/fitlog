@@ -79,6 +79,14 @@ fun ChatScreen(repository:SocialRepository,me:SocialProfile,friend:Friend,friend
             finally {controller.release()}
         }
     }
+    // While this chat is on screen its messages do not pop up as notifications.
+    LaunchedEffect(friend.profile.id,lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            dev.lzk.fitlog.features.SocialViewing.chat.value=friend.profile.id
+            try {awaitCancellation()}
+            finally {dev.lzk.fitlog.features.SocialViewing.chat.compareAndSet(friend.profile.id,null)}
+        }
+    }
     // What the friend is doing right now, for the header; shared live details name the exercise.
     LaunchedEffect(friend.profile.id,lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {

@@ -326,6 +326,26 @@ class SupabaseSocialRepository(
             ReplyNotice(it.comment(),it.getString("post_id"),it.optString("post_preview"))
         }
     override suspend fun unreadReplies():Int = rpc("social_activity",JSONObject().put("p_action","count")).toInt()
+
+    /**
+     * What notifications are made from. Refreshing the friend list also takes in waiting chat messages, so unread ones
+     * are read from this device; then friends' posts on the first feed page, and unread comments and replies.
+     */
+    suspend fun alertBatch():AlertBatch {
+        val owner=requireProfileId()
+        val names=friends().associate {it.profile.id to it.note.ifBlank {it.profile.nickname}}
+        val messages=cache.dao().unreadAll(owner).map {row->
+            AlertItem(row.peer,names[row.peer] ?: "好友",JSONObject(row.json).chatMessage().createdAt)
+        }
+        val posts=feed(null,null).filter {it.ownerId!=owner}.map {AlertItem(it.ownerId,names[it.ownerId] ?: it.nickname,it.createdAt)}
+        val replies=replyNotices(null).map {n->
+            val c=n.comment
+            AlertItem(c.ownerId,names[c.ownerId] ?: c.nickname,c.createdAt,comment=c.parentId==null)
+        }
+        val count=if(replies.isEmpty()) 0 else unreadReplies()
+        check(profile.value?.id==owner) {"账号已切换"}
+        return AlertBatch(messages,posts,replies,count)
+    }
     override suspend fun readReply(id:String) {rpc("social_activity",JSONObject().put("p_action","read").put("p_id",id))}
     override suspend fun readAllReplies() {rpc("social_activity",JSONObject().put("p_action","read_all"))}
     override suspend fun commentContext(id:String):CommentContext {

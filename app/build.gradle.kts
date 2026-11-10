@@ -16,8 +16,8 @@ android {
         applicationId = "dev.lzk.fitlog"
         minSdk = 26
         targetSdk = 36
-        versionCode = 36
-        versionName = "0.9.7-dev"
+        versionCode = 37
+        versionName = "0.9.8-dev"
         val updateUrl=socialConfig.getProperty("UPDATE_MANIFEST_URL")
             ?: (socialConfig.getProperty("SUPABASE_URL","").trimEnd('/')+"/storage/v1/object/public/fitlog-updates/latest.json")
         buildConfigField("String","UPDATE_MANIFEST_URL","\""+updateUrl.replace("\\","\\\\").replace("\"","\\\"")+"\"")
@@ -39,6 +39,7 @@ dependencies {
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.navigation.compose)
+    implementation(libs.work.runtime)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)

@@ -24,6 +24,9 @@ class AppContainer(context: Context, databaseName: String = "fitlog.db") : AutoC
     val portableBackups by lazy {PortableBackupRepository(backups,social)}
     val updates by lazy {dev.lzk.fitlog.updates.AppUpdates(context,BuildConfig.UPDATE_MANIFEST_URL,databaseName)}
     val sharing by lazy { dev.lzk.fitlog.features.TrainingSharing(scope, workouts, training, social) }
+    val alerts by lazy { dev.lzk.fitlog.features.SocialNotifications(context, social.profile, { social.alertBatch() }, databaseName) }
+    /** Friends' messages, posts and replies as notifications; only the app process starts this, not test containers. */
+    fun startAlerts() { alerts.start(scope, sharing.foreground, sharing.trainingService) }
     val ready = scope.async { ExerciseCatalog(context.applicationContext, database).initialize() }
     fun initialize() { ready.start() }
     override fun close() { scope.cancel(); if (socialDelegate.isInitialized()) social.close(); database.close() }

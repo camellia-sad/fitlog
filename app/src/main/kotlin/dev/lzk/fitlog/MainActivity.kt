@@ -33,15 +33,28 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val notificationOpens = mutableIntStateOf(0)
+    private val socialOpen = mutableStateOf<String?>(null)
     private val permission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
         if (!allowed) Toast.makeText(this, "允许训练通知后，才能在通知栏查看计时", Toast.LENGTH_LONG).show()
     }
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    // Asked once on opening; a refusal is left alone (the system stops asking after the second one).
+    private val launchPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private val notificationsAllowed get() = Build.VERSION.SDK_INT < 33 ||
+        checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    private fun readOpen(intent: Intent) {
         if (intent.getBooleanExtra(WorkoutTimerService.OPEN_WORKOUT, false)) {
             notificationOpens.intValue++
             intent.removeExtra(WorkoutTimerService.OPEN_WORKOUT)
         }
+        intent.getStringExtra(dev.lzk.fitlog.features.SocialNotifications.OPEN_SOCIAL)?.let {
+            socialOpen.value = it
+            intent.removeExtra(dev.lzk.fitlog.features.SocialNotifications.OPEN_SOCIAL)
+        }
+    }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        readOpen(intent)
+        if (savedInstanceState == null && !notificationsAllowed) launchPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         enableEdgeToEdge()
         val container = (application as FitLogApplication).container
         lifecycleScope.launch {
@@ -76,9 +89,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
             FitLogTheme(dark, period, timeTheme) {
-                FitLogApp(container, notificationOpens.intValue) {
-                    if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
-                        permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                FitLogApp(container, notificationOpens.intValue, socialOpen = socialOpen.value, onSocialOpened = { socialOpen.value = null }) {
+                    if (!notificationsAllowed) permission.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
         }
@@ -95,9 +107,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.getBooleanExtra(WorkoutTimerService.OPEN_WORKOUT, false)) {
-            notificationOpens.intValue++
-            intent.removeExtra(WorkoutTimerService.OPEN_WORKOUT)
-        }
+        readOpen(intent)
     }
 }

@@ -84,6 +84,13 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
             finally {posts=emptyList();archive=emptyList();commentPost=null;notices=emptyList();focusContext=null}
         }
     }
+    // While the friends' feed is on screen its posts and replies do not pop up as notifications.
+    if(owner==null) LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            dev.lzk.fitlog.features.SocialViewing.feed.value=true
+            try {awaitCancellation()} finally {dev.lzk.fitlog.features.SocialViewing.feed.value=false}
+        }
+    }
     DisposableEffect(lifecycle) {
         val observer=androidx.lifecycle.LifecycleEventObserver {_,event->
             if(event==Lifecycle.Event.ON_STOP) {scope.coroutineContext.cancelChildren();posts=emptyList();archive=emptyList();commentPost=null;notices=emptyList();focusContext=null}

@@ -8,5 +8,6 @@ class FitLogApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container.initialize()
+        container.startAlerts()
     }
 }

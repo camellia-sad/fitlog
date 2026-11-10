@@ -26,7 +26,8 @@ import java.time.DayOfWeek
 import java.time.temporal.TemporalAdjusters
 
 @Composable
-fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStarted: () -> Unit = {}) {
+fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, socialOpen: String? = null, onSocialOpened: () -> Unit = {},
+    onWorkoutStarted: () -> Unit = {}) {
     val model: WorkoutViewModel = viewModel(factory = WorkoutViewModel.Factory(container))
     val templates: TemplateViewModel = viewModel(factory = AppModelFactory(container))
     val settings: SettingsViewModel = viewModel(factory = AppModelFactory(container))
@@ -125,6 +126,13 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
         return
     }
     LaunchedEffect(route) { ThemeClock.holdForWorkout = route == "workout" }
+    // A tapped friends notification leads to the friends tab, which then opens the chat or the feed.
+    LaunchedEffect(socialOpen) {
+        if (socialOpen != null && route != "friends") {
+            if (route == "templates") requestTemplateExit("friends", false)
+            else nav.navigate("friends") { popUpTo("home"); launchSingleTop = true }
+        }
+    }
     val addExercise: (Exercise) -> Unit = { exercise ->
         model.startAndAddExercise(exercise.id)
         if (state.workout == null) nav.popBackStack("home", false) else goWorkout()
@@ -222,7 +230,7 @@ fun FitLogApp(container: AppContainer, openWorkoutSignal: Int = 0, onWorkoutStar
                     records, state.preferences.weightUnit, onBack = { nav.popBackStack() })
             }
             composable("friends") {
-                FriendsScreen(friendsModel,container.social,onLogin={nav.navigate("me")}) {socialSubpage=it}
+                FriendsScreen(friendsModel,container.social,onLogin={nav.navigate("me")},open=socialOpen,onOpened=onSocialOpened) {socialSubpage=it}
             }
             composable("me") {
                 val friendList by friendsModel.friends.collectAsStateWithLifecycle()

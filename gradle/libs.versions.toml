@@ -9,6 +9,7 @@ activity = "1.13.0"
 lifecycle = "2.10.0"
 navigation = "2.9.7"
 datastore = "1.2.1"
+work = "2.10.1"
 junit = "4.13.2"
 androidxTest = "1.7.0"
 testRunner = "1.7.0"
@@ -22,6 +23,7 @@ room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
 datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
 activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
