@@ -4,6 +4,7 @@
 begin;
 
 alter table public.social_posts add column if not exists workout jsonb;
+alter table public.social_posts drop constraint if exists social_post_workout_shape;
 alter table public.social_posts add constraint social_post_workout_shape
  check(workout is null or (jsonb_typeof(workout)='object' and pg_column_size(workout)<=32768));
 

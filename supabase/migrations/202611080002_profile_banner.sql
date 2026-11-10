@@ -4,6 +4,7 @@
 begin;
 
 alter table public.social_profiles add column if not exists banner text;
+alter table public.social_profiles drop constraint if exists social_banner_value;
 alter table public.social_profiles add constraint social_banner_value
  check(banner is null or banner in('gym','track','hills','sea') or banner like id::text||'/%');
 grant update(banner) on public.social_profiles to authenticated;
