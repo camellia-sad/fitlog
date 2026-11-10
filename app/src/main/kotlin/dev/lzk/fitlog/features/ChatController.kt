@@ -58,6 +58,26 @@ class ChatController(
             browsingHistory.value = false; messages.value = repository.messages(peer)
         } finally { pending.value = repository.pending(peer) }
     }
+    /**
+     * Pictures from the preview, one message each, in the order shown; a quote goes with the first. All are uploaded and
+     * queued before any is sent, so a lost connection leaves them as unsent messages to retry, not lost pictures.
+     */
+    fun sendImages(images: List<ByteArray>, upload: suspend (ByteArray) -> String, replyId: String?, onQueued: () -> Unit = {}) = action {
+        val drafts = images.mapIndexed { i, jpeg -> MessageDraft(mediaPath = upload(jpeg), replyId = if (i == 0) replyId else null) }
+        drafts.forEach { repository.queue(peer, it) }
+        onQueued()
+        pending.value = repository.pending(peer)
+        var failure: Exception? = null
+        try {
+            for (draft in drafts) {
+                try { repository.send(peer, draft) }
+                catch (e: CancellationException) { throw e }
+                catch (e: Exception) { if (failure == null) failure = e }
+            }
+            browsingHistory.value = false; messages.value = repository.messages(peer)
+        } finally { pending.value = repository.pending(peer) }
+        failure?.let { throw it }
+    }
     fun retry(draft: MessageDraft) = send(draft)
     fun discard(draft: MessageDraft) = action { repository.forgetPending(peer, draft.id); pending.value = repository.pending(peer) }
     fun delete(message: ChatMessage) = action {

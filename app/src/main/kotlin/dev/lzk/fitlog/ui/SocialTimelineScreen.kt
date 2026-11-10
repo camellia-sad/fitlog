@@ -98,11 +98,12 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
         lifecycle.addObserver(observer)
         onDispose {lifecycle.removeObserver(observer)}
     }
-    val picker=rememberImagePicker(onImage={jpeg->
-        if(images.size<9) {
-            busy=true
-            try {images=images+repository.uploadImage(jpeg)} finally {busy=false}
-        }
+    // Several pictures at once, uploaded in the order picked; the composer's grid is their preview before publishing.
+    var uploading by remember {mutableIntStateOf(0)}
+    val picker=rememberImagesPicker(room={SocialRules.MAX_IMAGES-images.size},onImages={list->
+        busy=true;error=null;uploading=list.size
+        try {for(jpeg in list) {if(images.size<SocialRules.MAX_IMAGES) images=images+repository.uploadImage(jpeg);uploading--}}
+        finally {busy=false;uploading=0}
     },onError={error=it})
     fun openNotice(n:ReplyNotice) {launch {
         val context=repository.commentContext(n.comment.id)
@@ -193,7 +194,7 @@ fun SocialTimelineScreen(repository:SocialRepository,me:SocialProfile,owner:Stri
         }
     }
     }
-    if(composing) PostComposer(repository,images,body,busy,error,onBody={body=it.take(4000)},onPick=picker,
+    if(composing) PostComposer(repository,images,body,busy,error,uploading=uploading,onBody={body=it.take(4000)},onPick=picker,
         onRemove={path->images=images-path},onCancel={composing=false}) {
         launch {
             repository.publish(PostDraft(draftId,body,images));body="";images=emptyList();draftId=UUID.randomUUID().toString();composing=false;refresh()

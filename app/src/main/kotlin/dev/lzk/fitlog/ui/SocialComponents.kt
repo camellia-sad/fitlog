@@ -129,28 +129,64 @@ internal object KeptImages {
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) {uri:Uri? ->
         if(uri!=null) scope.launch {
             try {
-                val jpeg=withContext(Dispatchers.IO) {
-                    val bounds=BitmapFactory.Options().apply {inJustDecodeBounds=true}
-                    context.contentResolver.openInputStream(uri).use {BitmapFactory.decodeStream(it,null,bounds)}
-                    require(bounds.outWidth>0 && bounds.outHeight>0) {"无法读取这张图片"}
-                    var sample=1
-                    while(maxOf(bounds.outWidth,bounds.outHeight)/sample>1600) sample*=2
-                    val options=BitmapFactory.Options().apply {inSampleSize=sample}
-                    val bitmap=context.contentResolver.openInputStream(uri).use {BitmapFactory.decodeStream(it,null,options)}
-                        ?: error("无法读取这张图片")
-                    try {
-                        val output=ByteArrayOutputStream()
-                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,82,output)
-                        require(output.size()<=2_000_000) {"图片较大，请选择尺寸更小的图片"}
-                        output.toByteArray()
-                    } finally {bitmap.recycle()}
-                }
-                currentImage(jpeg)
+                currentImage(withContext(Dispatchers.IO) {compressPicked(context,uri)})
             } catch(e:CancellationException) {throw e}
             catch(e:Exception) {currentError(e.message ?: "图片处理失败")}
         }
     }
     return {picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))}
+}
+
+/**
+ * Picks up to [SocialRules.MAX_IMAGES] pictures at once; [room] is how many more fit right now, and anything past it is
+ * dropped with a note. Pictures that cannot be read are left out, the rest still arrive.
+ */
+@Composable internal fun rememberImagesPicker(room:()->Int,onImages:suspend (List<ByteArray>)->Unit,onError:(String)->Unit):()->Unit {
+    val context=LocalContext.current
+    val scope=rememberCoroutineScope()
+    val currentRoom by rememberUpdatedState(room)
+    val currentImages by rememberUpdatedState(onImages)
+    val currentError by rememberUpdatedState(onError)
+    val picker=rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(SocialRules.MAX_IMAGES)) {uris:List<Uri> ->
+        if(uris.isNotEmpty()) scope.launch {
+            val space=currentRoom().coerceAtLeast(0)
+            var failed=0
+            val images=withContext(Dispatchers.IO) {
+                uris.take(space).mapNotNull {uri->
+                    try {compressPicked(context,uri)} catch(e:CancellationException) {throw e} catch(_:Exception) {failed++;null}
+                }
+            }
+            try {if(images.isNotEmpty()) currentImages(images)}
+            catch(e:CancellationException) {throw e}
+            catch(e:Exception) {currentError(e.message ?: "图片处理失败");return@launch}
+            when {
+                uris.size>space -> currentError("最多 ${SocialRules.MAX_IMAGES} 张图片")
+                failed>0 -> currentError("有 $failed 张图片无法读取或过大")
+            }
+        }
+    }
+    return {
+        if(currentRoom()<=0) currentError("最多 ${SocialRules.MAX_IMAGES} 张图片")
+        else picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+}
+
+/** A picked picture as a JPEG of at most 1600 px on the long side and 2 MB. */
+private fun compressPicked(context:android.content.Context,uri:Uri):ByteArray {
+    val bounds=BitmapFactory.Options().apply {inJustDecodeBounds=true}
+    context.contentResolver.openInputStream(uri).use {BitmapFactory.decodeStream(it,null,bounds)}
+    require(bounds.outWidth>0 && bounds.outHeight>0) {"无法读取这张图片"}
+    var sample=1
+    while(maxOf(bounds.outWidth,bounds.outHeight)/sample>1600) sample*=2
+    val options=BitmapFactory.Options().apply {inSampleSize=sample}
+    val bitmap=context.contentResolver.openInputStream(uri).use {BitmapFactory.decodeStream(it,null,options)}
+        ?: error("无法读取这张图片")
+    try {
+        val output=ByteArrayOutputStream()
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG,82,output)
+        require(output.size()<=2_000_000) {"图片较大，请选择尺寸更小的图片"}
+        return output.toByteArray()
+    } finally {bitmap.recycle()}
 }
 
 @Composable internal fun FitLogIdentityRow(id:String) {

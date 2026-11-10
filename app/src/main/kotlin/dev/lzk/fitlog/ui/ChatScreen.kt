@@ -103,9 +103,10 @@ fun ChatScreen(repository:SocialRepository,me:SocialProfile,friend:Friend,friend
         lifecycle.addObserver(observer)
         onDispose {lifecycle.removeObserver(observer)}
     }
-    val picker=rememberImagePicker(onImage={jpeg->
-        val path=repository.uploadChatImage(jpeg)
-        controller.send(MessageDraft(body=text,mediaPath=path,replyId=reply?.id)) {text="";reply=null}
+    // Picked pictures wait in the preview until [发送]; the typed text stays in the input.
+    var picked by remember {mutableStateOf<List<PickedImage>>(emptyList())}
+    val picker=rememberImagesPicker(room={SocialRules.MAX_IMAGES-picked.size},onImages={list->
+        controller.error.value=null;picked=picked+list.map(::PickedImage)
     },onError={controller.error.value=it})
     BackHandler {if(selecting) {selecting=false;selected=emptySet()} else onBack()}
     LaunchedEffect(locate,messages,busy,error) {
@@ -253,6 +254,12 @@ fun ChatScreen(repository:SocialRepository,me:SocialProfile,friend:Friend,friend
                 LineIcon(Symbol.SEND,Modifier.size(15.dp),LocalContentColor.current)
             }
         }
+    }
+    if(picked.isNotEmpty()) ImageSendPreview(picked,busy,error,
+        quoting=reply?.let {"回复 "+(if(it.sender==me.id)"自己" else friend.displayName)+"："+it.body.ifBlank {"[图片或记录]"}},
+        onAdd=picker,onRemove={image->picked=picked.filterNot {it.id==image.id}},
+        onCancel={picked=emptyList();controller.error.value=null}) {
+        controller.sendImages(picked.map {it.jpeg},repository::uploadChatImage,reply?.id) {picked=emptyList();reply=null}
     }
     if(forwarding) AlertDialog(onDismissRequest={forwarding=false},title={Text("转发给好友")},text={
         LazyColumn {

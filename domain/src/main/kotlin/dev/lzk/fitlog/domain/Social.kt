@@ -134,6 +134,8 @@ object SocialRules {
     const val MESSAGE_PAGE=50
     const val FEED_PAGE=20
     const val MAX_FORWARD=20
+    /** Pictures picked at once for a chat, and pictures on one post. */
+    const val MAX_IMAGES=9
     /** Posts stay in the cloud, and visible to friends, for this many days; one's own copies stay on the device. */
     const val POST_DAYS=30L
     fun message(draft:MessageDraft) {
@@ -141,7 +143,7 @@ object SocialRules {
         UUID.fromString(draft.id)
     }
     fun post(draft:PostDraft) {
-        require(draft.body.length<=4000 && draft.mediaPaths.size<=9 && (draft.body.isNotBlank() || draft.mediaPaths.isNotEmpty())) {"动态须有文字或图片，最多 4000 字、9 张图"}
+        require(draft.body.length<=4000 && draft.mediaPaths.size<=MAX_IMAGES && (draft.body.isNotBlank() || draft.mediaPaths.isNotEmpty())) {"动态须有文字或图片，最多 4000 字、9 张图"}
         UUID.fromString(draft.id)
     }
     fun <T> boundedMerge(newest:List<T>,older:List<T>,id:(T)->String,maximum:Int):List<T> =

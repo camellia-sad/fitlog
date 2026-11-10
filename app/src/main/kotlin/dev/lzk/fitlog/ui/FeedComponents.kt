@@ -266,7 +266,7 @@ internal fun PixelRefresh(active: Boolean, fraction: Float, modifier: Modifier =
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun PostComposer(repository: SocialRepository, images: List<String>, body: String, busy: Boolean, error: String?,
-    onBody: (String) -> Unit, onPick: () -> Unit, onRemove: (String) -> Unit, onCancel: () -> Unit, onPublish: () -> Unit) {
+    uploading: Int = 0, onBody: (String) -> Unit, onPick: () -> Unit, onRemove: (String) -> Unit, onCancel: () -> Unit, onPublish: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     ModalBottomSheet(onDismissRequest = { if (!busy) onCancel() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = scheme.surface) {
@@ -277,11 +277,11 @@ internal fun PostComposer(repository: SocialRepository, images: List<String>, bo
                 Text("发动态", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 PixelKey(onClick = onPublish, enabled = !busy && (body.isNotBlank() || images.isNotEmpty()), minHeight = 36.dp,
-                    modifier = Modifier.testTag("publish-post")) { Text(if (busy) "发表中…" else "发表", maxLines = 1) }
+                    modifier = Modifier.testTag("publish-post")) { Text(if (busy && uploading == 0) "发表中…" else "发表", maxLines = 1) }
             }
             OutlinedTextField(body, onBody, Modifier.fillMaxWidth().heightIn(min = 120.dp), placeholder = { Text("今天有什么新进步？") },
                 maxLines = 8, enabled = !busy, shape = RoundedCornerShape(14.dp), textStyle = MaterialTheme.typography.bodyLarge)
-            val cells = images.map { it as String? } + (if (images.size < 9) listOf(null) else emptyList())
+            val cells = images.map { it as String? } + (if (images.size < SocialRules.MAX_IMAGES) listOf(null) else emptyList())
             cells.chunked(3).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     row.forEach { path ->
@@ -297,9 +297,10 @@ internal fun PostComposer(repository: SocialRepository, images: List<String>, bo
                                         pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 4.dp.toPx()))))
                             }.clickable(enabled = !busy, onClick = onPick).testTag("add-post-image"), horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center) {
-                                LineIcon(Symbol.IMAGE, Modifier.size(18.dp), scheme.onSurfaceVariant)
-                                Text("添加图片", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
-                                Text("${images.size}/9", style = pixelNumber(15.sp), color = scheme.onSurfaceVariant)
+                                // While picked pictures upload, the tile counts down what is left.
+                                if (uploading > 0) PixelRefresh(true, 1f) else LineIcon(Symbol.IMAGE, Modifier.size(18.dp), scheme.onSurfaceVariant)
+                                Text(if (uploading > 0) "还剩 $uploading 张" else "添加图片", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                                Text("${images.size}/${SocialRules.MAX_IMAGES}", style = pixelNumber(15.sp), color = scheme.onSurfaceVariant)
                             }
                         }
                     }
